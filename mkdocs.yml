@@ -1,0 +1,43 @@
+site_name: Nexus
+site_description: Documentation for Nexus, a local single-user project manager.
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - content.code.copy
+
+markdown_extensions:
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - admonition
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+
+nav:
+  - Home: index.md
+  - Architecture:
+      - Overview: architecture/overview.md
+      - Decisions:
+          - "0001 — Services ignore HTTP": architecture/adr/0001-services-ignore-http.md
+          - "0002 — Append-only event log": architecture/adr/0002-append-only-event-log.md
+          - "0003 — Flask, Jinja, HTMX": architecture/adr/0003-flask-jinja-htmx.md
+          - "0004 — Localhost only": architecture/adr/0004-localhost-only.md
+  - Reference: reference/
+
+plugins:
+  - search
+  - gen-files:
+      scripts:
+        - scripts/gen_ref_nav.py
+  - literate-nav:
+      nav_file: SUMMARY.md
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_source: true
