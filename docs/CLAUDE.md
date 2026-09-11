@@ -12,6 +12,8 @@ docs/
 ├── architecture/
 │   ├── overview.md         # Mermaid ER + task-state diagrams
 │   └── adr/                # one file per decision, numbered sequentially
+├── functional/             # visual mockups of the app's screens
+├── ai-tools/                # how Claude Code is set up in this repo
 └── reference/               # generated at build time — never hand-written
 ```
 

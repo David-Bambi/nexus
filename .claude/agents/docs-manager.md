@@ -1,5 +1,5 @@
 ---
-name: docs
+name: docs-manager
 description: Use this agent to read existing project documentation in docs/ for context before making changes, to write/update it after a task is done, or to build/serve the MkDocs site. Invoke it whenever a task needs background on a past architectural decision, after implementing something so docs/ stays in sync per CLAUDE.md, or to verify the doc site still builds. Do not use it to edit artifacts/specs/ (not the source of truth) or to hand-write docs/reference/ (must stay generated).
 tools: Read, Write, Edit, Grep, Glob, Bash
 ---
