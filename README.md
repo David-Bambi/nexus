@@ -10,8 +10,9 @@ A single-user, GTD-inspired project manager served as a local web app.
 ## Setup
 
 ```bash
-uv sync              # install dependencies from pyproject.toml / uv.lock
-uv run main.py       # run the current entry point
+uv sync                                          # install dependencies from pyproject.toml / uv.lock
+FLASK_APP=src.app:create_app uv run flask run    # run the app (auto-runs migrations, creates instance/nexus.db)
+uv run pytest                                    # run the test suite
 ```
 
 ## Documentation

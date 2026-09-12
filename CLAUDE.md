@@ -16,7 +16,7 @@ The project nexus is a local webhost application to manage project.
 
 ## Project state
 
-This repository currently contains only a project skeleton (`main.py` is a
+This repository currently contains only a project skeleton (`main.py` is a  Lis
 placeholder) and a full technical specification for the application to be
 built, "Milestone" — a single-user, GTD-inspired project manager served as a
 local web app.
@@ -24,6 +24,8 @@ local web app.
 ## Documentations
 
 When you need to document something ask the agent docs-manager to do it. 
+
+For the code, comment each variable, class and function in python standard. Don't reference the artifact in comment. 
 
 ## Commands
 

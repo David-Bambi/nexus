@@ -8,3 +8,8 @@ __pycache__/
 
 # MkDocs build output
 site/
+
+instance/
+
+# local env vars
+.env

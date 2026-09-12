@@ -19,6 +19,13 @@ for path in sorted(src.rglob("*.py")):
 
     parts = tuple(module_path.parts)
 
+    if "migrations" in parts:
+        # src/migrations/ is Alembic's generated env (alembic init), not
+        # part of the app's API: env.py runs migration logic at import
+        # time, and versions/*.py are generated revision scripts. Neither
+        # should be imported by mkdocstrings for documentation purposes.
+        continue
+
     if parts[-1] == "__init__":
         parts = parts[:-1]
         doc_path = doc_path.with_name("index.md")

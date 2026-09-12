@@ -15,7 +15,14 @@ erDiagram
     PROJECT ||--o{ VERSION : has
     PROJECT ||--o{ TASK : "has (optional)"
     VERSION ||--o{ TASK : "has (optional)"
+    TASK }o--o{ TAG : has
 ```
+
+`Tag` is a free-form label, many-to-many with `Task` via a plain
+association table. The `Event` table (append-only mutation log) isn't
+shown here: it has no foreign keys by design, referencing any entity by
+`entity_type` + `entity_id` so a log entry survives deletion — see
+[0002](adr/0002-append-only-event-log.md).
 
 ## Task lifecycle
 
