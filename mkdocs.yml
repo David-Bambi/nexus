@@ -28,6 +28,12 @@ nav:
           - "0003 — Flask, Jinja, HTMX": architecture/adr/0003-flask-jinja-htmx.md
           - "0004 — Localhost only": architecture/adr/0004-localhost-only.md
   - Functional: functional/index.md
+  - Python:
+      - Overview: python/index.md
+      - SQLAlchemy: python/sqlalchemy.md
+      - Context managers: python/context-managers.md
+      - Alembic migrations: python/alembic.md
+      - Function declarations: python/function-declarations.md
   - AI tools: ai-tools/index.md
   - Reference: reference/
 

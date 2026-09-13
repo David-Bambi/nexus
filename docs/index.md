@@ -15,6 +15,13 @@ Visual mockups of the application's screens.
 
 [Browse Functional →](functional/index.md)
 
+## Python
+
+Generic Python and library concept explainers, grounded in this project's
+code but not architecture decisions themselves.
+
+[Browse Python →](python/index.md)
+
 ## AI tools
 
 How Claude Code is configured to work in this repository — CLAUDE.md
