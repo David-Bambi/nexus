@@ -2,7 +2,7 @@ import pytest
 
 from src.app import create_app
 from src.config import TestConfig
-from src.db import Base
+from src.db import Base, get_engine, get_session_factory
 
 
 @pytest.fixture
@@ -20,3 +20,9 @@ def app():
 def client(app):
     """Flask test client bound to the app fixture."""
     return app.test_client()
+
+@pytest.fixture
+def session():
+    engine = get_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    yield get_session_factory(engine)()
