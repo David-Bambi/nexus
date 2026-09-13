@@ -79,3 +79,18 @@ def archive(session : Session, key : str) -> Project:
     project.status = ProjectStatus.ARCHIVED
     session.commit()
     return project
+
+def delete(session : Session, key : str) -> None:
+    """Delete a project.
+
+    Args:
+        session: Database session to use.
+        key: Unique slug identifying the project.
+
+    Raises:
+        NotFoundError: If no project has this key.
+    """
+    project = get(session, key)
+    session.delete(project)
+    session.commit()
+

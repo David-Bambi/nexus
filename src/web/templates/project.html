@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}{{ project.name }} — Nexus{% endblock %}
+
+{% block content %}
+<p><a href="{{ url_for('pages.projects_list') }}">← Projects</a></p>
+
+<h1>{{ project.name }}</h1>
+<p><strong>Key:</strong> {{ project.key }}</p>
+<p><strong>Status:</strong> {{ project.status.name }}</p>
+{% if project.description %}
+<p>{{ project.description }}</p>
+{% endif %}
+
+<form method="post" action="{{ url_for('pages.project_delete', key=project.key) }}">
+    <p>Type <strong>{{ project.key }}</strong> to confirm deletion.</p>
+    <input type="text" id="delete-confirm-input"
+           oninput="document.getElementById('delete-button').disabled = this.value !== '{{ project.key }}';">
+    <button id="delete-button" type="submit" disabled>Delete project</button>
+</form>
+
+<h2>Versions</h2>
+<p>Not implemented yet.</p>
+{% endblock %}

@@ -107,3 +107,26 @@ def test_archive_project(session):
     projects.create(session, "nexus", "Nexus", "A project manager")
     project = projects.archive(session, "nexus")
     assert project.status is ProjectStatus.ARCHIVED
+
+
+# Delete --------------------------------------------------------------------------------------------
+
+def test_delete_project(session):
+    """Delete a project removes it from the database
+    Given a project 'nexus'
+    When deleting the project
+    Then getting it afterward raises a NotFoundError
+    """
+    projects.create(session, "nexus", "Nexus", "A project manager")
+    projects.delete(session, "nexus")
+    with pytest.raises(NotFoundError):
+        projects.get(session, "nexus")
+
+def test_delete_project_not_found(session):
+    """Delete a non existing project raises a NotFoundError
+    Given a database without a project with 'nexus' key
+    When deleting the project
+    Then a not found error is raised
+    """
+    with pytest.raises(NotFoundError):
+        projects.delete(session, "nexus")

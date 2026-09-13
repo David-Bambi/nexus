@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Projects — Nexus{% endblock %}
+
+{% block content %}
+<h1>Projects</h1>
+
+{% if error %}
+<p style="color: red;">{{ error }}</p>
+{% endif %}
+
+<ul>
+    {% for project in projects %}
+    <li>
+        <a href="{{ url_for('pages.project_detail', key=project.key) }}">{{ project.name }}</a>
+        ({{ project.key }}) — {{ project.status.name }}
+    </li>
+    {% else %}
+    <li>No projects yet.</li>
+    {% endfor %}
+</ul>
+
+<h2>New project</h2>
+<form method="post" action="{{ url_for('pages.projects_list') }}">
+    <label>Key <input type="text" name="key" required></label><br>
+    <label>Name <input type="text" name="name" required></label><br>
+    <label>Description <textarea name="description"></textarea></label><br>
+    <button type="submit">Create</button>
+</form>
+{% endblock %}
