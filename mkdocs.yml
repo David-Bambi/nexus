@@ -34,6 +34,9 @@ nav:
       - Context managers: python/context-managers.md
       - Alembic migrations: python/alembic.md
       - Function declarations: python/function-declarations.md
+      - Database relationships: python/database-relationships.md
+      - Jinja2 templates: python/jinja-templates.md
+      - Cascade behavior: python/cascade-behavior.md
   - AI tools: ai-tools/index.md
   - Reference: reference/
 

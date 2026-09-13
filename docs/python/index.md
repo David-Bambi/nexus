@@ -15,3 +15,12 @@ live under [Architecture](../architecture/overview.md) instead.
 - [Function declarations](function-declarations.md) — `def` shape,
   positional vs. default arguments, type hints, keyword-only arguments,
   and docstrings.
+- [Database relationships](database-relationships.md) — foreign-key
+  column vs. junction table, and how to tell which one a relationship
+  needs.
+- [Jinja2 templates](jinja-templates.md) — `render_template()`,
+  `{{ }}`/`{% %}` syntax, template inheritance, `url_for()`, and
+  auto-escaping, grounded in `src/web/templates/`.
+- [Cascade behavior](cascade-behavior.md) — what `session.delete()` does
+  to related rows, grounded in `projects.delete()` and the
+  `Project`/`Version`/`Task` relationships.
