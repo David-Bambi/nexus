@@ -13,3 +13,6 @@ instance/
 
 # local env vars
 .env
+
+# Claude Code local agent definitions
+.claude/
