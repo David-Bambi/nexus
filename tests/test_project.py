@@ -45,7 +45,7 @@ def test_get_project_found(session):
     Then the project is returned.
     """
     projects.create(session, "nexus", "Nexus", "")
-    project = projects.get("nexus")
+    project = projects.get(session, "nexus")
     assert project.id is not None
     assert project.key == "nexus"
 
@@ -58,7 +58,7 @@ def test_list_no_project(session):
     When listing the project
     Then resulting list is empty
     """
-    project_list = projects.list()
+    project_list = projects.list(session)
     assert not project_list
 
 def test_list_with_project(session):
@@ -68,7 +68,7 @@ def test_list_with_project(session):
     Then resulting list contain project with key 'nexus'
     """
     projects.create(session, "nexus", "Nexus", "A project manager")
-    project_list = projects.list()
+    project_list = projects.list(session)
     assert project_list
     assert project_list[0].key == "nexus"
 
