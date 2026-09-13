@@ -1,11 +1,25 @@
 from datetime import datetime
+from enum import Enum, auto
 from typing import Optional
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime, Enum as SAEnum, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.db import Base
 from src.models.tag import task_tag_table
+
+
+class TaskState(Enum):
+    """A task's position in the GTD workflow. See the state diagram in
+    docs/architecture/overview.md for the allowed transitions."""
+
+    INBOX = auto()
+    REFINED = auto()
+    PLANNED = auto()
+    DOING = auto()
+    WAITING = auto()
+    DONE = auto()
+    SOMEDAY = auto()
 
 
 class Task(Base):
@@ -20,8 +34,11 @@ class Task(Base):
     version_id: Mapped[Optional[int]] = mapped_column(ForeignKey("version.id"))
     title: Mapped[str] = mapped_column(String, nullable=False)
     body: Mapped[Optional[str]] = mapped_column(Text)
-    # inbox / refined / planned / doing / waiting / done / someday.
-    state: Mapped[str] = mapped_column(String, nullable=False, default="inbox")
+    state: Mapped[TaskState] = mapped_column(
+        SAEnum(TaskState, name="task_state", create_constraint=True),
+        nullable=False,
+        default=TaskState.INBOX,
+    )
     # Free string, e.g. "@ordi", "@achat" — suggested set only.
     context: Mapped[Optional[str]] = mapped_column(String)
     # XS / S / M / L — ordinal effort estimate, never converted to hours.

@@ -1,10 +1,18 @@
 from datetime import datetime
+from enum import Enum, auto
 from typing import Optional
 
-from sqlalchemy import DateTime, String, Text
+from sqlalchemy import DateTime, Enum as SAEnum, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.db import Base
+
+
+class ProjectStatus(Enum):
+    """Lifecycle state of a project."""
+
+    ACTIVE = auto()
+    ARCHIVED = auto()
 
 
 class Project(Base):
@@ -17,8 +25,12 @@ class Project(Base):
     key: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String, nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text)
-    # e.g. "active" / "archived" — plain string for now, no enum yet.
-    status: Mapped[str] = mapped_column(String, nullable=False, default="active")
+    
+    status: Mapped[ProjectStatus] = mapped_column(
+        SAEnum(ProjectStatus, name="project_status", create_constraint=True),
+        nullable=False,
+        default=ProjectStatus.ACTIVE,
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     # Deleting a project deletes its versions with it.

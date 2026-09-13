@@ -1,10 +1,19 @@
 from datetime import date, datetime
+from enum import Enum, auto
 from typing import Optional
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Date, DateTime, Enum as SAEnum, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.db import Base
+
+
+class VersionStatus(Enum):
+    """A version's lifecycle: PLANNED -> IN_PROGRESS -> RELEASED."""
+
+    PLANNED = auto()
+    IN_PROGRESS = auto()
+    RELEASED = auto()
 
 
 class Version(Base):
@@ -22,8 +31,11 @@ class Version(Base):
     # Meant to be mandatory, but that rule is enforced in services/, not as
     # a DB constraint.
     definition_of_done: Mapped[Optional[str]] = mapped_column(Text)
-    # "planned" -> "in_progress" -> "released".
-    status: Mapped[str] = mapped_column(String, nullable=False, default="planned")
+    status: Mapped[VersionStatus] = mapped_column(
+        SAEnum(VersionStatus, name="version_status", create_constraint=True),
+        nullable=False,
+        default=VersionStatus.PLANNED,
+    )
     # Manual ordering among a project's versions (drag-to-reorder in the UI).
     position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     target_date: Mapped[Optional[date]] = mapped_column(Date)
