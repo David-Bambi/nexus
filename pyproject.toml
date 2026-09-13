@@ -3,6 +3,7 @@ name = "nexus"
 version = "0.1.0"
 description = "Application de gestion de projet."
 readme = "README.md"
+license = "MIT"
 requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.20.0",
