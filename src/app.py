@@ -13,8 +13,17 @@ from src.web.routes_pages import bp as pages_bp
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-def create_app(config_class=Config) -> Flask:
-    """Application factory: build and configure the Flask app."""
+def create_app(config_class: type[Config] = Config) -> Flask:
+    """Application factory: build and configure the Flask app.
+
+    Args:
+        config_class: Config class to load settings from (defaults to
+            `Config`; tests pass `TestConfig`).
+
+    Returns:
+        A fully configured Flask app, with the database engine/session
+        factory attached and blueprints registered.
+    """
     app = Flask(
         __name__,
         template_folder="web/templates",
@@ -48,7 +57,11 @@ def create_app(config_class=Config) -> Flask:
 
 
 def _upgrade_database(database_url: str) -> None:
-    """Run pending migrations up to head. Idempotent, safe on every start."""
+    """Run pending migrations up to head. Idempotent, safe on every start.
+
+    Args:
+        database_url: SQLAlchemy connection URL to migrate.
+    """
     alembic_cfg = AlembicConfig(str(BASE_DIR / "alembic.ini"))
     alembic_cfg.set_main_option("sqlalchemy.url", database_url)
     command.upgrade(alembic_cfg, "head")
