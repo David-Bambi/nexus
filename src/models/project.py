@@ -21,9 +21,11 @@ class Project(Base):
     __tablename__ = "project"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    # Short unique slug used in URLs (e.g. /projects/<key>), not the id.
+
     key: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    
     name: Mapped[str] = mapped_column(String, nullable=False)
+    
     description: Mapped[Optional[str]] = mapped_column(Text)
     
     status: Mapped[ProjectStatus] = mapped_column(

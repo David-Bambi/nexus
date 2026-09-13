@@ -23,24 +23,33 @@ class Version(Base):
     __tablename__ = "version"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    
     project_id: Mapped[int] = mapped_column(ForeignKey("project.id"), nullable=False)
+    
     # e.g. "0.2.0" — free string, not parsed/validated as SemVer at the DB level.
     number: Mapped[str] = mapped_column(String, nullable=False)
+    
     title: Mapped[str] = mapped_column(String, nullable=False)
+    
     goal: Mapped[Optional[str]] = mapped_column(Text)
-    # Meant to be mandatory, but that rule is enforced in services/, not as
-    # a DB constraint.
-    definition_of_done: Mapped[Optional[str]] = mapped_column(Text)
+
     status: Mapped[VersionStatus] = mapped_column(
         SAEnum(VersionStatus, name="version_status", create_constraint=True),
         nullable=False,
         default=VersionStatus.PLANNED,
     )
+    
     # Manual ordering among a project's versions (drag-to-reorder in the UI).
     position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    
     target_date: Mapped[Optional[date]] = mapped_column(Date)
+    
     # Set when the version is released; null while planned/in_progress.
     released_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
+    # Relations
     project: Mapped["Project"] = relationship(back_populates="versions")
     tasks: Mapped[list["Task"]] = relationship(back_populates="version")
+    definition_of_done: Mapped[list["DefinitionOfDoneCriterion"]] = relationship(
+        back_populates="version", cascade="all, delete-orphan"
+    )

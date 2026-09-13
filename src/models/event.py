@@ -14,7 +14,9 @@ class Event(Base):
     __tablename__ = "event"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    
     at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+    
     # "web" in v1; will later distinguish "cli" / "agent".
     actor: Mapped[str] = mapped_column(String, nullable=False)
     # No FK on purpose: an append-only log that references any entity type
