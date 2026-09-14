@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}{{ version.number }} — {{ version.title }} — Nexus{% endblock %}
+
+{% block content %}
+<p><a href="{{ url_for('pages.versions_list', key=version.project.key) }}">← Versions</a></p>
+
+<h1>{{ version.number }} — {{ version.title }}</h1>
+<p><strong>Status:</strong> {{ version.status.name }}</p>
+{% if version.goal %}
+<p>{{ version.goal }}</p>
+{% endif %}
+{% if version.target_date %}
+<p><strong>Target date:</strong> {{ version.target_date }}</p>
+{% endif %}
+
+<h2>Definition of done</h2>
+<ul>
+    {% for criterion in version.definition_of_done %}
+    <li>{{ criterion.description }}</li>
+    {% endfor %}
+</ul>
+
+{% if error %}
+<p style="color: red;">{{ error }}</p>
+{% endif %}
+
+{% if version.status.name == "PLANNED" %}
+<form method="post" action="{{ url_for('pages.version_start', key=version.project.key, number=version.number) }}">
+    <button type="submit">Start</button>
+</form>
+{% elif version.status.name == "IN_PROGRESS" %}
+<form method="post" action="{{ url_for('pages.version_release', key=version.project.key, number=version.number) }}">
+    <button type="submit">Release</button>
+</form>
+{% endif %}
+{% endblock %}
