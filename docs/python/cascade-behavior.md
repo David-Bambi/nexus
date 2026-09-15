@@ -64,9 +64,10 @@ un-triaged inbox item. A task orphaned by a project deletion falls into
 that same state, even though it may have real work behind it (e.g. still
 sitting in a `doing` state per the task state machine in
 `docs/architecture/overview.md`). Nothing currently forces it back to
-`inbox` on orphaning. Not a bug to fix now — `services/tasks.py` doesn't
-exist yet — but a rule to decide when task deletion/orphaning is
-implemented there.
+`inbox` on orphaning. `services/tasks.py` now implements the full task
+lifecycle (capture through delete) but has no hook on project/version
+deletion — the gap is still open, to be closed with a deliberate rule,
+not a side effect of implementing the rest of the service.
 
 ## Rule of thumb
 

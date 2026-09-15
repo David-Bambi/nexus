@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}{{ task.title }} — Nexus{% endblock %}
+
+{% block content %}
+<p><a href="{{ url_for('pages.tasks_list') }}">← Tasks</a></p>
+
+<h1>{{ task.title }}</h1>
+<p><strong>State:</strong> {{ task.state.name }}</p>
+{% if task.project %}
+<p><strong>Project:</strong> <a href="{{ url_for('pages.project_detail', key=task.project.key) }}">{{ task.project.name }}</a></p>
+{% endif %}
+{% if task.version %}
+<p><strong>Version:</strong> {{ task.version.number }}</p>
+{% endif %}
+{% if task.context %}
+<p><strong>Context:</strong> {{ task.context }}</p>
+{% endif %}
+{% if task.size %}
+<p><strong>Size:</strong> {{ task.size }}</p>
+{% endif %}
+{% if task.body %}
+<p>{{ task.body }}</p>
+{% endif %}
+{% if task.state.name == "WAITING" %}
+<p><strong>Blocked reason:</strong> {{ task.blocked_reason }}</p>
+{% endif %}
+
+{% if error %}
+<p style="color: red;">{{ error }}</p>
+{% endif %}
+
+{% if task.state.name in ("INBOX", "SOMEDAY") %}
+<h2>Clarify</h2>
+<form method="post" action="{{ url_for('pages.task_clarify', task_id=task.id) }}">
+    <label>Title <input type="text" name="title" value="{{ task.title }}" required></label><br>
+    <label>Body <textarea name="body">{{ task.body or '' }}</textarea></label><br>
+    <label>Project key <input type="text" name="project_key" value="{{ task.project.key if task.project else '' }}"></label><br>
+    <label>Context <input type="text" name="context" value="{{ task.context or '' }}"></label><br>
+    <label>Size <input type="text" name="size" value="{{ task.size or '' }}"></label><br>
+    <button type="submit">Clarify</button>
+</form>
+{% endif %}
+
+{% if task.state.name == "REFINED" %}
+<form method="post" action="{{ url_for('pages.task_plan', task_id=task.id) }}">
+    <label>Version id <input type="number" name="version_id" required></label>
+    <button type="submit">Plan</button>
+</form>
+{% endif %}
+
+{% if task.state.name == "PLANNED" %}
+<form method="post" action="{{ url_for('pages.task_unplan', task_id=task.id) }}">
+    <button type="submit">Unplan</button>
+</form>
+<form method="post" action="{{ url_for('pages.task_start', task_id=task.id) }}">
+    <button type="submit">Start</button>
+</form>
+{% endif %}
+
+{% if task.state.name == "DOING" %}
+<form method="post" action="{{ url_for('pages.task_block', task_id=task.id) }}">
+    <label>Reason <input type="text" name="reason" required></label>
+    <button type="submit">Block</button>
+</form>
+<form method="post" action="{{ url_for('pages.task_complete', task_id=task.id) }}">
+    <button type="submit">Complete</button>
+</form>
+{% endif %}
+
+{% if task.state.name == "WAITING" %}
+<form method="post" action="{{ url_for('pages.task_unblock', task_id=task.id) }}">
+    <button type="submit">Unblock</button>
+</form>
+{% endif %}
+
+{% if task.state.name == "DONE" %}
+<form method="post" action="{{ url_for('pages.task_reopen', task_id=task.id) }}">
+    <button type="submit">Reopen</button>
+</form>
+{% endif %}
+
+{% if task.state.name in ("INBOX", "REFINED") %}
+<form method="post" action="{{ url_for('pages.task_defer', task_id=task.id) }}">
+    <button type="submit">Defer to someday</button>
+</form>
+{% endif %}
+
+<h2>Edit</h2>
+<form method="post" action="{{ url_for('pages.task_update', task_id=task.id) }}">
+    <label>Title <input type="text" name="title" value="{{ task.title }}" required></label><br>
+    <label>Body <textarea name="body">{{ task.body or '' }}</textarea></label><br>
+    <label>Context <input type="text" name="context" value="{{ task.context or '' }}"></label><br>
+    <label>Size <input type="text" name="size" value="{{ task.size or '' }}"></label><br>
+    <button type="submit">Save</button>
+</form>
+
+<form method="post" action="{{ url_for('pages.task_delete', task_id=task.id) }}">
+    <button type="submit">Delete</button>
+</form>
+{% endblock %}

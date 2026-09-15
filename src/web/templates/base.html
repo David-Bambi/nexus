@@ -5,6 +5,10 @@
     <title>{% block title %}Nexus{% endblock %}</title>
 </head>
 <body>
+<nav>
+    <a href="{{ url_for('pages.projects_list') }}">Projects</a>
+    | <a href="{{ url_for('pages.tasks_list') }}">Tasks</a>
+</nav>
 {% block content %}{% endblock %}
 </body>
 </html>

@@ -2,8 +2,8 @@ from datetime import date
 
 from flask import Blueprint, abort, current_app, redirect, render_template, request, url_for
 
-from src.services import projects, versions
-from src.services.errors import ConflictError, NotFoundError, ValidationError
+from src.services import projects, tasks, versions
+from src.services.errors import ConflictError, InvalidTransitionError, NotFoundError, ValidationError
 
 # Full-page (non-fragment) routes. Adapters only: no business logic here —
 # validate input, call a service, render a template (ADR-0001).
@@ -129,3 +129,144 @@ def version_release(key, number):
     except ValidationError as e:
         error = str(e)
     return render_template("version.html", version=version, error=error)
+
+
+@bp.route("/tasks", methods=["GET", "POST"])
+def tasks_list():
+    """List all tasks; a plain HTML form on the same page captures one."""
+    session = _session()
+    if request.method == "POST":
+        tasks.capture(session, request.form["title"])
+        return redirect(url_for("pages.tasks_list"))
+    return render_template("tasks.html", tasks=tasks.list(session))
+
+
+@bp.route("/tasks/<int:task_id>")
+def task_detail(task_id):
+    """Show a single task's details."""
+    session = _session()
+    try:
+        task = tasks.get(session, task_id)
+    except NotFoundError:
+        abort(404)
+    return render_template("task.html", task=task, error=None)
+
+
+def _apply_transition(task_id, fn):
+    """Run a task transition, looking the task up first for a clean 404.
+
+    Args:
+        task_id: Id of the task.
+        fn: Callable taking the session and applying the transition.
+
+    Returns:
+        The rendered task detail page, with an inline error on failure.
+    """
+    session = _session()
+    try:
+        task = tasks.get(session, task_id)
+    except NotFoundError:
+        abort(404)
+    error = None
+    try:
+        task = fn(session)
+    except (NotFoundError, ValidationError, InvalidTransitionError) as e:
+        error = str(e)
+    return render_template("task.html", task=task, error=error)
+
+
+@bp.route("/tasks/<int:task_id>/update", methods=["POST"])
+def task_update(task_id):
+    """Update a task's descriptive fields."""
+    return _apply_transition(
+        task_id,
+        lambda s: tasks.update(
+            s,
+            task_id,
+            title=request.form["title"],
+            body=request.form.get("body") or None,
+            context=request.form.get("context") or None,
+            size=request.form.get("size") or None,
+        ),
+    )
+
+
+@bp.route("/tasks/<int:task_id>/clarify", methods=["POST"])
+def task_clarify(task_id):
+    """Clarify a captured or someday task into a refined one."""
+    return _apply_transition(
+        task_id,
+        lambda s: tasks.clarify(
+            s,
+            task_id,
+            request.form["title"],
+            request.form.get("body") or None,
+            request.form.get("project_key") or None,
+            request.form.get("context") or None,
+            request.form.get("size") or None,
+        ),
+    )
+
+
+@bp.route("/tasks/<int:task_id>/plan", methods=["POST"])
+def task_plan(task_id):
+    """Plan a refined task into a version."""
+    return _apply_transition(
+        task_id, lambda s: tasks.plan(s, task_id, int(request.form["version_id"]))
+    )
+
+
+@bp.route("/tasks/<int:task_id>/unplan", methods=["POST"])
+def task_unplan(task_id):
+    """Unplan a planned task back to refined."""
+    return _apply_transition(task_id, lambda s: tasks.unplan(s, task_id))
+
+
+@bp.route("/tasks/<int:task_id>/start", methods=["POST"])
+def task_start(task_id):
+    """Start a planned task."""
+    return _apply_transition(task_id, lambda s: tasks.start(s, task_id))
+
+
+@bp.route("/tasks/<int:task_id>/block", methods=["POST"])
+def task_block(task_id):
+    """Block a task that's being worked on."""
+    return _apply_transition(
+        task_id, lambda s: tasks.block(s, task_id, request.form.get("reason", ""))
+    )
+
+
+@bp.route("/tasks/<int:task_id>/unblock", methods=["POST"])
+def task_unblock(task_id):
+    """Unblock a waiting task."""
+    return _apply_transition(task_id, lambda s: tasks.unblock(s, task_id))
+
+
+@bp.route("/tasks/<int:task_id>/complete", methods=["POST"])
+def task_complete(task_id):
+    """Complete a task that's being worked on."""
+    return _apply_transition(task_id, lambda s: tasks.complete(s, task_id))
+
+
+@bp.route("/tasks/<int:task_id>/reopen", methods=["POST"])
+def task_reopen(task_id):
+    """Reopen a completed task."""
+    return _apply_transition(task_id, lambda s: tasks.reopen(s, task_id))
+
+
+@bp.route("/tasks/<int:task_id>/defer", methods=["POST"])
+def task_defer(task_id):
+    """Defer a task to someday."""
+    return _apply_transition(task_id, lambda s: tasks.defer(s, task_id))
+
+
+@bp.route("/tasks/<int:task_id>/delete", methods=["POST"])
+def task_delete(task_id):
+    """Delete a task."""
+    session = _session()
+    try:
+        tasks.get(session, task_id)
+    except NotFoundError:
+        abort(404)
+    tasks.delete(session, task_id)
+    return redirect(url_for("pages.tasks_list"))

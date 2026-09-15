@@ -22,10 +22,10 @@ speculatively detailing them now against code that doesn't exist yet.
 - [x] **0.1.0 — Foundation.** Flask factory, SQLAlchemy, Alembic, all 5
       models, base template, empty home page. *DoD: `flask run` starts, the
       database gets created, the page responds.* → fully detailed below.
-- [ ] **0.2.0 — Projects & versions.** `services/projects.py`,
+- [x] **0.2.0 — Projects & versions.** `services/projects.py`,
       `services/versions.py`, CRUD, list/detail pages. *DoD: a project and
       its versions can be created and viewed from the browser.*
-- [ ] **0.3.0 — Tasks.** Full task state machine (§4.3) and transitions,
+- [x] **0.3.0 — Tasks.** Full task state machine (§4.3) and transitions,
       global capture, version board, task detail (no history yet). *DoD:
       every transition in the state diagram is triggerable from the UI;
       every task has a detail page.*

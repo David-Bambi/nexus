@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}Tasks — Nexus{% endblock %}
+
+{% block content %}
+<h1>Tasks</h1>
+
+<ul>
+    {% for task in tasks %}
+    <li>
+        <a href="{{ url_for('pages.task_detail', task_id=task.id) }}">{{ task.title }}</a>
+        — {{ task.state.name }}
+    </li>
+    {% else %}
+    <li>No tasks yet.</li>
+    {% endfor %}
+</ul>
+
+<h2>Capture</h2>
+<form method="post" action="{{ url_for('pages.tasks_list') }}">
+    <label>Title <input type="text" name="title" required></label>
+    <button type="submit">Capture</button>
+</form>
+{% endblock %}

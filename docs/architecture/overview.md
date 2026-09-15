@@ -31,18 +31,20 @@ stateDiagram-v2
     [*] --> inbox
     inbox --> refined
     refined --> planned
+    planned --> refined
     planned --> doing
     doing --> waiting
     waiting --> doing
     doing --> done
+    done --> doing
     inbox --> someday
     refined --> someday
-    planned --> someday
     someday --> refined
 ```
 
 `waiting` requires a non-empty `blocked_reason`. Transition rules are
-enforced in the services layer — see [0001](adr/0001-services-ignore-http.md).
+enforced in the services layer, implemented in `services/tasks.py` — see
+[0001](adr/0001-services-ignore-http.md).
 
 ## Decisions
 
