@@ -1,0 +1,8 @@
+<form method="post" action="{{ clarify_action }}">
+    <label>Title <input type="text" name="title" value="{{ task.title }}" required></label><br>
+    <label>Body <textarea name="body">{{ task.body or '' }}</textarea></label><br>
+    <label>Project key <input type="text" name="project_key" value="{{ task.project.key if task.project else '' }}"></label><br>
+    <label>Context <input type="text" name="context" value="{{ task.context or '' }}"></label><br>
+    <label>Size <input type="text" name="size" value="{{ task.size or '' }}"></label><br>
+    <button type="submit">{{ clarify_label }}</button>
+</form>

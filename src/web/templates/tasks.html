@@ -15,10 +15,4 @@
     <li>No tasks yet.</li>
     {% endfor %}
 </ul>
-
-<h2>Capture</h2>
-<form method="post" action="{{ url_for('pages.tasks_list') }}">
-    <label>Title <input type="text" name="title" required></label>
-    <button type="submit">Capture</button>
-</form>
 {% endblock %}

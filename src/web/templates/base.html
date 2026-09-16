@@ -8,7 +8,28 @@
 <nav>
     <a href="{{ url_for('pages.projects_list') }}">Projects</a>
     | <a href="{{ url_for('pages.tasks_list') }}">Tasks</a>
+    | <a href="{{ url_for('pages.inbox') }}">Inbox</a>
+    | <a href="{{ url_for('pages.refine') }}">Refine</a>
+    | <a href="{{ url_for('pages.search') }}">Search</a>
 </nav>
+
+<form method="post" action="{{ url_for('pages.capture') }}">
+    <input type="hidden" name="next" value="{{ request.path }}">
+    <input type="text" name="title" id="capture" placeholder="Capture a task (press c)" required>
+    <button type="submit">Capture</button>
+</form>
+
 {% block content %}{% endblock %}
+
+<script>
+document.addEventListener("keydown", function (event) {
+    var target = event.target;
+    var typing = target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable;
+    if (!typing && event.key === "c") {
+        event.preventDefault();
+        document.getElementById("capture").focus();
+    }
+});
+</script>
 </body>
 </html>

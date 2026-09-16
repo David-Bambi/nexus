@@ -32,14 +32,9 @@
 
 {% if task.state.name in ("INBOX", "SOMEDAY") %}
 <h2>Clarify</h2>
-<form method="post" action="{{ url_for('pages.task_clarify', task_id=task.id) }}">
-    <label>Title <input type="text" name="title" value="{{ task.title }}" required></label><br>
-    <label>Body <textarea name="body">{{ task.body or '' }}</textarea></label><br>
-    <label>Project key <input type="text" name="project_key" value="{{ task.project.key if task.project else '' }}"></label><br>
-    <label>Context <input type="text" name="context" value="{{ task.context or '' }}"></label><br>
-    <label>Size <input type="text" name="size" value="{{ task.size or '' }}"></label><br>
-    <button type="submit">Clarify</button>
-</form>
+{% with clarify_action = url_for('pages.task_clarify', task_id=task.id), clarify_label = "Clarify" %}
+{% include "_clarify_form.html" %}
+{% endwith %}
 {% endif %}
 
 {% if task.state.name == "REFINED" %}

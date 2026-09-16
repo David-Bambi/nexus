@@ -2,7 +2,7 @@ from datetime import date
 
 from flask import Blueprint, abort, current_app, redirect, render_template, request, url_for
 
-from src.services import projects, tasks, versions
+from src.services import projects, tasks, versions, views
 from src.services.errors import ConflictError, InvalidTransitionError, NotFoundError, ValidationError
 
 # Full-page (non-fragment) routes. Adapters only: no business logic here —
@@ -141,6 +141,32 @@ def tasks_list():
     return render_template("tasks.html", tasks=tasks.list(session))
 
 
+def _safe_next(next_url, fallback_endpoint):
+    """Resolve a client-supplied redirect target, rejecting anything unsafe.
+
+    Args:
+        next_url: Raw "next" value from the request, or None.
+        fallback_endpoint: Endpoint to redirect to if next_url isn't a safe,
+            same-app relative path (a bare "/..." path — a leading "//"
+            is rejected too, since browsers treat it as protocol-relative
+            and resolve it to an external host).
+
+    Returns:
+        A URL safe to redirect to.
+    """
+    if next_url and next_url.startswith("/") and not next_url.startswith("//"):
+        return next_url
+    return url_for(fallback_endpoint)
+
+
+@bp.route("/capture", methods=["POST"])
+def capture():
+    """Capture a task from the global capture bar, without leaving the current page."""
+    session = _session()
+    tasks.capture(session, request.form["title"])
+    return redirect(_safe_next(request.form.get("next"), "pages.tasks_list"))
+
+
 @bp.route("/tasks/<int:task_id>")
 def task_detail(task_id):
     """Show a single task's details."""
@@ -152,17 +178,19 @@ def task_detail(task_id):
     return render_template("task.html", task=task, error=None)
 
 
-def _apply_transition(task_id, fn):
-    """Run a task transition, looking the task up first for a clean 404.
+def _run_transition(session, task_id, fn):
+    """Look up a task and apply a transition to it, catching domain errors.
 
     Args:
+        session: Database session to use.
         task_id: Id of the task.
         fn: Callable taking the session and applying the transition.
 
     Returns:
-        The rendered task detail page, with an inline error on failure.
+        A (task, error) pair: task reflects the change on success, or is
+        left as originally looked up on failure; error is the message
+        string on failure, or None on success.
     """
-    session = _session()
     try:
         task = tasks.get(session, task_id)
     except NotFoundError:
@@ -172,6 +200,20 @@ def _apply_transition(task_id, fn):
         task = fn(session)
     except (NotFoundError, ValidationError, InvalidTransitionError) as e:
         error = str(e)
+    return task, error
+
+
+def _clarify_fields():
+    """Read the optional clarify fields from the current request's form."""
+    return {
+        name: request.form.get(name) or None
+        for name in ("body", "project_key", "context", "size")
+    }
+
+
+def _apply_transition(task_id, fn):
+    """Run a task transition and render the task detail page with the result."""
+    task, error = _run_transition(_session(), task_id, fn)
     return render_template("task.html", task=task, error=error)
 
 
@@ -194,16 +236,12 @@ def task_update(task_id):
 @bp.route("/tasks/<int:task_id>/clarify", methods=["POST"])
 def task_clarify(task_id):
     """Clarify a captured or someday task into a refined one."""
+    fields = _clarify_fields()
     return _apply_transition(
         task_id,
         lambda s: tasks.clarify(
-            s,
-            task_id,
-            request.form["title"],
-            request.form.get("body") or None,
-            request.form.get("project_key") or None,
-            request.form.get("context") or None,
-            request.form.get("size") or None,
+            s, task_id, request.form["title"],
+            fields["body"], fields["project_key"], fields["context"], fields["size"],
         ),
     )
 
@@ -260,13 +298,87 @@ def task_defer(task_id):
     return _apply_transition(task_id, lambda s: tasks.defer(s, task_id))
 
 
-@bp.route("/tasks/<int:task_id>/delete", methods=["POST"])
-def task_delete(task_id):
-    """Delete a task."""
+def _delete_task(task_id, redirect_endpoint):
+    """Delete a task, looking it up first for a clean 404.
+
+    Args:
+        task_id: Id of the task.
+        redirect_endpoint: Endpoint to redirect to afterward.
+    """
     session = _session()
     try:
         tasks.get(session, task_id)
     except NotFoundError:
         abort(404)
     tasks.delete(session, task_id)
-    return redirect(url_for("pages.tasks_list"))
+    return redirect(url_for(redirect_endpoint))
+
+
+@bp.route("/tasks/<int:task_id>/delete", methods=["POST"])
+def task_delete(task_id):
+    """Delete a task."""
+    return _delete_task(task_id, "pages.tasks_list")
+
+
+@bp.route("/inbox")
+def inbox():
+    """Show the next inbox item for sequential, one-at-a-time triage."""
+    session = _session()
+    queue = views.inbox(session)
+    return render_template("inbox.html", task=queue[0] if queue else None, error=None)
+
+
+def _inbox_action(task_id, fn):
+    """Run an inbox transition and advance to the next item, or show the error."""
+    task, error = _run_transition(_session(), task_id, fn)
+    if error:
+        return render_template("inbox.html", task=task, error=error)
+    return redirect(url_for("pages.inbox"))
+
+
+@bp.route("/inbox/<int:task_id>/clarify", methods=["POST"])
+def inbox_clarify(task_id):
+    """Clarify an inbox item into a refined task."""
+    fields = _clarify_fields()
+    return _inbox_action(
+        task_id,
+        lambda s: tasks.clarify(
+            s, task_id, request.form["title"],
+            fields["body"], fields["project_key"], fields["context"], fields["size"],
+        ),
+    )
+
+
+@bp.route("/inbox/<int:task_id>/defer", methods=["POST"])
+def inbox_defer(task_id):
+    """Defer an inbox item to someday."""
+    return _inbox_action(task_id, lambda s: tasks.defer(s, task_id))
+
+
+@bp.route("/inbox/<int:task_id>/delete", methods=["POST"])
+def inbox_delete(task_id):
+    """Delete an inbox item."""
+    return _delete_task(task_id, "pages.inbox")
+
+
+@bp.route("/refine")
+def refine():
+    """List refined, unplanned tasks, filterable by context and project."""
+    session = _session()
+    context = request.args.get("context") or None
+    project_key = request.args.get("project_key") or None
+    return render_template(
+        "refine.html",
+        tasks=views.to_refine(session, context, project_key),
+        projects=projects.list(session),
+        context=context,
+        project_key=project_key,
+    )
+
+
+@bp.route("/search")
+def search():
+    """Show tasks matching a free-text search term."""
+    session = _session()
+    term = request.args.get("q", "")
+    return render_template("search.html", tasks=views.search(session, term), term=term)

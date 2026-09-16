@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Inbox — Nexus{% endblock %}
+
+{% block content %}
+<h1>Inbox</h1>
+
+{% if error %}
+<p style="color: red;">{{ error }}</p>
+{% endif %}
+
+{% if task %}
+<h2>{{ task.title }}</h2>
+{% if task.body %}
+<p>{{ task.body }}</p>
+{% endif %}
+
+<h3>Refine</h3>
+{% with clarify_action = url_for('pages.inbox_clarify', task_id=task.id), clarify_label = "Refine" %}
+{% include "_clarify_form.html" %}
+{% endwith %}
+
+<form method="post" action="{{ url_for('pages.inbox_defer', task_id=task.id) }}">
+    <button type="submit">Someday</button>
+</form>
+
+<form method="post" action="{{ url_for('pages.inbox_delete', task_id=task.id) }}">
+    <button type="submit">Delete</button>
+</form>
+{% else %}
+<p>Inbox is empty.</p>
+{% endif %}
+{% endblock %}

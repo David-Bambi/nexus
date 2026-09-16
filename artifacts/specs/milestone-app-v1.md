@@ -228,7 +228,7 @@ defer(task_id) -> Task                  # -> someday
 delete(task_id) -> None
 ```
 
-### `services/queries.py`
+### `services/views.py`
 ```
 dashboard() -> DashboardView            # versions en cours + tâches doing + compteurs
 inbox() -> list[Task]
@@ -354,7 +354,7 @@ milestone/
 │   │   ├── projects.py
 │   │   ├── versions.py
 │   │   ├── tasks.py
-│   │   ├── queries.py
+│   │   ├── views.py
 │   │   ├── events.py
 │   │   ├── export.py
 │   │   └── errors.py
@@ -447,3 +447,11 @@ Chaque incrément est livrable et utilisable. Numérotation SemVer strict : tant
 | Périmètre qui gonfle avant 1.0.0 | L'application n'est jamais utilisée pour de vrai | Les manques constatés deviennent des tâches, pas des ajouts en cours de route |
 | Boîte de capture jamais vidée | Le système devient un cimetière d'idées | Compteur visible en permanence sur le tableau de bord |
 | Versions livrées à moitié | La règle fondatrice se vide de son sens | Livraison refusée mécaniquement si une tâche reste ouverte |
+
+---
+
+## Révisions
+
+| Date | Section | Changement | Raison |
+|---|---|---|---|
+| 2026-09-16 | §5, §9 | `services/queries.py` renommé `services/views.py` | Nom jugé trop générique — n'importe quel service expose des lectures ; le module regroupe en fait les vues assemblées pour une page (inbox, refine, recherche, tableau de bord) |

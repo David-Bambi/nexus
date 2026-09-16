@@ -46,6 +46,12 @@ stateDiagram-v2
 enforced in the services layer, implemented in `services/tasks.py` — see
 [0001](adr/0001-services-ignore-http.md).
 
+Within `services/`, mutations and cross-cutting reads are split into
+separate modules: `services/tasks.py` (and `projects.py`, `versions.py`)
+own single-entity commands, while `services/views.py` holds read-only,
+page-shaped queries (`inbox`, `to_refine`, `search`) that don't belong to
+any one entity. Both stay framework-agnostic per ADR-0001.
+
 ## Decisions
 
 See [Decisions](adr/0001-services-ignore-http.md) for the full ADR journal.

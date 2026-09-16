@@ -1,3 +1,6 @@
+import pytest
+
+
 def test_home_page_returns_200(client):
     """The empty home page responds successfully."""
     response = client.get("/")
@@ -191,3 +194,91 @@ def test_delete_task_removes_it(client):
 
     response = client.get("/tasks/1")
     assert response.status_code == 404
+
+
+def test_inbox_empty_returns_200(client):
+    """The inbox page responds successfully when there's nothing to triage."""
+    response = client.get("/inbox")
+    assert response.status_code == 200
+    assert b"Inbox is empty" in response.data
+
+
+def test_inbox_shows_next_item(client):
+    """The inbox page shows the oldest captured task."""
+    client.post("/tasks", data={"title": "Write the docs"})
+
+    response = client.get("/inbox")
+    assert response.status_code == 200
+    assert b"Write the docs" in response.data
+
+
+@pytest.mark.parametrize(
+    "action, data",
+    [("clarify", {"title": "First"}), ("defer", {}), ("delete", {})],
+)
+def test_inbox_action_advances_to_next_item(client, action, data):
+    """Clarifying, deferring or deleting the current inbox item advances the queue."""
+    client.post("/tasks", data={"title": "First"})
+    client.post("/tasks", data={"title": "Second"})
+
+    response = client.post(f"/inbox/1/{action}", data=data, follow_redirects=True)
+    assert response.status_code == 200
+    assert b"Second" in response.data
+    assert b"First" not in response.data
+
+
+def test_refine_filters_by_context(client):
+    """The refine queue filtered by context only shows the matching task."""
+    client.post("/tasks", data={"title": "At the computer"})
+    client.post("/tasks/1/clarify", data={"title": "At the computer", "context": "@ordi"})
+    client.post("/tasks", data={"title": "At the store"})
+    client.post("/tasks/2/clarify", data={"title": "At the store", "context": "@achat"})
+
+    response = client.get("/refine?context=@ordi")
+    assert response.status_code == 200
+    assert b"At the computer" in response.data
+    assert b"At the store" not in response.data
+
+
+def test_refine_filters_by_project_key(client):
+    """The refine queue filtered by project key only shows that project's task."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    client.post("/projects", data={"key": "other", "name": "Other"})
+    client.post("/tasks", data={"title": "Nexus task"})
+    client.post("/tasks/1/clarify", data={"title": "Nexus task", "project_key": "nexus"})
+    client.post("/tasks", data={"title": "Other task"})
+    client.post("/tasks/2/clarify", data={"title": "Other task", "project_key": "other"})
+
+    response = client.get("/refine?project_key=nexus")
+    assert response.status_code == 200
+    assert b"Nexus task" in response.data
+    assert b"Other task" not in response.data
+
+
+def test_search_finds_captured_task_by_title(client):
+    """Searching for a substring of a task's title finds it."""
+    client.post("/tasks", data={"title": "Write the docs"})
+
+    response = client.get("/search?q=docs")
+    assert response.status_code == 200
+    assert b"Write the docs" in response.data
+
+
+def test_capture_from_another_page_redirects_back_to_it(client):
+    """Capturing via the global form from a non-tasks page stays on that page."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+
+    response = client.post(
+        "/capture", data={"title": "Captured elsewhere", "next": "/projects/nexus"}
+    )
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/projects/nexus"
+
+
+def test_capture_rejects_protocol_relative_next(client):
+    """A protocol-relative next value is rejected rather than followed off-site."""
+    response = client.post(
+        "/capture", data={"title": "Captured elsewhere", "next": "//evil.example"}
+    )
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/tasks"
