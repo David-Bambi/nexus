@@ -11,8 +11,12 @@ site/
 
 instance/
 
+# Claude's own outputs (specs, plans) — kept on disk, not versioned
+artifacts/
+
 # local env vars
 .env
 
 # Claude Code local agent definitions
 .claude/
+CLAUDE.md
