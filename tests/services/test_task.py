@@ -1,6 +1,6 @@
 import pytest
 
-from src.services import projects, tasks, versions
+from src.services import events, projects, tasks, versions
 from src.models.task import TaskState
 from src.services.errors import InvalidTransitionError, NotFoundError, ValidationError
 
@@ -477,3 +477,154 @@ def test_delete_task_not_found(session):
     """
     with pytest.raises(NotFoundError):
         tasks.delete(session, 1)
+
+
+# Events ------------------------------------------------------------------------------------------
+
+def _history(session, task_id):
+    """Return a task's logged (action, payload) pairs, oldest first."""
+    return [(e.action, e.payload) for e in events.history(session, "task", task_id)]
+
+def _refined_task(session, title="Write the docs"):
+    """Capture a task and clarify it, ready to be planned."""
+    task = tasks.capture(session, title)
+    return tasks.clarify(session, task.id, title, None, None, None, None)
+
+def _doing_task(session):
+    """Return a task in the doing state, inside a fresh project and version."""
+    projects.create(session, "nexus", "Nexus", "")
+    version = versions.create(session, "nexus", "0.1.0", "First version", ["Ships"])
+    task = _refined_task(session)
+    tasks.plan(session, task.id, version.id)
+    return tasks.start(session, task.id), version
+
+def test_capture_logs_created(session):
+    """Capture logs a created event
+    Given no prior state
+    When capturing a task titled 'Write the docs'
+    Then its history holds a created event carrying the title
+    """
+    task = tasks.capture(session, "Write the docs")
+    assert _history(session, task.id) == [("created", {"title": "Write the docs"})]
+
+def test_create_logs_created(session):
+    """Create logs a created event
+    Given no prior state
+    When creating a task titled 'Write the docs'
+    Then its history holds a created event carrying the title
+    """
+    task = tasks.create(session, "Write the docs")
+    assert _history(session, task.id) == [("created", {"title": "Write the docs"})]
+
+def test_update_logs_changed_fields_only(session):
+    """Update logs an updated event holding only the changed fields
+    Given a captured task with no body
+    When updating its title and passing the same empty body
+    Then the updated event lists the title change and not the body
+    """
+    task = tasks.capture(session, "Write the docs")
+    tasks.update(session, task.id, title="Write the manual", body=None)
+
+    assert _history(session, task.id)[1] == (
+        "updated", {"title": {"from": "Write the docs", "to": "Write the manual"}})
+
+def test_update_without_change_logs_nothing(session):
+    """Update that changes nothing logs no event
+    Given a captured task
+    When updating its title to the same value
+    Then only the created event is in its history
+    """
+    task = tasks.capture(session, "Write the docs")
+    tasks.update(session, task.id, title="Write the docs")
+
+    assert [action for action, _ in _history(session, task.id)] == ["created"]
+
+def test_transitions_log_events(session):
+    """Every transition logs an event with its from and to states
+    Given a captured task
+    When it goes through clarify, plan, start, block, unblock, complete and reopen
+    Then each step appears in its history, in order, with the states it moved between
+    """
+    projects.create(session, "nexus", "Nexus", "")
+    version = versions.create(session, "nexus", "0.1.0", "First version", ["Ships"])
+    task = _refined_task(session)
+    tasks.plan(session, task.id, version.id)
+    tasks.start(session, task.id)
+    tasks.block(session, task.id, "Waiting for review")
+    tasks.unblock(session, task.id)
+    tasks.complete(session, task.id)
+    tasks.reopen(session, task.id)
+
+    assert _history(session, task.id)[1:] == [
+        ("clarified", {"from": "INBOX", "to": "REFINED"}),
+        ("planned", {"from": "REFINED", "to": "PLANNED", "version_id": version.id}),
+        ("started", {"from": "PLANNED", "to": "DOING"}),
+        ("blocked", {"from": "DOING", "to": "WAITING", "reason": "Waiting for review"}),
+        ("unblocked", {"from": "WAITING", "to": "DOING"}),
+        ("completed", {"from": "DOING", "to": "DONE"}),
+        ("reopened", {"from": "DONE", "to": "DOING"}),
+    ]
+
+def test_unplan_logs_unplanned(session):
+    """Unplan logs an unplanned event
+    Given a planned task
+    When unplanning it
+    Then its history ends with an unplanned event
+    """
+    projects.create(session, "nexus", "Nexus", "")
+    version = versions.create(session, "nexus", "0.1.0", "First version", ["Ships"])
+    task = _refined_task(session)
+    tasks.plan(session, task.id, version.id)
+    tasks.unplan(session, task.id)
+
+    assert _history(session, task.id)[-1] == ("unplanned", {"from": "PLANNED", "to": "REFINED"})
+
+def test_defer_logs_deferred(session):
+    """Defer logs a deferred event with the state it left
+    Given a refined task
+    When deferring it
+    Then its history ends with a deferred event from refined to someday
+    """
+    task = _refined_task(session)
+    tasks.defer(session, task.id)
+
+    assert _history(session, task.id)[-1] == ("deferred", {"from": "REFINED", "to": "SOMEDAY"})
+
+def test_refused_transition_logs_nothing(session):
+    """A refused transition logs no event
+    Given a captured task
+    When completing it, which is not allowed from inbox
+    Then an invalid transition error is raised and only the created event exists
+    """
+    task = tasks.capture(session, "Write the docs")
+    with pytest.raises(InvalidTransitionError):
+        tasks.complete(session, task.id)
+
+    assert [action for action, _ in _history(session, task.id)] == ["created"]
+
+def test_refused_block_logs_nothing(session):
+    """A block refused for its empty reason logs no event
+    Given a task in progress
+    When blocking it with an empty reason
+    Then a validation error is raised and no blocked event exists
+    """
+    task, _ = _doing_task(session)
+    with pytest.raises(ValidationError):
+        tasks.block(session, task.id, "")
+
+    assert "blocked" not in [action for action, _ in _history(session, task.id)]
+
+def test_delete_logs_deleted_and_keeps_history(session):
+    """Delete logs a deleted event and leaves the task's history readable
+    Given a captured task
+    When deleting it
+    Then its history holds the created and deleted events, the latter carrying the title
+    """
+    task = tasks.capture(session, "Write the docs")
+    task_id = task.id
+    tasks.delete(session, task_id)
+
+    assert _history(session, task_id) == [
+        ("created", {"title": "Write the docs"}),
+        ("deleted", {"title": "Write the docs"}),
+    ]

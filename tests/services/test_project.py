@@ -1,6 +1,6 @@
 import pytest
 
-from src.services import projects
+from src.services import events, projects
 from src.models.project import ProjectStatus
 from src.services.errors import ConflictError, NotFoundError
 
@@ -130,3 +130,54 @@ def test_delete_project_not_found(session):
     """
     with pytest.raises(NotFoundError):
         projects.delete(session, "nexus")
+
+
+# Events ------------------------------------------------------------------------------------------
+
+def _history(session, project_id):
+    """Return a project's logged (action, payload) pairs, oldest first."""
+    return [(e.action, e.payload) for e in events.history(session, "project", project_id)]
+
+def test_create_logs_created(session):
+    """Create logs a created event
+    Given a session database
+    When creating a project with the 'nexus' key
+    Then its history holds a created event carrying key and name
+    """
+    project = projects.create(session, "nexus", "Nexus", "")
+    assert _history(session, project.id) == [("created", {"key": "nexus", "name": "Nexus"})]
+
+def test_create_conflict_logs_nothing(session):
+    """A refused create logs no event
+    Given a project with the 'nexus' key
+    When creating another with the same key
+    Then a conflict error is raised and only one event exists
+    """
+    projects.create(session, "nexus", "Nexus", "")
+    with pytest.raises(ConflictError):
+        projects.create(session, "nexus", "Duplicate", "")
+
+    assert session.query(events.Event).count() == 1
+
+def test_archive_logs_archived(session):
+    """Archive logs an archived event
+    Given an active project
+    When archiving it
+    Then its history ends with an archived event from active to archived
+    """
+    project = projects.create(session, "nexus", "Nexus", "")
+    projects.archive(session, "nexus")
+
+    assert _history(session, project.id)[-1] == ("archived", {"from": "ACTIVE", "to": "ARCHIVED"})
+
+def test_delete_logs_deleted_and_keeps_history(session):
+    """Delete logs a deleted event and leaves the project's history readable
+    Given a project
+    When deleting it
+    Then its history holds the created and deleted events
+    """
+    project = projects.create(session, "nexus", "Nexus", "")
+    project_id = project.id
+    projects.delete(session, "nexus")
+
+    assert [action for action, _ in _history(session, project_id)] == ["created", "deleted"]

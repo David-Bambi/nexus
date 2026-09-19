@@ -154,3 +154,130 @@ def test_search_empty_term_returns_empty(session):
     """
     tasks.capture(session, "Write the docs")
     assert not views.search(session, "")
+
+
+# Dashboard ----------------------------------------------------------------------------------------
+
+def _refined_task(session, title, version=None):
+    """Capture and clarify a task, optionally planning it into a version."""
+    task = tasks.capture(session, title)
+    tasks.clarify(session, task.id, title, None, None, None, None)
+    if version:
+        tasks.plan(session, task.id, version.id)
+    return task
+
+def test_dashboard_empty(session):
+    """Dashboard on an empty database shows nothing
+    Given no data
+    When building the dashboard
+    Then there are no versions or tasks and both counters are zero
+    """
+    result = views.dashboard(session)
+
+    assert not result.versions
+    assert not result.doing
+    assert not result.waiting
+    assert result.inbox_count == 0
+    assert result.refine_count == 0
+
+def test_dashboard_only_lists_in_progress_versions(session):
+    """Dashboard lists only started, unreleased versions
+    Given a planned, an in-progress and a released version
+    When building the dashboard
+    Then only the in-progress version is listed
+    """
+    projects.create(session, "nexus", "Nexus", "")
+    versions.create(session, "nexus", "0.1.0", "Released", ["Ships"])
+    started = versions.create(session, "nexus", "0.2.0", "Started", ["Ships"])
+    versions.create(session, "nexus", "0.3.0", "Planned", ["Ships"])
+    released = versions.get(session, "nexus", "0.1.0")
+    versions.start(session, released.id)
+    versions.release(session, released.id)
+    versions.start(session, started.id)
+
+    result = views.dashboard(session)
+    assert [p.version.number for p in result.versions] == ["0.2.0"]
+
+def test_dashboard_version_progress(session):
+    """Dashboard shows how many of a version's tasks are done
+    Given a started version with two planned tasks, one of them completed
+    When building the dashboard
+    Then the version reports 1 done out of 2
+    """
+    projects.create(session, "nexus", "Nexus", "")
+    version = versions.create(session, "nexus", "0.1.0", "First version", ["Ships"])
+    versions.start(session, version.id)
+    finished = _refined_task(session, "Finished", version)
+    _refined_task(session, "Pending", version)
+    tasks.start(session, finished.id)
+    tasks.complete(session, finished.id)
+
+    [progress] = views.dashboard(session).versions
+    assert (progress.done, progress.total) == (1, 2)
+
+def test_dashboard_version_without_tasks(session):
+    """Dashboard shows a started version with no tasks as 0 out of 0
+    Given a started version with no tasks
+    When building the dashboard
+    Then the version reports 0 done out of 0
+    """
+    projects.create(session, "nexus", "Nexus", "")
+    version = versions.create(session, "nexus", "0.1.0", "First version", ["Ships"])
+    versions.start(session, version.id)
+
+    [progress] = views.dashboard(session).versions
+    assert (progress.done, progress.total) == (0, 0)
+
+def test_dashboard_progress_is_per_version(session):
+    """Dashboard counts each version's tasks separately
+    Given two started versions with one and two planned tasks
+    When building the dashboard
+    Then each version reports its own total
+    """
+    projects.create(session, "nexus", "Nexus", "")
+    first = versions.create(session, "nexus", "0.1.0", "First", ["Ships"])
+    second = versions.create(session, "nexus", "0.2.0", "Second", ["Ships"])
+    versions.start(session, first.id)
+    versions.start(session, second.id)
+    _refined_task(session, "A", first)
+    _refined_task(session, "B", second)
+    _refined_task(session, "C", second)
+
+    result = views.dashboard(session)
+    assert [(p.version.number, p.total) for p in result.versions] == [("0.1.0", 1), ("0.2.0", 2)]
+
+def test_dashboard_splits_doing_and_waiting(session):
+    """Dashboard separates tasks in progress from blocked ones
+    Given a doing task, a waiting task and a merely planned task
+    When building the dashboard
+    Then doing and waiting hold one task each, and the planned task appears in neither
+    """
+    projects.create(session, "nexus", "Nexus", "")
+    version = versions.create(session, "nexus", "0.1.0", "First version", ["Ships"])
+    doing = _refined_task(session, "Doing", version)
+    waiting = _refined_task(session, "Waiting", version)
+    _refined_task(session, "Planned", version)
+    tasks.start(session, doing.id)
+    tasks.start(session, waiting.id)
+    tasks.block(session, waiting.id, "Waiting for review")
+
+    result = views.dashboard(session)
+    assert [t.id for t in result.doing] == [doing.id]
+    assert [t.id for t in result.waiting] == [waiting.id]
+
+def test_dashboard_counters_match_inbox_and_refine(session):
+    """Dashboard counters match the inbox and refine queues
+    Given two inbox tasks, one refined unplanned task and one planned task
+    When building the dashboard
+    Then the counters equal the lengths of inbox() and to_refine()
+    """
+    projects.create(session, "nexus", "Nexus", "")
+    version = versions.create(session, "nexus", "0.1.0", "First version", ["Ships"])
+    tasks.capture(session, "First")
+    tasks.capture(session, "Second")
+    _refined_task(session, "To plan")
+    _refined_task(session, "Planned", version)
+
+    result = views.dashboard(session)
+    assert result.inbox_count == len(views.inbox(session)) == 2
+    assert result.refine_count == len(views.to_refine(session)) == 1

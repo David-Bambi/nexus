@@ -93,4 +93,9 @@
 <form method="post" action="{{ url_for('pages.task_delete', task_id=task.id) }}">
     <button type="submit">Delete</button>
 </form>
+
+<h2>History</h2>
+{% with event_items = history, show_entity = false %}
+{% include "_event_list.html" %}
+{% endwith %}
 {% endblock %}

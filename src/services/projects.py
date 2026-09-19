@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 
 from src.models.project import Project, ProjectStatus
+from src.services import events
 from src.services.errors import ConflictError, NotFoundError
 
 def create(session : Session, key : str, name : str, description : str | None = None) -> Project:
@@ -25,6 +26,9 @@ def create(session : Session, key : str, name : str, description : str | None = 
                       name=name,
                       description=description)
     session.add(project)
+    session.flush()
+    events.log(session, events.ACTOR_WEB, "project", project.id, "created",
+               {"key": key, "name": name})
     session.commit()
     return project
 
@@ -76,7 +80,10 @@ def archive(session : Session, key : str) -> Project:
         NotFoundError: If no project has this key.
     """
     project = get(session, key)
+    previous = project.status
     project.status = ProjectStatus.ARCHIVED
+    events.log(session, events.ACTOR_WEB, "project", project.id, "archived",
+               {"from": previous.name, "to": ProjectStatus.ARCHIVED.name})
     session.commit()
     return project
 
@@ -91,6 +98,8 @@ def delete(session : Session, key : str) -> None:
         NotFoundError: If no project has this key.
     """
     project = get(session, key)
+    events.log(session, events.ACTOR_WEB, "project", project.id, "deleted",
+               {"key": key, "name": project.name})
     session.delete(project)
     session.commit()
 

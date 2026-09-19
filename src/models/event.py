@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import JSON, DateTime, Integer, String
+from sqlalchemy import JSON, DateTime, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.db import Base
@@ -12,6 +12,8 @@ class Event(Base):
     or deleted. Powers task history, changelogs, and future traceability."""
 
     __tablename__ = "event"
+    # Keeps history lookups (one entity's events) fast as the log grows.
+    __table_args__ = (Index("ix_event_entity", "entity_type", "entity_id"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     

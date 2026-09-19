@@ -282,3 +282,100 @@ def test_capture_rejects_protocol_relative_next(client):
     )
     assert response.status_code == 302
     assert response.headers["Location"] == "/tasks"
+
+
+def _planned_task_in_started_version(client):
+    """Create project 'nexus' with started version 0.1.0 and task 1 planned into it."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    client.post(
+        "/projects/nexus/versions",
+        data={"number": "0.1.0", "title": "First version", "dod": "Ships"},
+    )
+    client.post("/projects/nexus/versions/0.1.0/start")
+    client.post("/capture", data={"title": "Write the docs"})
+    client.post("/tasks/1/clarify", data={"title": "Write the docs"})
+    client.post("/tasks/1/plan", data={"version_id": "1"})
+
+
+def test_dashboard_shows_work_in_progress(client):
+    """The dashboard lists the started version, doing and waiting tasks, and the counters."""
+    _planned_task_in_started_version(client)
+    client.post("/tasks/1/start")
+    client.post("/capture", data={"title": "Second task"})
+    client.post("/capture", data={"title": "Blocked task"})
+    client.post("/tasks/3/clarify", data={"title": "Blocked task"})
+    client.post("/tasks/3/plan", data={"version_id": "1"})
+    client.post("/tasks/3/start")
+    client.post("/tasks/3/block", data={"reason": "Waiting for review"})
+
+    response = client.get("/")
+    assert response.status_code == 200
+    assert b"First version" in response.data
+    assert b"0/2 done" in response.data
+    assert b"Write the docs" in response.data
+    assert b"Waiting for review" in response.data
+    assert b"Inbox: 1" in response.data
+
+
+def test_dashboard_counters_link_to_queues(client):
+    """The inbox and refine counters link to their pages."""
+    response = client.get("/")
+    assert b'href="/inbox"' in response.data
+    assert b'href="/refine"' in response.data
+
+
+def test_task_detail_shows_history(client):
+    """A task's page lists each transition it went through, in order."""
+    _planned_task_in_started_version(client)
+    client.post("/tasks/1/start")
+
+    response = client.get("/tasks/1")
+    assert response.status_code == 200
+    body = response.data.decode()
+    positions = [body.index(action) for action in ("created", "clarified", "planned", "started")]
+    assert positions == sorted(positions)
+
+
+def test_task_transition_response_shows_new_history_entry(client):
+    """The page returned after a transition already includes its event."""
+    _planned_task_in_started_version(client)
+
+    response = client.post("/tasks/1/start")
+    assert response.status_code == 200
+    assert b"started" in response.data
+
+
+def test_version_detail_shows_changelog(client):
+    """A version's page lists its own events and its tasks' events, linking each task."""
+    _planned_task_in_started_version(client)
+    client.post("/tasks/1/start")
+    client.post("/tasks/1/complete")
+
+    response = client.get("/projects/nexus/versions/0.1.0")
+    assert response.status_code == 200
+    assert b"Changelog" in response.data
+    assert b"completed" in response.data
+    assert b'href="/tasks/1"' in response.data
+
+
+def test_export_json_is_an_attachment_with_all_tables(client):
+    """The export downloads as a JSON file holding every table."""
+    _planned_task_in_started_version(client)
+
+    response = client.get("/export.json")
+    assert response.status_code == 200
+    assert response.mimetype == "application/json"
+    assert response.headers["Content-Disposition"].startswith("attachment; filename=")
+
+    data = response.get_json()
+    assert set(data) == {"exported_at", "projects", "versions", "tasks", "tags", "events"}
+    assert [p["key"] for p in data["projects"]] == ["nexus"]
+    assert [t["title"] for t in data["tasks"]] == ["Write the docs"]
+    assert data["events"]
+
+
+def test_nav_links_to_dashboard_and_export(client):
+    """Every page's navigation links to the dashboard and the export."""
+    response = client.get("/projects")
+    assert b'href="/"' in response.data
+    assert b'href="/export.json"' in response.data

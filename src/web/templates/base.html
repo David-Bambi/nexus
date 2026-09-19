@@ -6,11 +6,13 @@
 </head>
 <body>
 <nav>
-    <a href="{{ url_for('pages.projects_list') }}">Projects</a>
+    <a href="{{ url_for('pages.home') }}">Dashboard</a>
+    | <a href="{{ url_for('pages.projects_list') }}">Projects</a>
     | <a href="{{ url_for('pages.tasks_list') }}">Tasks</a>
     | <a href="{{ url_for('pages.inbox') }}">Inbox</a>
     | <a href="{{ url_for('pages.refine') }}">Refine</a>
     | <a href="{{ url_for('pages.search') }}">Search</a>
+    | <a href="{{ url_for('pages.export_json') }}">Export</a>
 </nav>
 
 <form method="post" action="{{ url_for('pages.capture') }}">

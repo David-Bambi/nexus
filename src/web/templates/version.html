@@ -34,4 +34,9 @@
     <button type="submit">Release</button>
 </form>
 {% endif %}
+
+<h2>Changelog</h2>
+{% with event_items = changelog, show_entity = true %}
+{% include "_event_list.html" %}
+{% endwith %}
 {% endblock %}

@@ -1,6 +1,6 @@
 import pytest
 
-from src.services import projects, versions
+from src.services import events, projects, tasks, versions
 from src.models.version import VersionStatus
 from src.models.task import Task, TaskState
 from src.services.errors import ConflictError, NotFoundError, ValidationError
@@ -228,3 +228,83 @@ def test_reorder_mismatched_ids(session):
     versions.create(session, "nexus", "0.1.0", "First version", ["Ships"])
     with pytest.raises(ValidationError):
         versions.reorder(session, "nexus", [999])
+
+
+# Events ------------------------------------------------------------------------------------------
+
+def _history(session, version_id):
+    """Return a version's logged (action, payload) pairs, oldest first."""
+    return [(e.action, e.payload) for e in events.history(session, "version", version_id)]
+
+def test_create_logs_created(session):
+    """Create logs a created event
+    Given a project 'nexus'
+    When creating version '0.1.0'
+    Then its history holds a created event carrying number and title
+    """
+    projects.create(session, "nexus", "Nexus", "")
+    version = versions.create(session, "nexus", "0.1.0", "First version", ["Ships"])
+
+    assert _history(session, version.id) == [
+        ("created", {"number": "0.1.0", "title": "First version"})]
+
+def test_create_conflict_logs_nothing(session):
+    """A refused create logs no event
+    Given a project with version '0.1.0'
+    When creating '0.1.0' again
+    Then a conflict error is raised and only one created event exists for versions
+    """
+    projects.create(session, "nexus", "Nexus", "")
+    versions.create(session, "nexus", "0.1.0", "First version", ["Ships"])
+    with pytest.raises(ConflictError):
+        versions.create(session, "nexus", "0.1.0", "Duplicate", ["Ships"])
+
+    assert session.query(events.Event).filter_by(entity_type="version").count() == 1
+
+def test_start_and_release_log_events(session):
+    """Start and release log their status change
+    Given a version with no tasks
+    When starting then releasing it
+    Then its history shows both status changes, in order
+    """
+    projects.create(session, "nexus", "Nexus", "")
+    version = versions.create(session, "nexus", "0.1.0", "First version", ["Ships"])
+    versions.start(session, version.id)
+    versions.release(session, version.id)
+
+    assert _history(session, version.id)[1:] == [
+        ("started", {"from": "PLANNED", "to": "IN_PROGRESS"}),
+        ("released", {"from": "IN_PROGRESS", "to": "RELEASED"}),
+    ]
+
+def test_refused_release_logs_nothing(session):
+    """A refused release logs no event
+    Given a started version with an unfinished task
+    When releasing it
+    Then a validation error is raised and no released event exists
+    """
+    projects.create(session, "nexus", "Nexus", "")
+    version = versions.create(session, "nexus", "0.1.0", "First version", ["Ships"])
+    versions.start(session, version.id)
+    task = tasks.capture(session, "Write the docs")
+    tasks.clarify(session, task.id, "Write the docs", None, None, None, None)
+    tasks.plan(session, task.id, version.id)
+    with pytest.raises(ValidationError):
+        versions.release(session, version.id)
+
+    assert "released" not in [action for action, _ in _history(session, version.id)]
+
+def test_reorder_logs_on_project(session):
+    """Reorder logs a versions_reordered event on the project
+    Given a project with two versions
+    When reordering them
+    Then the project's history holds the new order
+    """
+    project = projects.create(session, "nexus", "Nexus", "")
+    first = versions.create(session, "nexus", "0.1.0", "First version", ["Ships"])
+    second = versions.create(session, "nexus", "0.2.0", "Second version", ["Ships"])
+    versions.reorder(session, "nexus", [second.id, first.id])
+
+    history = events.history(session, "project", project.id)
+    assert (history[-1].action, history[-1].payload) == (
+        "versions_reordered", {"ordered_ids": [second.id, first.id]})

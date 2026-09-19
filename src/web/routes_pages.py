@@ -1,8 +1,9 @@
+import json
 from datetime import date
 
 from flask import Blueprint, abort, current_app, redirect, render_template, request, url_for
 
-from src.services import projects, tasks, versions, views
+from src.services import events, export, projects, tasks, versions, views
 from src.services.errors import ConflictError, InvalidTransitionError, NotFoundError, ValidationError
 
 # Full-page (non-fragment) routes. Adapters only: no business logic here —
@@ -17,8 +18,19 @@ def _session():
 
 @bp.route("/")
 def home():
-    """Empty home page for the 0.1.0 foundation increment."""
-    return render_template("base.html")     
+    """Show the dashboard: in-progress versions, doing/waiting tasks and queue counters."""
+    return render_template("dashboard.html", dashboard=views.dashboard(_session()))
+
+
+@bp.route("/export.json")
+def export_json():
+    """Download the whole database as a JSON file."""
+    body = json.dumps(export.dump_json(_session()), indent=2)
+    response = current_app.response_class(body, mimetype="application/json")
+    response.headers["Content-Disposition"] = (
+        f'attachment; filename="nexus-export-{date.today().isoformat()}.json"'
+    )
+    return response
 
 
 @bp.route("/projects", methods=["GET", "POST"])
@@ -88,6 +100,21 @@ def versions_list(key):
     )
 
 
+def _render_version(version, error):
+    """Render the version detail page with its changelog.
+
+    Args:
+        version: The version to show.
+        error: Message to display, or None.
+    """
+    return render_template(
+        "version.html",
+        version=version,
+        changelog=events.changelog(_session(), version.id),
+        error=error,
+    )
+
+
 @bp.route("/projects/<key>/versions/<number>")
 def version_detail(key, number):
     """Show a single version's details."""
@@ -96,7 +123,7 @@ def version_detail(key, number):
         version = versions.get(session, key, number)
     except NotFoundError:
         abort(404)
-    return render_template("version.html", version=version, error=None)
+    return _render_version(version, None)
 
 
 @bp.route("/projects/<key>/versions/<number>/start", methods=["POST"])
@@ -112,7 +139,7 @@ def version_start(key, number):
         versions.start(session, version.id)
     except ValidationError as e:
         error = str(e)
-    return render_template("version.html", version=version, error=error)
+    return _render_version(version, error)
 
 
 @bp.route("/projects/<key>/versions/<number>/release", methods=["POST"])
@@ -128,7 +155,7 @@ def version_release(key, number):
         versions.release(session, version.id)
     except ValidationError as e:
         error = str(e)
-    return render_template("version.html", version=version, error=error)
+    return _render_version(version, error)
 
 
 @bp.route("/tasks", methods=["GET", "POST"])
@@ -167,6 +194,21 @@ def capture():
     return redirect(_safe_next(request.form.get("next"), "pages.tasks_list"))
 
 
+def _render_task(task, error):
+    """Render the task detail page with its event history.
+
+    Args:
+        task: The task to show.
+        error: Message to display, or None.
+    """
+    return render_template(
+        "task.html",
+        task=task,
+        history=events.history(_session(), "task", task.id),
+        error=error,
+    )
+
+
 @bp.route("/tasks/<int:task_id>")
 def task_detail(task_id):
     """Show a single task's details."""
@@ -175,7 +217,7 @@ def task_detail(task_id):
         task = tasks.get(session, task_id)
     except NotFoundError:
         abort(404)
-    return render_template("task.html", task=task, error=None)
+    return _render_task(task, None)
 
 
 def _run_transition(session, task_id, fn):
@@ -214,7 +256,7 @@ def _clarify_fields():
 def _apply_transition(task_id, fn):
     """Run a task transition and render the task detail page with the result."""
     task, error = _run_transition(_session(), task_id, fn)
-    return render_template("task.html", task=task, error=error)
+    return _render_task(task, error)
 
 
 @bp.route("/tasks/<int:task_id>/update", methods=["POST"])

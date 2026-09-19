@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from src.models.definition_of_done import DefinitionOfDoneCriterion
 from src.models.version import Version, VersionStatus
 from src.models.task import Task,TaskState
-from src.services import projects
+from src.services import events, projects
 from src.services.errors import ConflictError, NotFoundError, ValidationError
 
 def create(session : Session,
@@ -53,6 +53,9 @@ def create(session : Session,
     ]
 
     session.add(version)
+    session.flush()
+    events.log(session, events.ACTOR_WEB, "version", version.id, "created",
+               {"number": number, "title": title})
     session.commit()
     return version
 
@@ -80,6 +83,8 @@ def reorder(session : Session, project_key : str, ordered_ids : list) -> None:
     for position, version_id in enumerate(ordered_ids):
         versions_by_id[version_id].position = position
 
+    events.log(session, events.ACTOR_WEB, "project", project.id, "versions_reordered",
+               {"ordered_ids": ordered_ids})
     session.commit()
 
 def list(session : Session, project_key : str) -> list:
@@ -162,6 +167,8 @@ def start(session : Session, version_id : int) -> Version:
 
     if version.status == VersionStatus.PLANNED:
         version.status = VersionStatus.IN_PROGRESS
+        events.log(session, events.ACTOR_WEB, "version", version.id, "started",
+                   {"from": VersionStatus.PLANNED.name, "to": VersionStatus.IN_PROGRESS.name})
         session.commit()
         return version
     else:
@@ -194,6 +201,8 @@ def release(session : Session, version_id : int) -> Version:
     if version.status == VersionStatus.IN_PROGRESS:
         version.status = VersionStatus.RELEASED
         version.released_at = datetime.utcnow()
+        events.log(session, events.ACTOR_WEB, "version", version.id, "released",
+                   {"from": VersionStatus.IN_PROGRESS.name, "to": VersionStatus.RELEASED.name})
         session.commit()
         return version
     else:

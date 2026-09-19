@@ -4,12 +4,25 @@ from sqlalchemy.orm import Session
 
 from src.models.task import Task, TaskState
 from src.models.version import Version, VersionStatus
-from src.services import projects
+from src.services import events, projects
 from src.services.errors import InvalidTransitionError, NotFoundError, ValidationError
 
 # Fields update() is allowed to touch; state, project/version linkage and
 # timestamps only ever change through the dedicated transition functions.
 _UPDATABLE_FIELDS = {"title", "body", "context", "size"}
+
+def _log_transition(session : Session, task : Task, action : str, previous : TaskState, **extra : object) -> None:
+    """Log a task state change in the event log.
+
+    Args:
+        session: Database session to use.
+        task: The task, already moved to its new state.
+        action: Event action (e.g. "started").
+        previous: The state the task was in before the change.
+        **extra: Additional payload entries (e.g. reason).
+    """
+    payload = {"from": previous.name, "to": task.state.name, **extra}
+    events.log(session, events.ACTOR_WEB, "task", task.id, action, payload)
 
 def get(session : Session, task_id : int) -> Task:
     """Look up a task by its id.
@@ -53,6 +66,8 @@ def capture(session : Session, title : str) -> Task:
     """
     task = Task(title=title, state=TaskState.INBOX)
     session.add(task)
+    session.flush()
+    events.log(session, events.ACTOR_WEB, "task", task.id, "created", {"title": title})
     session.commit()
     return task
 
@@ -87,6 +102,8 @@ def create(session : Session,
                 size=size,
                 state=TaskState.INBOX)
     session.add(task)
+    session.flush()
+    events.log(session, events.ACTOR_WEB, "task", task.id, "created", {"title": title})
     session.commit()
     return task
 
@@ -111,8 +128,15 @@ def update(session : Session, task_id : int, **fields : str | None) -> Task:
         if name not in _UPDATABLE_FIELDS:
             raise ValidationError(f"field '{name}' cannot be updated this way.")
 
+    changes = {}
     for name, value in fields.items():
+        old_value = getattr(task, name)
+        if old_value != value:
+            changes[name] = {"from": old_value, "to": value}
         setattr(task, name, value)
+
+    if changes:
+        events.log(session, events.ACTOR_WEB, "task", task.id, "updated", changes)
 
     session.commit()
     return task
@@ -152,6 +176,7 @@ def clarify(session : Session,
 
     project = projects.get(session, project_key) if project_key else None
 
+    previous = task.state
     task.title = title
     task.body = body
     task.project_id = project.id if project else None
@@ -159,6 +184,7 @@ def clarify(session : Session,
     task.size = size
     task.state = TaskState.REFINED
 
+    _log_transition(session, task, "clarified", previous)
     session.commit()
     return task
 
@@ -198,6 +224,7 @@ def plan(session : Session, task_id : int, version_id : int) -> Task:
     task.version_id = version.id
     task.state = TaskState.PLANNED
 
+    _log_transition(session, task, "planned", TaskState.REFINED, version_id=version.id)
     session.commit()
     return task
 
@@ -223,6 +250,7 @@ def unplan(session : Session, task_id : int) -> Task:
     task.version_id = None
     task.state = TaskState.REFINED
 
+    _log_transition(session, task, "unplanned", TaskState.PLANNED)
     session.commit()
     return task
 
@@ -247,6 +275,7 @@ def start(session : Session, task_id : int) -> Task:
 
     task.state = TaskState.DOING
 
+    _log_transition(session, task, "started", TaskState.PLANNED)
     session.commit()
     return task
 
@@ -277,6 +306,7 @@ def block(session : Session, task_id : int, reason : str) -> Task:
     task.state = TaskState.WAITING
     task.blocked_reason = reason
 
+    _log_transition(session, task, "blocked", TaskState.DOING, reason=reason)
     session.commit()
     return task
 
@@ -302,6 +332,7 @@ def unblock(session : Session, task_id : int) -> Task:
     task.state = TaskState.DOING
     task.blocked_reason = None
 
+    _log_transition(session, task, "unblocked", TaskState.WAITING)
     session.commit()
     return task
 
@@ -327,6 +358,7 @@ def complete(session : Session, task_id : int) -> Task:
     task.state = TaskState.DONE
     task.closed_at = datetime.utcnow()
 
+    _log_transition(session, task, "completed", TaskState.DOING)
     session.commit()
     return task
 
@@ -352,6 +384,7 @@ def reopen(session : Session, task_id : int) -> Task:
     task.state = TaskState.DOING
     task.closed_at = None
 
+    _log_transition(session, task, "reopened", TaskState.DONE)
     session.commit()
     return task
 
@@ -374,8 +407,10 @@ def defer(session : Session, task_id : int) -> Task:
     if task.state not in (TaskState.INBOX, TaskState.REFINED):
         raise InvalidTransitionError(f"task '{task_id}' isn't inbox or refined.")
 
+    previous = task.state
     task.state = TaskState.SOMEDAY
 
+    _log_transition(session, task, "deferred", previous)
     session.commit()
     return task
 
@@ -390,5 +425,6 @@ def delete(session : Session, task_id : int) -> None:
         NotFoundError: If no task has this id.
     """
     task = get(session, task_id)
+    events.log(session, events.ACTOR_WEB, "task", task.id, "deleted", {"title": task.title})
     session.delete(task)
     session.commit()
