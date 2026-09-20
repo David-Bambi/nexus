@@ -71,6 +71,33 @@ Routes are unprefixed full-page adapters (`web/routes_pages.py`):
 - The nav bar links Dashboard, Projects, Tasks, Inbox, Refine, Search and
   Export.
 
+## Runtime modules
+
+Top-level modules under `src/` that run the app as a service (see
+[0005](adr/0005-operational-layout.md)):
+
+- `config.py`: `Config` (data dir, database URL, log file, backup dir and
+  retention, `HOST` fixed to `127.0.0.1` per
+  [0004](adr/0004-localhost-only.md), `PORT`).
+- `main.py`: production entry point, `python -m src.main`.
+- `backup.py`: online SQLite backup with pruning.
+- `logging_config.py`: rotating file plus stderr handlers on the root logger.
+
+List pages (`/search`, `/refine`, `/tasks`) show at most 100 rows.
+
+### Startup sequence
+
+```mermaid
+flowchart LR
+    A[Create data dir] --> B[Configure logging]
+    B --> C[Backup database]
+    C --> D[create_app + migrations]
+    D --> E[waitress on 127.0.0.1]
+```
+
+The backup precedes migrations so a failed upgrade can be rolled back from
+a snapshot. A failed backup is logged and startup continues.
+
 ## Decisions
 
 See [Decisions](adr/0001-services-ignore-http.md) for the full ADR journal.

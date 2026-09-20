@@ -281,3 +281,39 @@ def test_dashboard_counters_match_inbox_and_refine(session):
     result = views.dashboard(session)
     assert result.inbox_count == len(views.inbox(session)) == 2
     assert result.refine_count == len(views.to_refine(session)) == 1
+
+
+# Limits -------------------------------------------------------------------------------------------
+
+def test_to_refine_limit_keeps_the_oldest(session):
+    """To refine with a limit returns only the oldest tasks
+    Given three refined tasks
+    When listing the queue with a limit of 2
+    Then the two oldest are returned, oldest first
+    """
+    ids = [_refined_task(session, name).id for name in ("First", "Second", "Third")]
+
+    result = views.to_refine(session, limit=2)
+    assert [t.id for t in result] == ids[:2]
+
+def test_to_refine_without_limit_returns_everything(session):
+    """To refine without a limit returns the whole queue
+    Given three refined tasks
+    When listing the queue
+    Then all three are returned
+    """
+    for name in ("First", "Second", "Third"):
+        _refined_task(session, name)
+
+    assert len(views.to_refine(session)) == 3
+
+def test_search_limit_keeps_the_oldest_matches(session):
+    """Search with a limit returns only the oldest matches
+    Given three tasks containing 'docs'
+    When searching with a limit of 2
+    Then the two oldest matches are returned
+    """
+    ids = [tasks.capture(session, f"Docs {n}").id for n in range(3)]
+
+    result = views.search(session, "docs", limit=2)
+    assert [t.id for t in result] == ids[:2]

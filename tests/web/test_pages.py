@@ -379,3 +379,58 @@ def test_nav_links_to_dashboard_and_export(client):
     response = client.get("/projects")
     assert b'href="/"' in response.data
     assert b'href="/export.json"' in response.data
+
+
+def _capture_many(client, count, refined=False):
+    """Create count tasks named 'Docs <n>' straight through the services, oldest first.
+
+    Args:
+        client: The Flask test client, whose app holds the database.
+        count: Number of tasks to create.
+        refined: If true, clarify each task so it lands in the refine queue.
+    """
+    from src.services import tasks
+    session = client.application.extensions["db_session"]()
+    for n in range(count):
+        task = tasks.capture(session, f"Docs {n}")
+        if refined:
+            tasks.clarify(session, task.id, task.title, None, None, None, None)
+
+
+def test_search_cuts_a_long_result_list_and_says_so(client):
+    """A search with more than 100 matches shows 100 and a note."""
+    _capture_many(client, 101)
+
+    response = client.get("/search?q=docs")
+    assert response.data.count(b'href="/tasks/') == 100
+    assert b"Showing the first 100 results" in response.data
+
+
+def test_search_under_the_limit_has_no_note(client):
+    """A search with few matches shows all of them and no note."""
+    _capture_many(client, 3)
+
+    response = client.get("/search?q=docs")
+    assert response.data.count(b'href="/tasks/') == 3
+    assert b"Showing the first" not in response.data
+
+
+def test_tasks_page_shows_the_most_recent_and_says_so(client):
+    """The task list with more than 100 tasks shows the newest 100 and a note."""
+    _capture_many(client, 101)
+
+    response = client.get("/tasks")
+    body = response.data
+    assert body.count(b'href="/tasks/') == 100
+    assert b"Showing the 100 most recent tasks" in body
+    assert b"Docs 100" in body
+    assert b"Docs 0<" not in body
+
+
+def test_refine_cuts_a_long_queue_and_says_so(client):
+    """The refine queue with more than 100 tasks shows the oldest 100 and a note."""
+    _capture_many(client, 101, refined=True)
+
+    response = client.get("/refine")
+    assert response.data.count(b'href="/tasks/') == 100
+    assert b"Showing the 100 oldest tasks" in response.data

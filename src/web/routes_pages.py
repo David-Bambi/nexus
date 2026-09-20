@@ -10,6 +10,10 @@ from src.services.errors import ConflictError, InvalidTransitionError, NotFoundE
 # validate input, call a service, render a template (ADR-0001).
 bp = Blueprint("pages", __name__)
 
+# Most rows a list page renders. Beyond that, pages get slow (spec §8: under
+# 100 ms) and unreadable; a note tells the user the list was cut.
+PAGE_LIMIT = 100
+
 
 def _session():
     """Return this request's SQLAlchemy session, stashed on the app by create_app()."""
@@ -165,7 +169,8 @@ def tasks_list():
     if request.method == "POST":
         tasks.capture(session, request.form["title"])
         return redirect(url_for("pages.tasks_list"))
-    return render_template("tasks.html", tasks=tasks.list(session))
+    recent = tasks.list(session, limit=PAGE_LIMIT)
+    return render_template("tasks.html", tasks=recent, truncated=len(recent) == PAGE_LIMIT, limit=PAGE_LIMIT)
 
 
 def _safe_next(next_url, fallback_endpoint):
@@ -409,9 +414,12 @@ def refine():
     session = _session()
     context = request.args.get("context") or None
     project_key = request.args.get("project_key") or None
+    queue = views.to_refine(session, context, project_key, limit=PAGE_LIMIT)
     return render_template(
         "refine.html",
-        tasks=views.to_refine(session, context, project_key),
+        tasks=queue,
+        truncated=len(queue) == PAGE_LIMIT,
+        limit=PAGE_LIMIT,
         projects=projects.list(session),
         context=context,
         project_key=project_key,
@@ -423,4 +431,7 @@ def search():
     """Show tasks matching a free-text search term."""
     session = _session()
     term = request.args.get("q", "")
-    return render_template("search.html", tasks=views.search(session, term), term=term)
+    found = views.search(session, term, limit=PAGE_LIMIT)
+    return render_template(
+        "search.html", tasks=found, term=term, truncated=len(found) == PAGE_LIMIT, limit=PAGE_LIMIT
+    )

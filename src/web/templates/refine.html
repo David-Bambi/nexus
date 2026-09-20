@@ -29,4 +29,7 @@
     <li>Nothing to refine.</li>
     {% endfor %}
 </ul>
+{% if truncated %}
+<p>Showing the {{ limit }} oldest tasks. Refine some, or narrow the filters, to see the rest.</p>
+{% endif %}
 {% endblock %}

@@ -27,6 +27,7 @@ nav:
           - "0002 — Append-only event log": architecture/adr/0002-append-only-event-log.md
           - "0003 — Flask, Jinja, HTMX": architecture/adr/0003-flask-jinja-htmx.md
           - "0004 — Localhost only": architecture/adr/0004-localhost-only.md
+          - "0005 — Operational layout": architecture/adr/0005-operational-layout.md
   - Functional: functional/index.md
   - Python:
       - Overview: python/index.md

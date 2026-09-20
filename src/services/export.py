@@ -2,7 +2,7 @@ from datetime import date, datetime
 from enum import Enum
 
 from sqlalchemy import inspect
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from src.models.event import Event
 from src.models.project import Project
@@ -43,9 +43,16 @@ def _row(entity : object) -> dict:
     }
 
 
-def _all(session : Session, model : type) -> list:
-    """Query every row of a model, in id order."""
-    return session.query(model).order_by(model.id).all()
+def _all(session : Session, model : type, *options : object) -> list:
+    """Query every row of a model, in id order.
+
+    Args:
+        session: Database session to use.
+        model: The model to query.
+        *options: Loader options, to fetch related rows in bulk rather than
+            one query per row.
+    """
+    return session.query(model).options(*options).order_by(model.id).all()
 
 
 def dump_json(session : Session) -> dict:
@@ -62,13 +69,13 @@ def dump_json(session : Session) -> dict:
         are included.
     """
     versions = []
-    for version in _all(session, Version):
+    for version in _all(session, Version, selectinload(Version.definition_of_done)):
         criteria = sorted(version.definition_of_done, key=lambda c: c.position)
         versions.append({**_row(version), "definition_of_done": [c.description for c in criteria]})
 
     tasks = [
         {**_row(task), "tags": sorted(tag.name for tag in task.tags)}
-        for task in _all(session, Task)
+        for task in _all(session, Task, selectinload(Task.tags))
     ]
 
     return {

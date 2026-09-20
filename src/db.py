@@ -1,4 +1,4 @@
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.orm import DeclarativeBase, Session, scoped_session, sessionmaker
 
 
@@ -21,7 +21,20 @@ def get_engine(database_url: str) -> Engine:
     # SQLite forbids sharing a connection across threads by default; Flask's
     # dev server can serve a request on a different thread, so relax that.
     connect_args = {"check_same_thread": False} if database_url.startswith("sqlite") else {}
-    return create_engine(database_url, connect_args=connect_args)
+    engine = create_engine(database_url, connect_args=connect_args)
+
+    # WAL lets readers and the writer work at the same time, and survives a
+    # crash better than the default journal. It needs a real file, so
+    # in-memory databases are left alone.
+    if engine.dialect.name == "sqlite" and engine.url.database not in (None, "", ":memory:"):
+        @event.listens_for(engine, "connect")
+        def _enable_wal(dbapi_connection, connection_record):
+            """Switch each new SQLite connection to write-ahead logging."""
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.close()
+
+    return engine
 
 
 def get_session_factory(engine: Engine) -> scoped_session[Session]:

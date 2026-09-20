@@ -14,12 +14,17 @@ config = context.config
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
-if config.config_file_name is not None:
+#
+# Skipped when the app runs the migrations itself (it sets the attribute to
+# False): fileConfig would replace the handlers the app already installed.
+if config.config_file_name is not None and config.attributes.get("configure_logger", True):
     fileConfig(config.config_file_name)
 
 # Single source of truth for the DB URL: same Config class the Flask app
-# uses, instead of duplicating it in alembic.ini.
-config.set_main_option("sqlalchemy.url", Config.DATABASE_URL)
+# uses, instead of duplicating it in alembic.ini. A URL already set by the
+# caller (the app passes its own) is kept.
+if not config.get_main_option("sqlalchemy.url"):
+    config.set_main_option("sqlalchemy.url", Config.DATABASE_URL)
 
 # Import src.models above registers every model on Base.metadata, which is
 # what autogenerate diffs against.

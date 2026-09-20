@@ -5,6 +5,10 @@
 {% block content %}
 <h1>Tasks</h1>
 
+{% if truncated %}
+<p>Showing the {{ limit }} most recent tasks. Use Search to find older ones.</p>
+{% endif %}
+
 <ul>
     {% for task in tasks %}
     <li>

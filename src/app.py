@@ -4,6 +4,7 @@ from pathlib import Path
 from alembic import command
 from alembic.config import Config as AlembicConfig
 from flask import Flask
+from sqlalchemy.engine import make_url
 
 from src.config import Config
 from src.db import get_engine, get_session_factory
@@ -36,6 +37,10 @@ def create_app(config_class: type[Config] = Config) -> Flask:
     # database file there.
     os.makedirs(app.instance_path, exist_ok=True)
 
+    # SQLite creates the database file but not its folder (e.g. ~/.nexus on
+    # first run).
+    _ensure_database_folder(app.config["DATABASE_URL"])
+
     # Skip in tests: an in-memory DB can't be migrated and then reopened by
     # a second connection — tests create tables directly instead.
     if not app.config.get("TESTING"):
@@ -56,6 +61,18 @@ def create_app(config_class: type[Config] = Config) -> Flask:
     return app
 
 
+def _ensure_database_folder(database_url: str) -> None:
+    """Create the folder of a file-based SQLite database if it is missing.
+
+    Args:
+        database_url: SQLAlchemy connection URL. Anything other than a
+            SQLite file (another database, or in memory) is ignored.
+    """
+    url = make_url(database_url)
+    if url.get_backend_name() == "sqlite" and url.database not in (None, "", ":memory:"):
+        Path(url.database).parent.mkdir(parents=True, exist_ok=True)
+
+
 def _upgrade_database(database_url: str) -> None:
     """Run pending migrations up to head. Idempotent, safe on every start.
 
@@ -64,4 +81,7 @@ def _upgrade_database(database_url: str) -> None:
     """
     alembic_cfg = AlembicConfig(str(BASE_DIR / "alembic.ini"))
     alembic_cfg.set_main_option("sqlalchemy.url", database_url)
+    # Keep the app's own logging setup: env.py would otherwise replace it
+    # with the one from alembic.ini.
+    alembic_cfg.attributes["configure_logger"] = False
     command.upgrade(alembic_cfg, "head")

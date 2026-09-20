@@ -99,3 +99,44 @@ def test_dump_includes_archived_projects_and_done_tasks(session):
     assert result["projects"][0]["status"] == "ARCHIVED"
     assert result["tasks"][0]["state"] == "DONE"
     assert result["tasks"][0]["closed_at"]
+
+
+# Queries ------------------------------------------------------------------------------------------
+
+def _count_queries(session, action):
+    """Run action() and return how many SQL statements it issued."""
+    from sqlalchemy import event
+    statements = []
+    engine = session.get_bind()
+    listener = lambda *args: statements.append(1)
+    event.listen(engine, "before_cursor_execute", listener)
+    try:
+        action()
+    finally:
+        event.remove(engine, "before_cursor_execute", listener)
+    return len(statements)
+
+def _tagged_task(session, title, tag):
+    """Capture a task carrying a tag."""
+    task = tasks.capture(session, title)
+    task.tags.append(tag)
+    session.commit()
+
+def test_dump_query_count_does_not_grow_with_the_data(session):
+    """Dump issues the same number of queries however many tasks and versions exist
+    Given a database with one tagged task and one version
+    When dumping it, then adding many more tagged tasks and versions and dumping again
+    Then the number of SQL statements is unchanged
+    """
+    projects.create(session, "nexus", "Nexus", "")
+    versions.create(session, "nexus", "0.1.0", "First version", ["Ships", "Documented"])
+    tag = Tag(name="docs")
+    _tagged_task(session, "Write the docs", tag)
+    small = _count_queries(session, lambda: export.dump_json(session))
+
+    for i in range(20):
+        versions.create(session, "nexus", f"1.{i}.0", "Another", ["Ships"])
+        _tagged_task(session, f"Task {i}", tag)
+    large = _count_queries(session, lambda: export.dump_json(session))
+
+    assert large == small

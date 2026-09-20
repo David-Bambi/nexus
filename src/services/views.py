@@ -55,7 +55,8 @@ def inbox(session : Session) -> list:
     )
 
 
-def to_refine(session : Session, context : str | None = None, project_key : str | None = None) -> list:
+def to_refine(session : Session, context : str | None = None, project_key : str | None = None,
+              limit : int | None = None) -> list:
     """List refined tasks that still need to be planned into a version.
 
     Args:
@@ -63,9 +64,11 @@ def to_refine(session : Session, context : str | None = None, project_key : str 
         context: Optional context tag (e.g. "@ordi") to filter on.
         project_key: Optional project key to filter on. A key matching no
             project simply yields no results, rather than raising.
+        limit: Optional maximum number of tasks to return.
 
     Returns:
-        Refined, unplanned tasks matching the given filters, oldest first.
+        Refined, unplanned tasks matching the given filters, oldest first
+        (the oldest `limit` of them when a limit is given).
     """
     query = session.query(Task).options(joinedload(Task.project)).filter(
         Task.state == TaskState.REFINED, Task.version_id.is_(None)
@@ -81,30 +84,37 @@ def to_refine(session : Session, context : str | None = None, project_key : str 
             return []
         query = query.filter(Task.project_id == project.id)
 
-    return query.order_by(Task.created_at).all()
+    query = query.order_by(Task.created_at)
+    if limit is not None:
+        query = query.limit(limit)
+    return query.all()
 
 
-def search(session : Session, term : str) -> list:
+def search(session : Session, term : str, limit : int | None = None) -> list:
     """Search tasks by a substring of their title or body.
 
     Args:
         session: Database session to use.
         term: Text to search for, matched case-insensitively. An empty or
             missing term yields no results, rather than the whole table.
+        limit: Optional maximum number of tasks to return.
 
     Returns:
-        Matching tasks, oldest first.
+        Matching tasks, oldest first (the oldest `limit` of them when a
+        limit is given).
     """
     if not term:
         return []
 
     pattern = f"%{term}%"
-    return (
+    query = (
         session.query(Task)
         .filter((Task.title.ilike(pattern)) | (Task.body.ilike(pattern)))
         .order_by(Task.created_at)
-        .all()
     )
+    if limit is not None:
+        query = query.limit(limit)
+    return query.all()
 
 
 def dashboard(session : Session) -> DashboardView:

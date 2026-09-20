@@ -43,16 +43,22 @@ def get(session : Session, task_id : int) -> Task:
     else:
         return task
 
-def list(session : Session) -> list:
-    """List all tasks.
+def list(session : Session, limit : int | None = None) -> list:
+    """List tasks.
 
     Args:
         session: Database session to use.
+        limit: Optional maximum number of tasks to return.
 
     Returns:
-        All tasks, ordered by creation.
+        All tasks, ordered by creation, oldest first. With a limit, only
+        the `limit` most recently created ones (still oldest first).
     """
-    return session.query(Task).order_by(Task.created_at).all()
+    if limit is None:
+        return session.query(Task).order_by(Task.created_at, Task.id).all()
+
+    recent = session.query(Task).order_by(Task.created_at.desc(), Task.id.desc()).limit(limit).all()
+    return recent[::-1]
 
 def capture(session : Session, title : str) -> Task:
     """Quickly capture a task title, with no other detail yet.

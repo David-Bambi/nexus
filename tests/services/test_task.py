@@ -628,3 +628,28 @@ def test_delete_logs_deleted_and_keeps_history(session):
         ("created", {"title": "Write the docs"}),
         ("deleted", {"title": "Write the docs"}),
     ]
+
+
+# List ---------------------------------------------------------------------------------------------
+
+def test_list_with_limit_returns_the_most_recent_oldest_first(session):
+    """List with a limit returns the newest tasks, in creation order
+    Given four captured tasks
+    When listing with a limit of 3
+    Then the three most recent are returned, oldest first
+    """
+    ids = [tasks.capture(session, f"Task {n}").id for n in range(4)]
+
+    result = tasks.list(session, limit=3)
+    assert [t.id for t in result] == ids[1:]
+
+def test_list_limit_larger_than_the_data_returns_everything(session):
+    """List with a limit above the number of tasks returns them all
+    Given two captured tasks
+    When listing with a limit of 10
+    Then both are returned
+    """
+    tasks.capture(session, "First")
+    tasks.capture(session, "Second")
+
+    assert len(tasks.list(session, limit=10)) == 2

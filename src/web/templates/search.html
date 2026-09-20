@@ -22,4 +22,7 @@
     {% endif %}
     {% endfor %}
 </ul>
+{% if truncated %}
+<p>Showing the first {{ limit }} results. Narrow your search to see the rest.</p>
+{% endif %}
 {% endblock %}
