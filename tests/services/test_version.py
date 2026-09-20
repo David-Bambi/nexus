@@ -153,6 +153,7 @@ def test_release_in_progress_version(session):
     projects.create(session, "nexus", "Nexus", "")
     version = versions.create(session, "nexus", "0.1.0", "First version", ["Ships"])
     versions.start(session, version.id)
+    versions.set_criterion_done(session, version.definition_of_done[0].id, True)
     released = versions.release(session, version.id)
     assert released.status is VersionStatus.RELEASED
     assert released.released_at is not None
@@ -270,10 +271,12 @@ def test_start_and_release_log_events(session):
     projects.create(session, "nexus", "Nexus", "")
     version = versions.create(session, "nexus", "0.1.0", "First version", ["Ships"])
     versions.start(session, version.id)
+    versions.set_criterion_done(session, version.definition_of_done[0].id, True)
     versions.release(session, version.id)
 
     assert _history(session, version.id)[1:] == [
         ("started", {"from": "PLANNED", "to": "IN_PROGRESS"}),
+        ("dod_checked", {"criterion_id": version.definition_of_done[0].id, "description": "Ships"}),
         ("released", {"from": "IN_PROGRESS", "to": "RELEASED"}),
     ]
 
@@ -308,3 +311,172 @@ def test_reorder_logs_on_project(session):
     history = events.history(session, "project", project.id)
     assert (history[-1].action, history[-1].payload) == (
         "versions_reordered", {"ordered_ids": [second.id, first.id]})
+
+
+# Definition of done ------------------------------------------------------------------------------
+
+def _version_with_dod(session, *dod):
+    """Create project 'nexus' with a version '0.1.0' holding the given criteria."""
+    projects.create(session, "nexus", "Nexus", "")
+    return versions.create(session, "nexus", "0.1.0", "First version", list(dod))
+
+def _released_version(session):
+    """Create a released version '0.1.0' with one checked criterion."""
+    version = _version_with_dod(session, "Ships")
+    versions.start(session, version.id)
+    versions.set_criterion_done(session, version.definition_of_done[0].id, True)
+    versions.release(session, version.id)
+    return version
+
+def test_add_criterion_appends_unchecked(session):
+    """Add a criterion appends it, unchecked, after the existing ones
+    Given a version with criteria 'Ships' and 'Docs'
+    When adding the criterion 'Tests'
+    Then it is last, unchecked, and the description is stripped
+    """
+    version = _version_with_dod(session, "Ships", "Docs")
+    criterion = versions.add_criterion(session, version.id, "  Tests ")
+    assert [c.description for c in version.definition_of_done] == ["Ships", "Docs", "Tests"]
+    assert criterion.position == 2
+    assert criterion.done is False
+
+def test_add_criterion_rejects_empty_description(session):
+    """Add a blank criterion raises a ValidationError
+    Given a version
+    When adding a criterion with a blank description
+    Then a validation error is raised
+    """
+    version = _version_with_dod(session, "Ships")
+    with pytest.raises(ValidationError):
+        versions.add_criterion(session, version.id, "   ")
+
+def test_add_criterion_version_not_found(session):
+    """Add a criterion to a non existing version raises a NotFoundError
+    Given no version
+    When adding a criterion to version 1
+    Then a not found error is raised
+    """
+    with pytest.raises(NotFoundError):
+        versions.add_criterion(session, 1, "Tests")
+
+def test_update_criterion_changes_description(session):
+    """Update a criterion changes its description
+    Given a version with criterion 'Ships'
+    When updating it to 'Ships to prod'
+    Then the criterion has the new description
+    """
+    version = _version_with_dod(session, "Ships")
+    criterion = versions.update_criterion(session, version.definition_of_done[0].id, "Ships to prod")
+    assert criterion.description == "Ships to prod"
+
+def test_update_criterion_rejects_empty_description(session):
+    """Update a criterion to a blank description raises a ValidationError
+    Given a version with criterion 'Ships'
+    When updating it to a blank description
+    Then a validation error is raised
+    """
+    version = _version_with_dod(session, "Ships")
+    with pytest.raises(ValidationError):
+        versions.update_criterion(session, version.definition_of_done[0].id, " ")
+
+def test_delete_criterion_removes_it(session):
+    """Delete a criterion removes it from the version
+    Given a version with criteria 'Ships' and 'Docs'
+    When deleting 'Ships'
+    Then only 'Docs' remains
+    """
+    version = _version_with_dod(session, "Ships", "Docs")
+    versions.delete_criterion(session, version.definition_of_done[0].id)
+    assert [c.description for c in version.definition_of_done] == ["Docs"]
+
+def test_delete_last_criterion_rejected(session):
+    """Delete the last criterion raises a ValidationError
+    Given a version with a single criterion
+    When deleting it
+    Then a validation error is raised and the criterion remains
+    """
+    version = _version_with_dod(session, "Ships")
+    with pytest.raises(ValidationError):
+        versions.delete_criterion(session, version.definition_of_done[0].id)
+    assert len(version.definition_of_done) == 1
+
+def test_set_criterion_done_checks_and_unchecks(session):
+    """Set a criterion done toggles its state
+    Given a version with an unchecked criterion
+    When checking it, then unchecking it
+    Then its done flag follows
+    """
+    version = _version_with_dod(session, "Ships")
+    criterion_id = version.definition_of_done[0].id
+    assert versions.set_criterion_done(session, criterion_id, True).done is True
+    assert versions.set_criterion_done(session, criterion_id, False).done is False
+
+def test_criterion_not_found(session):
+    """Mutating a non existing criterion raises a NotFoundError
+    Given no criterion
+    When updating, deleting or checking criterion 1
+    Then a not found error is raised each time
+    """
+    with pytest.raises(NotFoundError):
+        versions.update_criterion(session, 1, "x")
+    with pytest.raises(NotFoundError):
+        versions.delete_criterion(session, 1)
+    with pytest.raises(NotFoundError):
+        versions.set_criterion_done(session, 1, True)
+
+def test_released_version_dod_is_frozen(session):
+    """Every DOD mutation on a released version raises a ConflictError
+    Given a released version
+    When adding, updating, deleting or unchecking a criterion
+    Then a conflict error is raised each time
+    """
+    version = _released_version(session)
+    criterion_id = version.definition_of_done[0].id
+    with pytest.raises(ConflictError):
+        versions.add_criterion(session, version.id, "Tests")
+    with pytest.raises(ConflictError):
+        versions.update_criterion(session, criterion_id, "Other")
+    with pytest.raises(ConflictError):
+        versions.delete_criterion(session, criterion_id)
+    with pytest.raises(ConflictError):
+        versions.set_criterion_done(session, criterion_id, False)
+
+def test_release_with_unchecked_criterion(session):
+    """Release a version with an unchecked criterion raises a ValidationError
+    Given a version in progress with one checked and one unchecked criterion
+    When releasing it
+    Then a validation error is raised and the version stays in progress
+    """
+    version = _version_with_dod(session, "Ships", "Docs")
+    versions.start(session, version.id)
+    versions.set_criterion_done(session, version.definition_of_done[0].id, True)
+    with pytest.raises(ValidationError):
+        versions.release(session, version.id)
+    assert version.status is VersionStatus.IN_PROGRESS
+
+def test_dod_mutations_log_events(session):
+    """DOD mutations log events on the version
+    Given a version with criterion 'Ships'
+    When adding 'Docs', renaming it, checking it, unchecking it, then deleting it
+    Then the history shows each mutation in order
+    """
+    version = _version_with_dod(session, "Ships")
+    docs = versions.add_criterion(session, version.id, "Docs")
+    versions.update_criterion(session, docs.id, "Docs v2")
+    versions.set_criterion_done(session, docs.id, True)
+    versions.set_criterion_done(session, docs.id, False)
+    versions.delete_criterion(session, docs.id)
+
+    assert [action for action, _ in _history(session, version.id)[1:]] == [
+        "dod_added", "dod_updated", "dod_checked", "dod_unchecked", "dod_deleted",
+    ]
+
+def test_set_criterion_done_unchanged_logs_nothing(session):
+    """Setting a criterion to its current state logs no event
+    Given a version with an unchecked criterion
+    When setting it to not done
+    Then no dod event exists
+    """
+    version = _version_with_dod(session, "Ships")
+    versions.set_criterion_done(session, version.definition_of_done[0].id, False)
+    assert [action for action, _ in _history(session, version.id)] == ["created"]

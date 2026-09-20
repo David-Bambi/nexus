@@ -1,4 +1,4 @@
-from sqlalchemy import ForeignKey, Integer, Text
+from sqlalchemy import Boolean, ForeignKey, Integer, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.db import Base
@@ -19,5 +19,6 @@ class DefinitionOfDoneCriterion(Base):
     description: Mapped[str] = mapped_column(Text, nullable=False)
     # Manual ordering within a version's checklist.
     position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    done: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
 
     version: Mapped["Version"] = relationship(back_populates="definition_of_done")

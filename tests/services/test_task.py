@@ -226,6 +226,7 @@ def test_plan_released_version(session):
     projects.create(session, "nexus", "Nexus", "")
     version = versions.create(session, "nexus", "0.1.0", "First version", ["Ships"])
     versions.start(session, version.id)
+    versions.set_criterion_done(session, version.definition_of_done[0].id, True)
     versions.release(session, version.id)
     task = tasks.capture(session, "Write the docs")
     tasks.clarify(session, task.id, "Write the docs", None, None, None, None)

@@ -105,6 +105,7 @@ def test_start_and_release_version(client):
     assert response.status_code == 200
     assert b"IN_PROGRESS" in response.data
 
+    client.post("/projects/nexus/versions/0.1.0/dod/1/toggle")
     response = client.post("/projects/nexus/versions/0.1.0/release")
     assert response.status_code == 200
     assert b"RELEASED" in response.data
@@ -434,3 +435,111 @@ def test_refine_cuts_a_long_queue_and_says_so(client):
     response = client.get("/refine")
     assert response.data.count(b'href="/tasks/') == 100
     assert b"Showing the 100 oldest tasks" in response.data
+
+
+def _create_version(client, dod="Ships\nDocs"):
+    """Create project 'nexus' with version '0.1.0' holding the given criteria."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    client.post(
+        "/projects/nexus/versions",
+        data={"number": "0.1.0", "title": "First version", "dod": dod},
+    )
+
+
+def test_dod_add_criterion(client):
+    """Adding a criterion shows it on the version page."""
+    _create_version(client)
+    response = client.post("/projects/nexus/versions/0.1.0/dod", data={"description": "Tests"})
+    assert response.status_code == 200
+    assert b'value="Tests"' in response.data
+
+
+def test_dod_add_empty_criterion_shows_error(client):
+    """Adding a blank criterion shows an error, not a 500."""
+    _create_version(client)
+    response = client.post("/projects/nexus/versions/0.1.0/dod", data={"description": " "})
+    assert response.status_code == 200
+    assert b"cannot be empty" in response.data
+
+
+def test_dod_toggle_criterion(client):
+    """Toggling a criterion checks it, then unchecks it."""
+    _create_version(client)
+    response = client.post("/projects/nexus/versions/0.1.0/dod/1/toggle")
+    assert b"1/2 checked" in response.data
+    response = client.post("/projects/nexus/versions/0.1.0/dod/1/toggle")
+    assert b"0/2 checked" in response.data
+
+
+def test_dod_edit_criterion(client):
+    """Editing a criterion changes its description on the page."""
+    _create_version(client)
+    response = client.post("/projects/nexus/versions/0.1.0/dod/1/edit", data={"description": "Ships to prod"})
+    assert b'value="Ships to prod"' in response.data
+
+
+def test_dod_delete_criterion(client):
+    """Deleting a criterion removes it from the page."""
+    _create_version(client)
+    response = client.post("/projects/nexus/versions/0.1.0/dod/1/delete")
+    assert response.status_code == 200
+    assert b'value="Ships"' not in response.data
+    assert b'value="Docs"' in response.data
+
+
+def test_dod_delete_last_criterion_shows_error(client):
+    """Deleting the last criterion shows an error and keeps it."""
+    _create_version(client, dod="Ships")
+    response = client.post("/projects/nexus/versions/0.1.0/dod/1/delete")
+    assert b"at least one entry" in response.data
+    assert b"Ships" in response.data
+
+
+def test_dod_unknown_criterion_returns_404(client):
+    """A criterion id that is not in the version returns 404."""
+    _create_version(client)
+    response = client.post("/projects/nexus/versions/0.1.0/dod/99/toggle")
+    assert response.status_code == 404
+
+
+def test_dod_frozen_once_released(client):
+    """A released version's DOD refuses changes with an error."""
+    _create_version(client, dod="Ships")
+    client.post("/projects/nexus/versions/0.1.0/start")
+    client.post("/projects/nexus/versions/0.1.0/dod/1/toggle")
+    client.post("/projects/nexus/versions/0.1.0/release")
+    response = client.post("/projects/nexus/versions/0.1.0/dod/1/toggle")
+    assert b"cannot change" in response.data
+
+
+def test_release_with_unchecked_criterion_shows_error(client):
+    """Releasing with an unchecked criterion shows an error, not a 500."""
+    _create_version(client)
+    client.post("/projects/nexus/versions/0.1.0/start")
+    response = client.post("/projects/nexus/versions/0.1.0/release")
+    assert response.status_code == 200
+    assert b"unchecked" in response.data
+
+
+def test_create_version_with_repeated_dod_fields(client):
+    """The creation form's repeated 'dod' fields each become a criterion."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    client.post(
+        "/projects/nexus/versions",
+        data={"number": "0.1.0", "title": "First version", "dod": ["Ships", " ", "Docs"]},
+    )
+    response = client.get("/projects/nexus/versions/0.1.0")
+    assert b'value="Ships"' in response.data
+    assert b'value="Docs"' in response.data
+    assert b"0/2 checked" in response.data
+
+
+def test_released_version_page_has_no_dod_forms(client):
+    """A released version shows its DOD read-only, without edit forms."""
+    _create_version(client, dod="Ships")
+    client.post("/projects/nexus/versions/0.1.0/start")
+    client.post("/projects/nexus/versions/0.1.0/dod/1/toggle")
+    client.post("/projects/nexus/versions/0.1.0/release")
+    response = client.get("/projects/nexus/versions/0.1.0")
+    assert "☑ Ships".encode() in response.data
+    assert b"/dod/1/toggle" not in response.data

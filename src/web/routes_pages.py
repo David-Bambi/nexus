@@ -84,7 +84,13 @@ def versions_list(key):
 
     error = None
     if request.method == "POST":
-        dod = [line.strip() for line in request.form.get("dod", "").splitlines() if line.strip()]
+        # One "dod" field per criterion; a field holding several lines is split too.
+        dod = [
+            line.strip()
+            for value in request.form.getlist("dod")
+            for line in value.splitlines()
+            if line.strip()
+        ]
         target_date = request.form.get("target_date") or None
         try:
             versions.create(
@@ -160,6 +166,77 @@ def version_release(key, number):
     except ValidationError as e:
         error = str(e)
     return _render_version(version, error)
+
+
+def _dod_mutation(key, number, criterion_id, mutate):
+    """Apply a definition-of-done change to a version, then re-render its page.
+
+    Args:
+        key: Key of the owning project.
+        number: Version number.
+        criterion_id: Id of the targeted criterion, or None when the change
+            targets no existing criterion (adding one).
+        mutate: Callable(session, version, criterion) performing the change
+            through the service layer.
+
+    Returns:
+        The rendered version page, with the error message if the service refused.
+    """
+    session = _session()
+    try:
+        version = versions.get(session, key, number)
+    except NotFoundError:
+        abort(404)
+    criterion = None
+    if criterion_id is not None:
+        criterion = next((c for c in version.definition_of_done if c.id == criterion_id), None)
+        if criterion is None:
+            abort(404)
+    error = None
+    try:
+        mutate(session, version, criterion)
+    except (ValidationError, ConflictError) as e:
+        error = str(e)
+    return _render_version(version, error)
+
+
+@bp.route("/projects/<key>/versions/<number>/dod", methods=["POST"])
+def version_dod_add(key, number):
+    """Add a criterion to a version's definition of done."""
+    return _dod_mutation(
+        key, number, None,
+        lambda session, version, _: versions.add_criterion(
+            session, version.id, request.form.get("description", "")),
+    )
+
+
+@bp.route("/projects/<key>/versions/<number>/dod/<int:criterion_id>/toggle", methods=["POST"])
+def version_dod_toggle(key, number, criterion_id):
+    """Check or uncheck a criterion, flipping its current state."""
+    return _dod_mutation(
+        key, number, criterion_id,
+        lambda session, _, criterion: versions.set_criterion_done(
+            session, criterion.id, not criterion.done),
+    )
+
+
+@bp.route("/projects/<key>/versions/<number>/dod/<int:criterion_id>/edit", methods=["POST"])
+def version_dod_edit(key, number, criterion_id):
+    """Change the description of a criterion."""
+    return _dod_mutation(
+        key, number, criterion_id,
+        lambda session, _, criterion: versions.update_criterion(
+            session, criterion.id, request.form.get("description", "")),
+    )
+
+
+@bp.route("/projects/<key>/versions/<number>/dod/<int:criterion_id>/delete", methods=["POST"])
+def version_dod_delete(key, number, criterion_id):
+    """Delete a criterion from a version's definition of done."""
+    return _dod_mutation(
+        key, number, criterion_id,
+        lambda session, _, criterion: versions.delete_criterion(session, criterion.id),
+    )
 
 
 @bp.route("/tasks", methods=["GET", "POST"])

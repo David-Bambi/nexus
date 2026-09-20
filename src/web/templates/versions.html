@@ -28,7 +28,48 @@
     <label>Title <input type="text" name="title" required></label><br>
     <label>Goal <textarea name="goal"></textarea></label><br>
     <label>Target date <input type="date" name="target_date"></label><br>
-    <label>Definition of done (one per line) <textarea name="dod" required></textarea></label><br>
+    <fieldset>
+        <legend>Definition of done</legend>
+        <div id="dod-rows">
+            <div class="dod-row">
+                <input type="text" name="dod" aria-label="Criterion" required>
+                <button type="button" class="dod-remove">Remove</button>
+            </div>
+        </div>
+        <button type="button" id="dod-add">Add criterion</button>
+    </fieldset>
     <button type="submit">Create</button>
 </form>
+
+<script>
+(function () {
+    var rows = document.getElementById("dod-rows");
+    var template = rows.firstElementChild.cloneNode(true);
+
+    // Append an empty criterion row and focus it.
+    function addRow() {
+        var row = template.cloneNode(true);
+        row.querySelector("input").value = "";
+        rows.appendChild(row);
+        row.querySelector("input").focus();
+    }
+
+    document.getElementById("dod-add").addEventListener("click", addRow);
+
+    // Remove a row, always keeping at least one.
+    rows.addEventListener("click", function (event) {
+        if (event.target.classList.contains("dod-remove") && rows.children.length > 1) {
+            event.target.closest(".dod-row").remove();
+        }
+    });
+
+    // Enter adds a row instead of submitting the form.
+    rows.addEventListener("keydown", function (event) {
+        if (event.key === "Enter" && event.target.name === "dod") {
+            event.preventDefault();
+            addRow();
+        }
+    });
+})();
+</script>
 {% endblock %}

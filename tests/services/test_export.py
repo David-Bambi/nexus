@@ -68,16 +68,20 @@ def test_dump_nests_definition_of_done_and_tags(session):
     """Dump attaches criteria to their version and tag names to their task
     Given a version with two criteria and a task with two tags
     When dumping the database
-    Then the version lists its criteria in order and the task lists its tag names
+    Then the version lists its criteria in order, with their done state, and the task lists its tag names
     """
     projects.create(session, "nexus", "Nexus", "")
     versions.create(session, "nexus", "0.1.0", "First version", ["Ships", "Documented"])
     task = tasks.capture(session, "Write the docs")
     task.tags.extend([Tag(name="writing"), Tag(name="docs")])
     session.commit()
+    versions.set_criterion_done(session, versions.get(session, "nexus", "0.1.0").definition_of_done[1].id, True)
 
     result = export.dump_json(session)
-    assert result["versions"][0]["definition_of_done"] == ["Ships", "Documented"]
+    assert result["versions"][0]["definition_of_done"] == [
+        {"description": "Ships", "done": False},
+        {"description": "Documented", "done": True},
+    ]
     assert result["tasks"][0]["tags"] == ["docs", "writing"]
 
 def test_dump_includes_archived_projects_and_done_tasks(session):

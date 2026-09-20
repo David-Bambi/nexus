@@ -51,5 +51,7 @@ class Version(Base):
     project: Mapped["Project"] = relationship(back_populates="versions")
     tasks: Mapped[list["Task"]] = relationship(back_populates="version")
     definition_of_done: Mapped[list["DefinitionOfDoneCriterion"]] = relationship(
-        back_populates="version", cascade="all, delete-orphan"
+        back_populates="version",
+        cascade="all, delete-orphan",
+        order_by="DefinitionOfDoneCriterion.position"
     )

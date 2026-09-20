@@ -15,6 +15,7 @@ erDiagram
     PROJECT ||--o{ VERSION : has
     PROJECT ||--o{ TASK : "has (optional)"
     VERSION ||--o{ TASK : "has (optional)"
+    VERSION ||--|{ DEFINITION_OF_DONE_CRITERION : has
     TASK }o--o{ TAG : has
 ```
 
@@ -23,6 +24,27 @@ association table. The `Event` table (append-only mutation log) isn't
 shown here: it has no foreign keys by design, referencing any entity by
 `entity_type` + `entity_id` so a log entry survives deletion — see
 [0002](adr/0002-append-only-event-log.md).
+
+## Definition of Done
+
+Each version carries an ordered checklist of criteria
+(`DefinitionOfDoneCriterion`: `description`, `position`, `done`, default
+`False`). It is live: `services/versions.py` exposes `add_criterion`,
+`update_criterion`, `delete_criterion` and `set_criterion_done`, allowed
+while the version is `planned` or `in_progress`; on a released version they
+raise `ConflictError`. Rules:
+
+- An empty description raises `ValidationError`.
+- The last criterion can't be deleted (`ValidationError`): the DoD stays
+  mandatory.
+- `versions.release` raises `ValidationError` while any criterion is
+  unchecked.
+- Each mutation logs a `dod_*` event on the version, visible in its
+  changelog (see [0002](adr/0002-append-only-event-log.md)).
+
+`VersionProgress` (`services/views.py`) carries `dod_done` / `dod_total`
+next to the task counts; the dashboard and version page render a DoD bar
+beside the task bar.
 
 ## Task lifecycle
 
@@ -57,7 +79,9 @@ event-log readers (`history`, `changelog`, see
 [0002](adr/0002-append-only-event-log.md)), and `services/export.py`
 provides `dump_json()`, a full database dump (projects, versions with their
 definition of done, tasks with their tags, tags, events). Enums are exported
-by name and dates in ISO 8601. There is no import.
+by name and dates in ISO 8601. There is no import. `definition_of_done` is a
+list of `{"description", "done"}` objects (it was a list of strings before
+the live DoD; a breaking change for anything reading the export).
 
 ## Web pages
 
@@ -67,6 +91,12 @@ Routes are unprefixed full-page adapters (`web/routes_pages.py`):
   `doing` and `waiting` tasks, inbox and refine counters
   (`views.dashboard()` returns a `DashboardView`).
 - The task page shows its History; the version page shows its Changelog.
+- The version page manages the DoD (checkbox, inline edit, delete, add form;
+  read-only once released) through POST routes under
+  `/projects/<key>/versions/<number>/dod` (add) and `/dod/<id>/toggle`,
+  `/dod/<id>/edit`, `/dod/<id>/delete`. The version creation form takes one
+  `dod` field per criterion (dynamic rows; newline-separated text is still
+  accepted).
 - `GET /export.json` downloads the export as an attachment.
 - The nav bar links Dashboard, Projects, Tasks, Inbox, Refine, Search and
   Export.

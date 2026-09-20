@@ -15,11 +15,40 @@
 {% endif %}
 
 <h2>Definition of done</h2>
+{% set dod_done = version.definition_of_done | selectattr("done") | list | length %}
+{% set dod_total = version.definition_of_done | length %}
+<p>{{ dod_done }}/{{ dod_total }} checked
+    <progress value="{{ dod_done }}" max="{{ dod_total or 1 }}"></progress>
+</p>
+{% set editable = version.status.name != "RELEASED" %}
+{% set dod_url = url_for('pages.version_dod_add', key=version.project.key, number=version.number) %}
 <ul>
     {% for criterion in version.definition_of_done %}
-    <li>{{ criterion.description }}</li>
+    <li>
+        {% if editable %}
+        <form method="post" action="{{ dod_url }}/{{ criterion.id }}/toggle" style="display: inline;">
+            <input type="checkbox" aria-label="Done" {% if criterion.done %}checked{% endif %} onchange="this.form.submit()">
+            <noscript><button type="submit">Toggle</button></noscript>
+        </form>
+        <form method="post" action="{{ dod_url }}/{{ criterion.id }}/edit" style="display: inline;">
+            <input type="text" name="description" value="{{ criterion.description }}" aria-label="Description" required>
+            <button type="submit">Save</button>
+        </form>
+        <form method="post" action="{{ dod_url }}/{{ criterion.id }}/delete" style="display: inline;">
+            <button type="submit">Delete</button>
+        </form>
+        {% else %}
+        {% if criterion.done %}☑{% else %}☐{% endif %} {{ criterion.description }}
+        {% endif %}
+    </li>
     {% endfor %}
 </ul>
+{% if editable %}
+<form method="post" action="{{ dod_url }}">
+    <input type="text" name="description" aria-label="New criterion" required>
+    <button type="submit">Add criterion</button>
+</form>
+{% endif %}
 
 {% if error %}
 <p style="color: red;">{{ error }}</p>

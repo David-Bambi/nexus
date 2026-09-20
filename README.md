@@ -74,7 +74,8 @@ A backup is taken each time the app starts, before migrations are applied,
 so a bad upgrade can always be undone. Backups happen **only at startup**: a
 machine that stays up for weeks gets no new snapshot in between. For a copy
 at any time, download `http://127.0.0.1:8765/export.json` (the whole
-database as JSON).
+database as JSON; each version's `definition_of_done` is a list of
+`{"description", "done"}` objects).
 
 ### Restore a backup
 

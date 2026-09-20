@@ -187,8 +187,8 @@ def release(session : Session, version_id : int) -> Version:
 
     Raises:
         NotFoundError: If no version has this id.
-        ValidationError: If the version has unfinished tasks, or is not
-            currently in progress.
+        ValidationError: If the version has unfinished tasks, has unchecked
+            definition of done criteria, or is not currently in progress.
     """
     version = _get_by_id(session, version_id)
 
@@ -197,6 +197,9 @@ def release(session : Session, version_id : int) -> Version:
 
     if unfinished_tasks:
         raise ValidationError(f"Version '{version.number}' has unfinished tasks")
+
+    if any(not criterion.done for criterion in version.definition_of_done):
+        raise ValidationError(f"Version '{version.number}' has unchecked definition of done criteria")
 
     if version.status == VersionStatus.IN_PROGRESS:
         version.status = VersionStatus.RELEASED
@@ -207,3 +210,139 @@ def release(session : Session, version_id : int) -> Version:
         return version
     else:
         raise ValidationError("Cannot release this version.")
+
+def _get_editable_criterion(session : Session, criterion_id : int) -> DefinitionOfDoneCriterion:
+    """Look up a criterion whose version still accepts changes.
+
+    Args:
+        session: Database session to use.
+        criterion_id: Id of the criterion.
+
+    Returns:
+        The matching DefinitionOfDoneCriterion.
+
+    Raises:
+        NotFoundError: If no criterion has this id.
+        ConflictError: If the criterion's version is released.
+    """
+    criterion = session.query(DefinitionOfDoneCriterion).filter_by(id=criterion_id).first()
+    if not criterion:
+        raise NotFoundError(f"Criterion '{criterion_id}' doesn't exist.")
+    if criterion.version.status == VersionStatus.RELEASED:
+        raise ConflictError("The definition of done of a released version cannot change.")
+    return criterion
+
+
+def add_criterion(session : Session, version_id : int, description : str) -> DefinitionOfDoneCriterion:
+    """Append a criterion to a version's definition of done.
+
+    Args:
+        session: Database session to use.
+        version_id: Id of the version.
+        description: Text of the new criterion.
+
+    Returns:
+        The newly created DefinitionOfDoneCriterion, unchecked, in last position.
+
+    Raises:
+        NotFoundError: If no version has this id.
+        ValidationError: If the description is empty.
+        ConflictError: If the version is released.
+    """
+    version = _get_by_id(session, version_id)
+
+    if version.status == VersionStatus.RELEASED:
+        raise ConflictError("The definition of done of a released version cannot change.")
+
+    description = description.strip()
+    if not description:
+        raise ValidationError("A criterion description cannot be empty.")
+
+    position = max((c.position for c in version.definition_of_done), default=-1) + 1
+    criterion = DefinitionOfDoneCriterion(description=description, position=position)
+    version.definition_of_done.append(criterion)
+    session.flush()
+    events.log(session, events.ACTOR_WEB, "version", version.id, "dod_added",
+               {"criterion_id": criterion.id, "description": description})
+    session.commit()
+    return criterion
+
+
+def update_criterion(session : Session, criterion_id : int, description : str) -> DefinitionOfDoneCriterion:
+    """Change the description of a criterion.
+
+    Args:
+        session: Database session to use.
+        criterion_id: Id of the criterion.
+        description: New text of the criterion.
+
+    Returns:
+        The updated DefinitionOfDoneCriterion.
+
+    Raises:
+        NotFoundError: If no criterion has this id.
+        ValidationError: If the description is empty.
+        ConflictError: If the criterion's version is released.
+    """
+    criterion = _get_editable_criterion(session, criterion_id)
+
+    description = description.strip()
+    if not description:
+        raise ValidationError("A criterion description cannot be empty.")
+
+    previous = criterion.description
+    criterion.description = description
+    events.log(session, events.ACTOR_WEB, "version", criterion.version_id, "dod_updated",
+               {"criterion_id": criterion.id, "from": previous, "to": description})
+    session.commit()
+    return criterion
+
+
+def delete_criterion(session : Session, criterion_id : int) -> None:
+    """Delete a criterion from a version's definition of done.
+
+    Args:
+        session: Database session to use.
+        criterion_id: Id of the criterion.
+
+    Raises:
+        NotFoundError: If no criterion has this id.
+        ValidationError: If it is the last criterion of its version.
+        ConflictError: If the criterion's version is released.
+    """
+    criterion = _get_editable_criterion(session, criterion_id)
+    version = criterion.version
+
+    if len(version.definition_of_done) <= 1:
+        raise ValidationError("Definition of done for the version must contain at least one entry.")
+
+    version.definition_of_done.remove(criterion)
+    events.log(session, events.ACTOR_WEB, "version", version.id, "dod_deleted",
+               {"criterion_id": criterion_id, "description": criterion.description})
+    session.commit()
+
+
+def set_criterion_done(session : Session, criterion_id : int, done : bool) -> DefinitionOfDoneCriterion:
+    """Check or uncheck a criterion.
+
+    Args:
+        session: Database session to use.
+        criterion_id: Id of the criterion.
+        done: True to check the criterion, False to uncheck it.
+
+    Returns:
+        The updated DefinitionOfDoneCriterion.
+
+    Raises:
+        NotFoundError: If no criterion has this id.
+        ConflictError: If the criterion's version is released.
+    """
+    criterion = _get_editable_criterion(session, criterion_id)
+
+    if criterion.done != done:
+        criterion.done = done
+        events.log(session, events.ACTOR_WEB, "version", criterion.version_id,
+                   "dod_checked" if done else "dod_unchecked",
+                   {"criterion_id": criterion.id, "description": criterion.description})
+    session.commit()
+    return criterion

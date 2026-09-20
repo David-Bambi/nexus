@@ -38,10 +38,14 @@ leaves no event. The session runs with `autoflush=False`, so services
 | Entity | Actions |
 |---|---|
 | task | `created`, `updated`, `clarified`, `planned`, `unplanned`, `started`, `blocked`, `unblocked`, `completed`, `reopened`, `deferred`, `deleted` |
-| version | `created`, `started`, `released` |
+| version | `created`, `started`, `released`, `dod_added`, `dod_updated`, `dod_deleted`, `dod_checked`, `dod_unchecked` |
 | project | `created`, `archived`, `deleted`, `versions_reordered` |
 
 `versions_reordered` is logged on the project, with payload `ordered_ids`.
+
+`dod_*` events are logged on the version (Definition of Done criteria have no
+entity of their own in the log). `dod_checked` / `dod_unchecked` are skipped
+when the state doesn't change.
 
 **Payload convention.**
 

@@ -192,6 +192,7 @@ def test_dashboard_only_lists_in_progress_versions(session):
     versions.create(session, "nexus", "0.3.0", "Planned", ["Ships"])
     released = versions.get(session, "nexus", "0.1.0")
     versions.start(session, released.id)
+    versions.set_criterion_done(session, released.definition_of_done[0].id, True)
     versions.release(session, released.id)
     versions.start(session, started.id)
 
@@ -317,3 +318,17 @@ def test_search_limit_keeps_the_oldest_matches(session):
 
     result = views.search(session, "docs", limit=2)
     assert [t.id for t in result] == ids[:2]
+
+def test_dashboard_version_dod_progress(session):
+    """Dashboard shows how many of a version's DOD criteria are checked
+    Given a started version with three criteria, one of them checked
+    When building the dashboard
+    Then the version reports 1 checked out of 3
+    """
+    projects.create(session, "nexus", "Nexus", "")
+    version = versions.create(session, "nexus", "0.1.0", "First version", ["Ships", "Docs", "Tests"])
+    versions.start(session, version.id)
+    versions.set_criterion_done(session, version.definition_of_done[0].id, True)
+
+    [progress] = views.dashboard(session).versions
+    assert (progress.dod_done, progress.dod_total) == (1, 3)

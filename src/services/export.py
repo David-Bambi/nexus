@@ -63,7 +63,8 @@ def dump_json(session : Session) -> dict:
 
     Returns:
         A dict with the export time and every table: "projects",
-        "versions" (each with its ordered "definition_of_done" descriptions),
+        "versions" (each with its ordered "definition_of_done" criteria, as
+        {"description", "done"} objects),
         "tasks" (each with its "tags" names), "tags" and "events". Enums are
         given by name and dates in ISO 8601. Archived projects and done tasks
         are included.
@@ -71,7 +72,10 @@ def dump_json(session : Session) -> dict:
     versions = []
     for version in _all(session, Version, selectinload(Version.definition_of_done)):
         criteria = sorted(version.definition_of_done, key=lambda c: c.position)
-        versions.append({**_row(version), "definition_of_done": [c.description for c in criteria]})
+        versions.append({
+            **_row(version),
+            "definition_of_done": [{"description": c.description, "done": c.done} for c in criteria],
+        })
 
     tasks = [
         {**_row(task), "tags": sorted(tag.name for tag in task.tags)}
