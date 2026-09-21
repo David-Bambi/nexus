@@ -65,9 +65,14 @@ time out even though the service is up.
 
 ## Command line
 
-`uv sync` installs the `nexus` command. It works on the same database as the
-service (`NEXUS_HOME` / `NEXUS_DATABASE_URL` apply). Tasks and versions have
-short refs (`t-4k2`, `v-9xa`), shown in the web UI too.
+`scripts/install_cli.sh install` puts an editable `nexus` command in
+`~/.local/bin` (uv's tool bin dir), so it runs from any directory without
+`uv run`. It follows the checkout: reinstall only after moving the repo.
+`scripts/install_cli.sh uninstall` removes it. Without the install,
+`uv sync` and `uv run nexus ...` work the same. The CLI uses the same database
+as the service (`NEXUS_HOME` / `NEXUS_DATABASE_URL` apply). Tasks and versions
+have short refs (`t-4k2`, `v-9xa`), shown in the web UI too. The examples
+below use `uv run`; drop it if `nexus` is installed.
 
 ```bash
 uv run nexus tasks                          # also: versions, projects, version

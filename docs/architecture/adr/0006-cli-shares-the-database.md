@@ -20,6 +20,9 @@ Accepted
 - **Entry point**: `nexus = "src.cli:main"` in `pyproject.toml`; also
   `python -m src.cli`. Making `uv sync` install the project required a
   `[build-system]` (hatchling, `packages = ["src"]`).
+  `scripts/install_cli.sh` installs it as an editable uv tool, giving a bare
+  `nexus` command on the PATH; the caveat below on migrating the real
+  database applies to it as to `uv run nexus`.
 - **Exit codes**: 0 success, 1 domain error (a service refused the
   request), 2 usage error (unknown command, missing argument).
 - **Refs**: tasks and versions carry a short, unique, immutable `ref`

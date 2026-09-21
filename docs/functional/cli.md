@@ -4,9 +4,16 @@
 [0006](../architecture/adr/0006-cli-shares-the-database.md)).
 
 ```bash
-uv sync                  # installs the `nexus` command
-uv run nexus <command>   # or: uv run python -m src.cli <command>
+scripts/install_cli.sh install     # bare `nexus` command, from any directory
+scripts/install_cli.sh uninstall   # remove it
+uv run nexus <command>             # no-install alternative (after `uv sync`)
 ```
+
+`install` runs `uv tool install --editable --force .`, which places a `nexus`
+executable in uv's tool bin dir (`~/.local/bin`; add it to `PATH` if
+missing). It is editable, so it follows the checkout: no reinstall after code
+changes, only after moving the repo. `uninstall` runs `uv tool uninstall
+nexus`. `python -m src.cli <command>` also works.
 
 Exit codes: `0` ok, `1` a rule of the data refused the request, `2` wrong
 command line. Errors go to stderr.
