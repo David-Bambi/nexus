@@ -3,7 +3,7 @@ from typing import Callable, TextIO
 
 from sqlalchemy.orm import Session
 
-from src.cli import add, commands, views  # noqa: F401  (views registers commands)
+from src.cli import add, commands, import_cmd, views  # noqa: F401  (register commands)
 from src.cli.errors import UsageError
 from src.cli.resolve import resolve
 from src.cli.session import open_session

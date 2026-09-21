@@ -1,28 +1,20 @@
 import argparse
 import sys
-from typing import NoReturn, TextIO
+from typing import TextIO
 
 from sqlalchemy.orm import Session
 
 from src.cli import commands
-from src.cli.errors import UsageError
+from src.cli.errors import UsageError, UsageParser
 from src.cli.resolve import resolve_version
 from src.models.task import Task
 from src.services import events, tasks
 from src.services.errors import ValidationError
 
 
-class _Parser(argparse.ArgumentParser):
-    """Argument parser that reports mistakes as a UsageError instead of exiting."""
-
-    def error(self, message : str) -> NoReturn:
-        """Raise the parsing mistake as a UsageError."""
-        raise UsageError(message)
-
-
 def _task_parser() -> argparse.ArgumentParser:
     """Build the parser of `nexus add task`."""
-    parser = _Parser(prog="nexus add task", add_help=False)
+    parser = UsageParser(prog="nexus add task", add_help=False)
     parser.add_argument("project")
     parser.add_argument("version", nargs="?")
     parser.add_argument("-t", "--title")

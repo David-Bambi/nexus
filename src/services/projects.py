@@ -8,6 +8,14 @@ from src.services.errors import ConflictError, NotFoundError, ValidationError
 # as project keys.
 RESERVED_KEYS = frozenset({"add", "help", "import", "projects", "tasks", "version", "versions"})
 
+def is_reserved_key(key : str) -> bool:
+    """Tell whether a project key is refused as a command word or ref lookalike.
+
+    Args:
+        key: Candidate project key.
+    """
+    return key.strip().lower() in RESERVED_KEYS or refs.is_ref(key)
+
 def create(session : Session, key : str, name : str, description : str | None = None,
            actor : str = events.ACTOR_WEB) -> Project:
     """Create a project.
@@ -27,7 +35,7 @@ def create(session : Session, key : str, name : str, description : str | None = 
         ValidationError: If the key is a reserved word or looks like a
             task or version ref.
     """
-    if key.strip().lower() in RESERVED_KEYS or refs.is_ref(key):
+    if is_reserved_key(key):
         raise ValidationError(f"project key '{key}' is reserved.")
 
     if session.query(Project).filter_by(key=key).first() is not None:
