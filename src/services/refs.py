@@ -1,3 +1,4 @@
+import re
 import secrets
 
 from sqlalchemy.orm import Session
@@ -15,6 +16,23 @@ _PREFIXES = {Task: "t", Version: "v"}
 # collisions so a crowded namespace never becomes a dead end.
 _MIN_LENGTH = 3
 _ATTEMPTS_PER_LENGTH = 5
+
+
+# Shape of a ref: a model prefix, a dash, then a base36 code.
+_REF_PATTERN = re.compile(r"[tv]-[0-9a-z]{3,}")
+
+
+def is_ref(text : str) -> bool:
+    """Tell whether a string has the shape of a task or version ref.
+
+    Args:
+        text: Any string, e.g. a command-line argument or a project key.
+
+    Returns:
+        True if it looks like "t-4k2" or "v-9xa" (case-insensitive). It says
+        nothing about whether such a row exists.
+    """
+    return _REF_PATTERN.fullmatch(text.strip().lower()) is not None
 
 
 def _is_taken(session : Session, model : type, ref : str) -> bool:

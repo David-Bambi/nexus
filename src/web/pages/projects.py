@@ -4,7 +4,7 @@ from datetime import date
 from flask import abort, current_app, redirect, render_template, request, url_for
 
 from src.services import export, projects, views
-from src.services.errors import ConflictError, NotFoundError
+from src.services.errors import ConflictError, NotFoundError, ValidationError
 from src.web.pages._shared import _session, bp
 
 
@@ -39,7 +39,7 @@ def projects_list():
                 request.form.get("description") or None,
             )
             return redirect(url_for("pages.projects_list"))
-        except ConflictError as e:
+        except (ConflictError, ValidationError) as e:
             error = str(e)
     return render_template("projects.html", projects=projects.list(session), error=error)
 

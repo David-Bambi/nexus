@@ -1,8 +1,12 @@
 from sqlalchemy.orm import Session
 
 from src.models.project import Project, ProjectStatus
-from src.services import events
-from src.services.errors import ConflictError, NotFoundError
+from src.services import events, refs
+from src.services.errors import ConflictError, NotFoundError, ValidationError
+
+# Keys a project may not take: the command line reads them as commands, not
+# as project keys.
+RESERVED_KEYS = frozenset({"add", "help", "import", "projects", "tasks", "version", "versions"})
 
 def create(session : Session, key : str, name : str, description : str | None = None,
            actor : str = events.ACTOR_WEB) -> Project:
@@ -20,7 +24,12 @@ def create(session : Session, key : str, name : str, description : str | None = 
 
     Raises:
         ConflictError: If a project with this key already exists.
+        ValidationError: If the key is a reserved word or looks like a
+            task or version ref.
     """
+    if key.strip().lower() in RESERVED_KEYS or refs.is_ref(key):
+        raise ValidationError(f"project key '{key}' is reserved.")
+
     if session.query(Project).filter_by(key=key).first() is not None:
         raise ConflictError(f"project key '{key}' already exists")
 
@@ -49,7 +58,7 @@ def get(session : Session, key : str) -> Project:
     """
     project = session.query(Project).filter_by(key=key).first()
     if project is None:
-        raise NotFoundError
+        raise NotFoundError(f"Project '{key}' doesn't exist.")
     else:
         return project
 
