@@ -3,7 +3,7 @@ from typing import Callable, TextIO
 
 from sqlalchemy.orm import Session
 
-from src.cli import commands, views  # noqa: F401  (registers the commands)
+from src.cli import add, commands, views  # noqa: F401  (views registers commands)
 from src.cli.errors import UsageError
 from src.cli.resolve import resolve
 from src.cli.session import open_session
@@ -19,7 +19,8 @@ USAGE = """usage: nexus <command> | <reference> [<version>]
   nexus <project>          project detail and its versions
   nexus <project> <version>  version detail, tasks and definition of done
   nexus <task>             task detail
-  nexus add task <project> [<version>]
+  nexus add task <project> [<version>] [--title T] [--body B] [--context C] [--size S]
+  nexus "<description>"     capture a task into the inbox
   nexus import <file|->
 
 A reference is a project key, a task ref (t-4k2) or a version ref (v-9xa)."""
@@ -48,6 +49,11 @@ def dispatch(session : Session, argv : list[str], out : TextIO) -> None:
     word = argv[0]
     if word in commands.COMMANDS:
         commands.COMMANDS[word](session, argv[1:], out)
+        return
+
+    # A lone argument that reads as a sentence is a task to capture.
+    if len(argv) == 1 and (not word.strip() or any(c.isspace() for c in word)):
+        add.capture(session, word, out)
         return
 
     target = resolve(session, word)
