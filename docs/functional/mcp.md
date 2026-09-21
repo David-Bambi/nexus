@@ -12,6 +12,10 @@ Read-only tools can be auto-allowed in Claude Code; write tools prompt for
 approval. That is the write safeguard: the server has no read-only mode.
 After a redeploy of the service, reconnect (`/mcp` in Claude Code).
 
+Servers added with `claude mcp add` are only loaded when a Claude Code
+session starts: restart Claude Code (open a fresh session) before the tools
+appear. `claude mcp list` shows the connection status.
+
 Transport: `POST /mcp`, JSON-RPC 2.0, one JSON reply per POST, no sessions.
 Only requests from the machine itself are accepted (no authentication).
 
@@ -69,8 +73,15 @@ arbitrary state changes.
 - An unexpected exception becomes an `isError` result "internal error, see
   the server log"; the traceback is in `app.log`.
 - An unknown tool is JSON-RPC error `-32602`.
-- HTTP-level refusals (wrong Host, Origin, Content-Type, protocol version,
-  oversized body) return `421`, `403`, `415`, `400`, `413`.
+- HTTP-level refusals (wrong Host, Origin, Content-Type, oversized body)
+  return `421`, `403`, `415`, `413`.
+- `MCP-Protocol-Version`: on every message except `initialize`, a header
+  naming a version the server does not speak (it speaks `2025-11-25`,
+  `2025-06-18`, `2025-03-26`, `2024-11-05`) is refused with `400`.
+  `initialize` may name any version and is answered with the client's own
+  if supported, else the newest. Claude Code probes with a newer version,
+  takes the `400`, then retries `initialize` with `2025-11-25`; this is
+  normal.
 
 Everything written through the tools is logged with actor `mcp`
 ([0002](../architecture/adr/0002-append-only-event-log.md)).

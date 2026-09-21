@@ -51,8 +51,10 @@ Both passed the official SDK client (initialize, list, call).
 | Odd behaviour | `GET` returned 500 | `405` |
 | Origin / Host / Content-Type protection | Built in | Written and tested by us (about 100 lines plus guard) |
 
-The real Claude Code client was not run during development (registering it
-edits the user's Claude config); it is verified at rollout.
+The real Claude Code client was not run during the spike (registering it
+edits the user's Claude config). It was tested afterwards against the
+running endpoint: it connected, listed the 20 tools, and read tools and a
+dry-run `import_data` worked from a session.
 
 ## Security guard
 
@@ -65,13 +67,28 @@ parsed:
 | `Host` is `127.0.0.1`, `localhost` or `::1` (any port) | `421` |
 | `Origin`, if present, equals the server's own host:port exactly | `403` |
 | `Content-Type` is `application/json` | `415` |
-| `MCP-Protocol-Version`, if present, is supported | `400` |
 | Body at most 1 MB | `413` |
 
 The Host check stops DNS rebinding. The exact-Origin check blocks other sites
 and even pages on other local ports; Claude Code sends no `Origin`. A
 cross-site form cannot send `application/json` without a preflight, and no
 CORS header is ever sent, so preflights fail.
+
+### Protocol-version header
+
+Not part of the pre-parse guard: `endpoint` checks `MCP-Protocol-Version`
+after the body is parsed, on every message except `initialize`. After the
+handshake, a header naming a version the server does not speak is refused
+with `400`. `initialize` may name any version, even a newer one, and is
+answered with the client's own version if supported, else the newest the
+server speaks: that is what the handshake negotiates.
+
+Observed with Claude Code (service log): it first probes with
+`MCP-Protocol-Version: 2026-07-28` (newer than this server) and gets the
+intended `400`, then falls back to a normal `initialize` asking for
+`2025-11-25`, which is agreed; from then on it sends the agreed version. The
+service logs each handshake (`MCP initialize: client asked … agreed …`) and
+each refusal with the offending value.
 
 ## Why
 
