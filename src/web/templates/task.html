@@ -3,7 +3,11 @@
 {% block title %}{{ task.title }} — Nexus{% endblock %}
 
 {% block content %}
+{% if next %}
+<p><a href="{{ next }}">← Back</a></p>
+{% else %}
 <p><a href="{{ url_for('pages.tasks_list') }}">← Tasks</a></p>
+{% endif %}
 
 <h1>{{ task.title }}</h1>
 <p><strong>State:</strong> {{ task.state.name }}</p>
@@ -38,51 +42,83 @@
 {% endif %}
 
 {% if task.state.name == "REFINED" %}
-<form method="post" action="{{ url_for('pages.task_plan', task_id=task.id) }}">
+<form method="post" action="{{ url_for('pages.task_plan', task_id=task.id, next=next) }}">
     <label>Version id <input type="number" name="version_id" required></label>
     <button type="submit">Plan</button>
 </form>
 {% endif %}
 
 {% if task.state.name == "PLANNED" %}
-<form method="post" action="{{ url_for('pages.task_unplan', task_id=task.id) }}">
+<form method="post" action="{{ url_for('pages.task_unplan', task_id=task.id, next=next) }}">
     <button type="submit">Unplan</button>
 </form>
-<form method="post" action="{{ url_for('pages.task_start', task_id=task.id) }}">
+<form method="post" action="{{ url_for('pages.task_start', task_id=task.id, next=next) }}">
     <button type="submit">Start</button>
 </form>
 {% endif %}
 
 {% if task.state.name == "DOING" %}
-<form method="post" action="{{ url_for('pages.task_block', task_id=task.id) }}">
+<form method="post" action="{{ url_for('pages.task_block', task_id=task.id, next=next) }}">
     <label>Reason <input type="text" name="reason" required></label>
     <button type="submit">Block</button>
 </form>
-<form method="post" action="{{ url_for('pages.task_complete', task_id=task.id) }}">
+<form method="post" action="{{ url_for('pages.task_complete', task_id=task.id, next=next) }}">
     <button type="submit">Complete</button>
 </form>
 {% endif %}
 
 {% if task.state.name == "WAITING" %}
-<form method="post" action="{{ url_for('pages.task_unblock', task_id=task.id) }}">
+<form method="post" action="{{ url_for('pages.task_unblock', task_id=task.id, next=next) }}">
     <button type="submit">Unblock</button>
 </form>
 {% endif %}
 
 {% if task.state.name == "DONE" %}
-<form method="post" action="{{ url_for('pages.task_reopen', task_id=task.id) }}">
+<form method="post" action="{{ url_for('pages.task_reopen', task_id=task.id, next=next) }}">
     <button type="submit">Reopen</button>
 </form>
 {% endif %}
 
+{% with state_action = url_for('pages.task_state', task_id=task.id, next=next) %}
+{% include "_task_state_form.html" %}
+{% endwith %}
+
 {% if task.state.name in ("INBOX", "REFINED") %}
-<form method="post" action="{{ url_for('pages.task_defer', task_id=task.id) }}">
+<form method="post" action="{{ url_for('pages.task_defer', task_id=task.id, next=next) }}">
     <button type="submit">Defer to someday</button>
 </form>
 {% endif %}
 
+{% if task.state.name in ("PLANNED", "DOING", "WAITING") %}
+{% set targets = versions | rejectattr("status.name", "equalto", "RELEASED") | rejectattr("id", "equalto", task.version_id) | list %}
+{% if targets %}
+<form method="post" action="{{ url_for('pages.task_move', task_id=task.id, next=next) }}">
+    <label>Version
+        <select name="version_id">
+            {% for target in targets %}
+            <option value="{{ target.id }}">{{ target.number }} — {{ target.title }}</option>
+            {% endfor %}
+        </select>
+    </label>
+    <button type="submit">Move to version</button>
+</form>
+{% endif %}
+{% endif %}
+
+{% if task.state.name not in ("DONE", "CANCELLED") %}
+<form method="post" action="{{ url_for('pages.task_cancel', task_id=task.id, next=next) }}">
+    <button type="submit">Cancel task</button>
+</form>
+{% endif %}
+
+{% if task.state.name == "CANCELLED" %}
+<form method="post" action="{{ url_for('pages.task_restore', task_id=task.id, next=next) }}">
+    <button type="submit">Restore to refined</button>
+</form>
+{% endif %}
+
 <h2>Edit</h2>
-<form method="post" action="{{ url_for('pages.task_update', task_id=task.id) }}">
+<form method="post" action="{{ url_for('pages.task_update', task_id=task.id, next=next) }}">
     <label>Title <input type="text" name="title" value="{{ task.title }}" required></label><br>
     <label>Body <textarea name="body">{{ task.body or '' }}</textarea></label><br>
     <label>Context <input type="text" name="context" value="{{ task.context or '' }}"></label><br>
@@ -90,7 +126,7 @@
     <button type="submit">Save</button>
 </form>
 
-<form method="post" action="{{ url_for('pages.task_delete', task_id=task.id) }}">
+<form method="post" action="{{ url_for('pages.task_delete', task_id=task.id, next=next) }}">
     <button type="submit">Delete</button>
 </form>
 

@@ -2,7 +2,7 @@
 
 Jinja2 is Flask's default template engine: HTML files with a small
 templating language mixed in, rendered server-side into plain HTML
-strings. Routes in `src/web/routes_pages.py` never build HTML by hand —
+strings. Routes in `src/web/pages/` never build HTML by hand —
 they call `render_template()` and let a `.html` file under
 `src/web/templates/` do it.
 
@@ -14,7 +14,7 @@ finds `name` under that folder, fills in the variables passed as keyword
 arguments, and returns the resulting HTML string:
 
 ```python
-# src/web/routes_pages.py
+# src/web/pages/projects.py
 return render_template("projects.html", projects=projects.list(session), error=error)
 return render_template("project.html", project=project)
 ```
@@ -98,6 +98,14 @@ ignored, everything inside `base.html` but outside its blocks (the
 Both `projects.html` and `project.html` extend `base.html` this way,
 each overriding `title` and `content` with its own markup.
 
+## Partials: `{% include %}`
+
+`{% include "_name.html" %}` renders another template in place, with the
+current variables in scope. Shared fragments are prefixed with `_`: for
+example `_task_state_form.html` (needs `task` and `state_action`) is included
+by `task.html` and by each task row in `version.html`. Use
+`{% with state_action=... %}` to set the variables the partial expects.
+
 ## `url_for()`
 
 `url_for(endpoint, **kwargs)` generates a URL from a route's
@@ -112,7 +120,7 @@ Real call sites, both in `projects.html`:
 
 `'pages.project_detail'` and `'pages.projects_list'` refer to the
 `bp = Blueprint("pages", ...)` view functions of the same name in
-`src/web/routes_pages.py`; `key=project.key` fills the `<key>` part of
+`src/web/pages/projects.py` (one blueprint shared across the package modules); `key=project.key` fills the `<key>` part of
 `@bp.route("/projects/<key>")`. If that route's path ever changes, every
 template calling `url_for()` for it updates automatically — no path
 string to find and fix by hand.

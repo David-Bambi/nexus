@@ -332,3 +332,22 @@ def test_dashboard_version_dod_progress(session):
 
     [progress] = views.dashboard(session).versions
     assert (progress.dod_done, progress.dod_total) == (1, 3)
+
+
+def test_dashboard_progress_ignores_cancelled_tasks(session):
+    """Dashboard progress leaves cancelled tasks out of the total
+    Given a started version with a done task and a cancelled task
+    When building the dashboard
+    Then the version reports 1 done out of 1
+    """
+    projects.create(session, "nexus", "Nexus", "")
+    version = versions.create(session, "nexus", "0.1.0", "First version", ["Ships"])
+    versions.start(session, version.id)
+    finished = _refined_task(session, "Finished", version)
+    dropped = _refined_task(session, "Dropped", version)
+    tasks.start(session, finished.id)
+    tasks.complete(session, finished.id)
+    tasks.cancel(session, dropped.id)
+
+    [progress] = views.dashboard(session).versions
+    assert (progress.done, progress.total) == (1, 1)

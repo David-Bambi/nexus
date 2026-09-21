@@ -14,18 +14,62 @@
 <p><strong>Target date:</strong> {{ version.target_date }}</p>
 {% endif %}
 
+{% set editable = version.status.name != "RELEASED" %}
+{% set page_url = url_for('pages.version_detail', key=version.project.key, number=version.number) %}
 <h2>Tasks</h2>
+{% set tasks_done = tasks | selectattr("state.name", "equalto", "DONE") | list | length %}
+{% set tasks_total = tasks | rejectattr("state.name", "equalto", "CANCELLED") | list | length %}
+<p>{{ tasks_done }}/{{ tasks_total }} done
+    <progress value="{{ tasks_done }}" max="{{ tasks_total or 1 }}"></progress>
+</p>
+{% set task_url = url_for('pages.version_task_add', key=version.project.key, number=version.number) %}
 <ul>
     {% for task in tasks %}
-        {% if task %}
-        <li><a href="{{ url_for('pages.task_detail', task_id=task.id )}}">
-        {{ task.title }}</a> - {{ task.state.name }}</li>
+        <li><a href="{{ url_for('pages.task_detail', task_id=task.id, next=page_url)}}">
+        {{ task.title }}</a> - {{ task.state.name }}
+        {% if editable %}
+        {% with state_action = url_for('pages.version_task_state', key=version.project.key, number=version.number, task_id=task.id) %}
+        {% include "_task_state_form.html" %}
+        {% endwith %}
+        {% endif %}
+        </li>
         {% else %}
         <li>No tasks yet.</li>
-        {% endif %}
-
     {% endfor %}
 </ul>
+{% if editable %}
+<form method="post" action="{{ task_url }}">
+    <input type="text" name="title" aria-label="New task" required>
+    <input type="text" name="body" aria-label="Body">
+    <input type="text" name="context" aria-label="Context">
+    <select name="size">
+        <option value="XS">XS</option>
+        <option value="S">S</option>
+        <option value="M">M</option>
+        <option value="L">L</option>
+    </select>
+    <button type="submit">Add task</button>
+</form>
+{% endif %}
+
+{% if editable %}
+<h2>Candidate tasks</h2>
+<p>Refined tasks of {{ version.project.name }} not yet in a version.</p>
+<ul>
+    {% for task in candidates %}
+    <li>
+        <a href="{{ url_for('pages.task_detail', task_id=task.id, next=page_url) }}">{{ task.title }}</a>
+        {% if task.context %}{{ task.context }}{% endif %}
+        {% if task.size %}[{{ task.size }}]{% endif %}
+        <form method="post" action="{{ url_for('pages.version_task_plan', key=version.project.key, number=version.number, task_id=task.id) }}" style="display: inline;">
+            <button type="submit" aria-label="Add to version">+</button>
+        </form>
+    </li>
+    {% else %}
+    <li>No candidate tasks.</li>
+    {% endfor %}
+</ul>
+{% endif %}
 
 <h2>Definition of done</h2>
 {% set dod_done = version.definition_of_done | selectattr("done") | list | length %}
@@ -33,7 +77,6 @@
 <p>{{ dod_done }}/{{ dod_total }} checked
     <progress value="{{ dod_done }}" max="{{ dod_total or 1 }}"></progress>
 </p>
-{% set editable = version.status.name != "RELEASED" %}
 {% set dod_url = url_for('pages.version_dod_add', key=version.project.key, number=version.number) %}
 <ul>
     {% for criterion in version.definition_of_done %}

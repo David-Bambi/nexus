@@ -187,13 +187,13 @@ def release(session : Session, version_id : int) -> Version:
 
     Raises:
         NotFoundError: If no version has this id.
-        ValidationError: If the version has unfinished tasks, has unchecked
+        ValidationError: If the version has unfinished tasks (cancelled ones don't count), has unchecked
             definition of done criteria, or is not currently in progress.
     """
     version = _get_by_id(session, version_id)
 
     unfinished_tasks = session.query(Task).filter(Task.version_id == version_id,
-                                                  Task.state != TaskState.DONE).first()
+                                                  Task.state.notin_([TaskState.DONE, TaskState.CANCELLED])).first()
 
     if unfinished_tasks:
         raise ValidationError(f"Version '{version.number}' has unfinished tasks")

@@ -66,3 +66,17 @@ def test_creating_the_app_keeps_logging_configuration(tmp_path):
         for handler in [h for h in root.handlers if getattr(h, "_nexus_handler", False)]:
             root.removeHandler(handler)
             handler.close()
+
+
+def test_migrated_database_accepts_cancelled_tasks(tmp_path):
+    """The migrated task table accepts the cancelled state
+    Given a freshly migrated database
+    When inserting a cancelled task
+    Then the insert succeeds
+    """
+    database = tmp_path / "data.db"
+    create_app(_config_for(database))
+    with closing(sqlite3.connect(database)) as connection:
+        connection.execute(
+            "INSERT INTO task (title, state, position, created_at, updated_at) "
+            "VALUES ('Dropped', 'CANCELLED', 0, '2026-09-21', '2026-09-21')")

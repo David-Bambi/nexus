@@ -8,7 +8,7 @@ from sqlalchemy.engine import make_url
 
 from src.config import Config
 from src.db import get_engine, get_session_factory
-from src.web.routes_pages import bp as pages_bp
+from src.web.pages import bp as pages_bp
 
 # Repo root, used to locate alembic.ini regardless of the working directory.
 BASE_DIR = Path(__file__).resolve().parent.parent

@@ -543,3 +543,340 @@ def test_released_version_page_has_no_dod_forms(client):
     response = client.get("/projects/nexus/versions/0.1.0")
     assert "☑ Ships".encode() in response.data
     assert b"/dod/1/toggle" not in response.data
+
+
+def test_version_task_add_shows_planned_task(client):
+    """Adding a task from the version page lists it there, already planned."""
+    _create_version(client)
+    response = client.post("/projects/nexus/versions/0.1.0/tasks/", data={"title": "Write the docs"})
+    assert response.status_code == 200
+    assert b"Write the docs" in response.data
+    assert b"PLANNED" in response.data
+    assert b'href="/tasks/1"' in response.data
+
+
+def test_version_task_add_keeps_optional_fields(client):
+    """The optional context, size and body fields are stored on the new task."""
+    _create_version(client)
+    client.post(
+        "/projects/nexus/versions/0.1.0/tasks/",
+        data={"title": "Write the docs", "context": "@ordi", "size": "S", "body": "Details"},
+    )
+    response = client.get("/tasks/1")
+    assert b"@ordi" in response.data
+    assert b"Details" in response.data
+
+
+def test_version_task_add_blank_title_shows_error(client):
+    """A blank title shows an error, not a 500, and creates no task."""
+    _create_version(client)
+    response = client.post("/projects/nexus/versions/0.1.0/tasks/", data={"title": " "})
+    assert response.status_code == 200
+    assert b"title must be specified" in response.data
+    assert client.get("/tasks/1").status_code == 404
+
+
+def test_version_task_add_missing_version_returns_404(client):
+    """Adding a task to an unknown version returns 404."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    response = client.post("/projects/nexus/versions/9.9.9/tasks/", data={"title": "Anything"})
+    assert response.status_code == 404
+
+
+def test_version_task_add_released_version_shows_error(client):
+    """A released version refuses new tasks with an error."""
+    _create_version(client, dod="Ships")
+    client.post("/projects/nexus/versions/0.1.0/start")
+    client.post("/projects/nexus/versions/0.1.0/dod/1/toggle")
+    client.post("/projects/nexus/versions/0.1.0/release")
+    response = client.post("/projects/nexus/versions/0.1.0/tasks/", data={"title": "Too late"})
+    assert response.status_code == 200
+    assert b"already released" in response.data
+    assert client.get("/tasks/1").status_code == 404
+
+
+def test_task_delete_returns_to_next_page(client):
+    """Deleting a task opened from a version page brings back to that page."""
+    _create_version(client)
+    client.post("/projects/nexus/versions/0.1.0/tasks/", data={"title": "Write the docs"})
+    response = client.get("/projects/nexus/versions/0.1.0")
+    assert b'href="/tasks/1?next=/projects/nexus/versions/0.1.0"' in response.data
+    response = client.get("/tasks/1?next=/projects/nexus/versions/0.1.0")
+    assert b'/tasks/1/delete?next=/projects/nexus/versions/0.1.0' in response.data
+    response = client.post("/tasks/1/delete?next=/projects/nexus/versions/0.1.0")
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/projects/nexus/versions/0.1.0"
+    assert client.get("/tasks/1").status_code == 404
+
+
+@pytest.mark.parametrize("target", ["https://evil.example", "//evil.example"])
+def test_task_delete_ignores_unsafe_next(client, target):
+    """An external "next" is ignored: the delete falls back to the task list."""
+    client.post("/tasks", data={"title": "Write the docs"})
+    response = client.post("/tasks/1/delete", query_string={"next": target})
+    assert response.headers["Location"] == "/tasks"
+
+
+def test_task_action_keeps_next_page(client):
+    """An action on the task page keeps the page to return to."""
+    client.post("/tasks", data={"title": "Write the docs"})
+    response = client.post("/tasks/1/defer?next=/projects/nexus/versions/0.1.0")
+    assert b'/delete?next=/projects/nexus/versions/0.1.0' in response.data
+
+
+def test_task_state_select_moves_task(client):
+    """The state form moves a task through the working states, waiting with a reason."""
+    _create_version(client)
+    client.post("/projects/nexus/versions/0.1.0/tasks/", data={"title": "Write the docs"})
+    response = client.get("/tasks/1")
+    assert b'name="state"' in response.data
+    response = client.post("/tasks/1/state", data={"state": "DOING"})
+    assert b"<strong>State:</strong> DOING" in response.data
+    response = client.post("/tasks/1/state", data={"state": "WAITING", "reason": "Review"})
+    assert b"<strong>State:</strong> WAITING" in response.data
+    assert b"Review" in response.data
+    response = client.post("/tasks/1/state", data={"state": "DOING"})
+    response = client.post("/tasks/1/state", data={"state": "DONE"})
+    assert b"<strong>State:</strong> DONE" in response.data
+
+
+@pytest.mark.parametrize("data, message", [
+    ({"state": "NOPE"}, b"unknown state"),
+    ({"state": "DONE"}, b"isn&#39;t doing"),
+])
+def test_task_state_invalid_shows_error(client, data, message):
+    """An unknown or not allowed state shows an error and keeps the task's state."""
+    _create_version(client)
+    client.post("/projects/nexus/versions/0.1.0/tasks/", data={"title": "Write the docs"})
+    response = client.post("/tasks/1/state", data=data)
+    assert response.status_code == 200
+    assert message in response.data
+    assert b"<strong>State:</strong> PLANNED" in response.data
+
+
+def test_task_state_select_absent_for_inbox_task(client):
+    """A captured task has no state select; clarifying comes first."""
+    client.post("/tasks", data={"title": "Write the docs"})
+    response = client.get("/tasks/1")
+    assert b'name="state"' not in response.data
+
+
+def test_task_state_unknown_task_returns_404(client):
+    """Changing the state of an unknown task returns 404."""
+    response = client.post("/tasks/9/state", data={"state": "DOING"})
+    assert response.status_code == 404
+
+
+def test_version_task_state_select_moves_task(client):
+    """The version page's state form moves a task and re-renders the version page."""
+    _create_version(client)
+    client.post("/projects/nexus/versions/0.1.0/tasks/", data={"title": "Write the docs"})
+    page = client.get("/projects/nexus/versions/0.1.0")
+    assert b"/versions/0.1.0/task/1/state" in page.data
+    response = client.post("/projects/nexus/versions/0.1.0/task/1/state", data={"state": "DOING"})
+    assert response.status_code == 200
+    assert b"<h2>Tasks</h2>" in response.data
+    assert b"Write the docs</a> - DOING" in response.data
+    response = client.post(
+        "/projects/nexus/versions/0.1.0/task/1/state", data={"state": "WAITING", "reason": "Review"})
+    assert b"Write the docs</a> - WAITING" in response.data
+
+
+@pytest.mark.parametrize("data, message", [
+    ({"state": "NOPE"}, b"unknown state"),
+    ({"state": "DONE"}, b"isn&#39;t doing"),
+    ({"state": "DOING"}, b"can&#39;t go from DOING to DOING"),
+])
+def test_version_task_state_invalid_shows_error(client, data, message):
+    """An unknown or not allowed state shows an error on the version page."""
+    _create_version(client)
+    client.post("/projects/nexus/versions/0.1.0/tasks/", data={"title": "Write the docs"})
+    if data["state"] == "DOING":
+        client.post("/tasks/1/state", data={"state": "DOING"})
+    response = client.post("/projects/nexus/versions/0.1.0/task/1/state", data=data)
+    assert response.status_code == 200
+    assert message in response.data
+
+
+def test_version_task_state_other_version_returns_404(client):
+    """A task can't be moved through another version's URL."""
+    _create_version(client)
+    client.post("/projects/nexus/versions", data={"number": "0.2.0", "title": "Second", "dod": "Ships"})
+    client.post("/projects/nexus/versions/0.1.0/tasks/", data={"title": "Write the docs"})
+    response = client.post("/projects/nexus/versions/0.2.0/task/1/state", data={"state": "DOING"})
+    assert response.status_code == 404
+    assert b"<strong>State:</strong> PLANNED" in client.get("/tasks/1").data
+
+
+def test_version_task_state_released_version_refused(client):
+    """A released version's tasks can't be moved; the select is gone from its page."""
+    _create_version(client, dod="Ships")
+    client.post("/projects/nexus/versions/0.1.0/tasks/", data={"title": "Write the docs"})
+    client.post("/projects/nexus/versions/0.1.0/start")
+    client.post("/tasks/1/state", data={"state": "DOING"})
+    client.post("/tasks/1/state", data={"state": "DONE"})
+    client.post("/projects/nexus/versions/0.1.0/dod/1/toggle")
+    client.post("/projects/nexus/versions/0.1.0/release")
+    page = client.get("/projects/nexus/versions/0.1.0")
+    assert b"/task/1/state" not in page.data
+    response = client.post("/projects/nexus/versions/0.1.0/task/1/state", data={"state": "DOING"})
+    assert b"already released" in response.data
+    assert b"<strong>State:</strong> DONE" in client.get("/tasks/1").data
+
+
+def test_version_page_shows_task_progress(client):
+    """The version page shows how many of its tasks are done, with a progress bar."""
+    _create_version(client)
+    client.post("/projects/nexus/versions/0.1.0/tasks/", data={"title": "First"})
+    client.post("/projects/nexus/versions/0.1.0/tasks/", data={"title": "Second"})
+    page = client.get("/projects/nexus/versions/0.1.0")
+    assert b"0/2 done" in page.data
+    assert b'<progress value="0" max="2">' in page.data
+    client.post("/tasks/1/state", data={"state": "DOING"})
+    client.post("/tasks/1/state", data={"state": "DONE"})
+    page = client.get("/projects/nexus/versions/0.1.0")
+    assert b"1/2 done" in page.data
+    assert b'<progress value="1" max="2">' in page.data
+
+
+def test_task_cancel_and_restore(client):
+    """A task can be cancelled from its page, then restored to refined."""
+    _create_version(client)
+    client.post("/projects/nexus/versions/0.1.0/tasks/", data={"title": "Write the docs"})
+    assert b'action="/tasks/1/cancel"' in client.get("/tasks/1").data
+    response = client.post("/tasks/1/cancel")
+    assert b"<strong>State:</strong> CANCELLED" in response.data
+    assert b'action="/tasks/1/cancel"' not in response.data
+    assert b'action="/tasks/1/restore"' in response.data
+    response = client.post("/tasks/1/restore")
+    assert b"<strong>State:</strong> REFINED" in response.data
+
+
+def test_task_cancel_done_task_shows_error(client):
+    """Cancelling a done task shows an error and keeps it done."""
+    _create_version(client)
+    client.post("/projects/nexus/versions/0.1.0/tasks/", data={"title": "Write the docs"})
+    client.post("/tasks/1/state", data={"state": "DOING"})
+    client.post("/tasks/1/state", data={"state": "DONE"})
+    response = client.post("/tasks/1/cancel")
+    assert b"already done or cancelled" in response.data
+    assert b"<strong>State:</strong> DONE" in response.data
+
+
+def test_version_page_cancelled_task_leaves_progress_total(client):
+    """A task cancelled from the version page's select isn't counted in the progress bar."""
+    _create_version(client)
+    client.post("/projects/nexus/versions/0.1.0/tasks/", data={"title": "First"})
+    client.post("/projects/nexus/versions/0.1.0/tasks/", data={"title": "Second"})
+    response = client.post("/projects/nexus/versions/0.1.0/task/2/state", data={"state": "CANCELLED"})
+    assert b"First</a> - PLANNED" in response.data
+    assert b"Second</a> - CANCELLED" in response.data
+    assert b"0/1 done" in response.data
+
+
+def _refined_task(client, task_id, title, project_key="nexus"):
+    """Capture a task (the task_id-th of the test) and clarify it into a project."""
+    client.post("/tasks", data={"title": title})
+    client.post(f"/tasks/{task_id}/clarify", data={"title": title, "project_key": project_key})
+
+
+def test_version_page_lists_project_candidates(client):
+    """The version page lists the project's refined, unplanned tasks, and only those."""
+    _create_version(client)
+    client.post("/projects", data={"key": "other", "name": "Other"})
+    _refined_task(client, 1, "Candidate")
+    _refined_task(client, 2, "Elsewhere", "other")
+    client.post("/tasks", data={"title": "Still in the inbox"})
+    page = client.get("/projects/nexus/versions/0.1.0").get_data(as_text=True)
+    candidates = page.split("<h2>Candidate tasks</h2>")[1].split("<h2>Definition of done</h2>")[0]
+    assert "Candidate" in candidates
+    assert "Elsewhere" not in candidates
+    assert "Still in the inbox" not in candidates
+
+
+def test_version_candidate_plus_button_adds_it_to_the_version(client):
+    """The + button plans a candidate into the version and removes it from the candidates."""
+    _create_version(client)
+    _refined_task(client, 1, "Candidate")
+    response = client.post("/projects/nexus/versions/0.1.0/task/1/plan")
+    assert response.status_code == 200
+    page = response.get_data(as_text=True)
+    assert "Candidate</a> - PLANNED" in page
+    assert "No candidate tasks." in page
+
+
+def test_version_candidate_plan_errors(client):
+    """Planning an unknown task is a 404; a task that isn't refined shows an error."""
+    _create_version(client)
+    assert client.post("/projects/nexus/versions/0.1.0/task/9/plan").status_code == 404
+    client.post("/tasks", data={"title": "Still in the inbox"})
+    response = client.post("/projects/nexus/versions/0.1.0/task/1/plan")
+    assert response.status_code == 200
+    assert b"isn&#39;t refined" in response.data
+
+
+def test_version_candidates_hidden_once_released(client):
+    """A released version doesn't offer candidates."""
+    _create_version(client, dod="Ships")
+    client.post("/projects/nexus/versions/0.1.0/start")
+    client.post("/projects/nexus/versions/0.1.0/dod/1/toggle")
+    client.post("/projects/nexus/versions/0.1.0/release")
+    assert b"Candidate tasks" not in client.get("/projects/nexus/versions/0.1.0").data
+
+
+def test_task_page_moves_task_to_another_version(client):
+    """The task page offers the project's other open versions and moves the task."""
+    _create_version(client)
+    client.post("/projects/nexus/versions", data={"number": "0.2.0", "title": "Second", "dod": "Ships"})
+    client.post("/projects/nexus/versions/0.1.0/tasks/", data={"title": "Write the docs"})
+    page = client.get("/tasks/1").get_data(as_text=True)
+    assert 'action="/tasks/1/move"' in page
+    assert "0.2.0 — Second" in page
+    assert "0.1.0 — " not in page.split('action="/tasks/1/move"')[1].split("</form>")[0]
+    response = client.post("/tasks/1/move", data={"version_id": "2"})
+    assert b"<strong>Version:</strong> 0.2.0" in response.data
+    assert b"Write the docs" in client.get("/projects/nexus/versions/0.2.0").data
+    assert b"Write the docs" not in client.get("/projects/nexus/versions/0.1.0").data
+
+
+def test_task_move_same_version_shows_error(client):
+    """Moving a task to its own version shows an error."""
+    _create_version(client)
+    client.post("/projects/nexus/versions/0.1.0/tasks/", data={"title": "Write the docs"})
+    response = client.post("/tasks/1/move", data={"version_id": "1"})
+    assert response.status_code == 200
+    assert b"already in version" in response.data
+
+
+def test_task_page_hides_move_without_other_version(client):
+    """With no other open version, the task page has no move form."""
+    _create_version(client)
+    client.post("/projects/nexus/versions/0.1.0/tasks/", data={"title": "Write the docs"})
+    assert b'action="/tasks/1/move"' not in client.get("/tasks/1").data
+
+
+def test_version_page_task_links_keep_the_version_url_after_a_post(client):
+    """After a POST on the version page, task links still return to the version page itself."""
+    _create_version(client)
+    response = client.post("/projects/nexus/versions/0.1.0/tasks/", data={"title": "Write the docs"})
+    assert b'href="/tasks/1?next=/projects/nexus/versions/0.1.0"' in response.data
+    response = client.post("/projects/nexus/versions/0.1.0/task/1/state", data={"state": "DOING"})
+    assert b'href="/tasks/1?next=/projects/nexus/versions/0.1.0"' in response.data
+
+
+def test_task_page_back_link_returns_to_the_parent_page(client):
+    """The task page's back link goes to the page it was opened from, else to the task list."""
+    client.post("/tasks", data={"title": "Write the docs"})
+    page = client.get("/tasks/1?next=/projects/nexus/versions/0.1.0").get_data(as_text=True)
+    assert '<a href="/projects/nexus/versions/0.1.0">← Back</a>' in page
+    page = client.get("/tasks/1").get_data(as_text=True)
+    assert '<a href="/tasks">← Tasks</a>' in page
+
+
+@pytest.mark.parametrize("target", ["javascript:alert(1)", "https://evil.example", "//evil.example"])
+def test_task_page_back_link_ignores_unsafe_next(client, target):
+    """An unsafe "next" is neither linked as the back link nor carried in the forms."""
+    client.post("/tasks", data={"title": "Write the docs"})
+    page = client.get("/tasks/1", query_string={"next": target}).get_data(as_text=True)
+    assert '<a href="/tasks">← Tasks</a>' in page
+    assert "evil.example" not in page and "javascript:" not in page

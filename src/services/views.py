@@ -149,7 +149,8 @@ def dashboard(session : Session) -> DashboardView:
             func.sum(case((Task.state == TaskState.DONE, 1), else_=0)),
             func.count(Task.id),
         )
-        .filter(Task.version_id.in_([v.id for v in started]))
+        .filter(Task.version_id.in_([v.id for v in started]),
+                Task.state != TaskState.CANCELLED)
         .group_by(Task.version_id)
     }
 

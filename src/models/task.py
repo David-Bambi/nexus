@@ -20,6 +20,7 @@ class TaskState(Enum):
     WAITING = auto()
     DONE = auto()
     SOMEDAY = auto()
+    CANCELLED = auto()
 
 
 class Task(Base):

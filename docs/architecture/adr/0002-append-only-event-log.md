@@ -37,7 +37,7 @@ leaves no event. The session runs with `autoflush=False`, so services
 
 | Entity | Actions |
 |---|---|
-| task | `created`, `updated`, `clarified`, `planned`, `unplanned`, `started`, `blocked`, `unblocked`, `completed`, `reopened`, `deferred`, `deleted` |
+| task | `created`, `updated`, `clarified`, `planned`, `unplanned`, `started`, `blocked`, `unblocked`, `completed`, `reopened`, `deferred`, `cancelled`, `restored`, `moved`, `deleted` |
 | version | `created`, `started`, `released`, `dod_added`, `dod_updated`, `dod_deleted`, `dod_checked`, `dod_unchecked` |
 | project | `created`, `archived`, `deleted`, `versions_reordered` |
 
@@ -50,7 +50,9 @@ when the state doesn't change.
 **Payload convention.**
 
 - State changes: `{"from", "to"}` (state names), plus `version_id` on
-  `planned` and `reason` on `blocked`.
+  `planned` and `reason` on `blocked`. `moved` carries `{from, to,
+  from_version_id, version_id}` (`from` / `to` are the unchanged state
+  name, `version_id` the target).
 - `updated`: only the changed fields, as `{field: {"from", "to"}}`. No
   event if nothing changed.
 - `created` / `deleted`: carry the title (or key/name/number) so a deleted

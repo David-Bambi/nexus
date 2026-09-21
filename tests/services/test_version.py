@@ -480,3 +480,18 @@ def test_set_criterion_done_unchanged_logs_nothing(session):
     version = _version_with_dod(session, "Ships")
     versions.set_criterion_done(session, version.definition_of_done[0].id, False)
     assert [action for action, _ in _history(session, version.id)] == ["created"]
+
+
+def test_release_ignores_cancelled_tasks(session):
+    """Release a version whose only open task was cancelled releases it
+    Given a version in progress with a cancelled task and a done task
+    When releasing that version
+    Then the version is released
+    """
+    projects.create(session, "nexus", "Nexus", "")
+    version = versions.create(session, "nexus", "0.1.0", "First version", ["Ships"])
+    versions.start(session, version.id)
+    versions.set_criterion_done(session, version.definition_of_done[0].id, True)
+    dropped = tasks.create_in_version(session, version.id, "Dropped")
+    tasks.cancel(session, dropped.id)
+    assert versions.release(session, version.id).status is VersionStatus.RELEASED

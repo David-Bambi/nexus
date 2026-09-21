@@ -11,6 +11,49 @@ from src.services.errors import InvalidTransitionError, NotFoundError, Validatio
 # timestamps only ever change through the dedicated transition functions.
 _UPDATABLE_FIELDS = {"title", "body", "context", "size"}
 
+
+# -----------------------------------------------------------------------------
+# Internal helpers
+# -----------------------------------------------------------------------------
+
+def _require_unreleased(version : Version) -> None:
+    """Refuse changes to a released version.
+
+    Args:
+        version: The version to check.
+
+    Raises:
+        ValidationError: If the version is already released.
+    """
+    if version.status == VersionStatus.RELEASED:
+        raise ValidationError(f"version '{version.id}' is already released.")
+
+def _require_existing_version(version : Version, version_id : int) -> None:
+    """Refuse a version lookup that found nothing.
+
+    Args:
+        version: The version returned by the lookup, or None.
+        version_id: Id that was looked up, used in the error message.
+
+    Raises:
+        NotFoundError: If version is None.
+    """
+    if version is None:
+        raise NotFoundError(f"Version '{version_id}' doesn't exist.")
+
+def _require_valid_title(title : str) -> None:
+    """Refuse an empty task title.
+
+    Args:
+        title: The title to check.
+
+    Raises:
+        ValidationError: If the title is empty.
+    """
+    if not title.strip() :
+        raise ValidationError("The title must be specified.")
+
+
 def _log_transition(session : Session, task : Task, action : str, previous : TaskState, **extra : object) -> None:
     """Log a task state change in the event log.
 
@@ -23,6 +66,10 @@ def _log_transition(session : Session, task : Task, action : str, previous : Tas
     """
     payload = {"from": previous.name, "to": task.state.name, **extra}
     events.log(session, events.ACTOR_WEB, "task", task.id, action, payload)
+
+# -----------------------------------------------------------------------------
+# Reading
+# -----------------------------------------------------------------------------
 
 def get(session : Session, task_id : int) -> Task:
     """Look up a task by its id.
@@ -59,6 +106,10 @@ def list(session : Session, limit : int | None = None) -> list:
 
     recent = session.query(Task).order_by(Task.created_at.desc(), Task.id.desc()).limit(limit).all()
     return recent[::-1]
+
+# -----------------------------------------------------------------------------
+# Creation
+# -----------------------------------------------------------------------------
 
 def capture(session : Session, title : str) -> Task:
     """Quickly capture a task title, with no other detail yet.
@@ -112,6 +163,61 @@ def create(session : Session,
     events.log(session, events.ACTOR_WEB, "task", task.id, "created", {"title": title})
     session.commit()
     return task
+
+def create_in_version(session : Session,
+                      version_id : int,
+                      title : str,
+                      context : str | None = None,
+                      size : str | None = None,
+                      body : str | None = None) -> Task:
+    """Create a task directly in a version, already planned.
+
+    Skips the inbox and refine steps: the task belongs to the version and to
+    the version's project from the start.
+
+    Args:
+        session: Database session to use.
+        version_id: Id of the version to create the task in.
+        title: Short title for the task.
+        context: Optional context tag (e.g. "@ordi").
+        size: Optional effort size ("XS", "S", "M", "L").
+        body: Optional free-text detail.
+
+    Returns:
+        The newly created Task, in the planned state.
+
+    Raises:
+        NotFoundError: If no version has this id.
+        ValidationError: If the version is already released, or the title is empty.
+    """
+    version = session.query(Version).filter_by(id=version_id).first()
+    _require_existing_version(version, version_id)
+    _require_unreleased(version)
+    _require_valid_title(title)
+
+
+    task = Task(project_id=version.project_id,
+                version_id=version_id,
+                title=title,
+                state=TaskState.PLANNED,
+                context=context,
+                size=size,
+                body=body)
+    
+    session.add(task)
+    session.flush()
+    events.log(session, 
+               events.ACTOR_WEB, 
+               "task",
+                task.id, 
+                "created",  
+                {"title": title, "state": "PLANNED", "version_id": version.id})
+    session.commit()
+    return task
+
+# -----------------------------------------------------------------------------
+# Editing
+# -----------------------------------------------------------------------------
 
 def update(session : Session, task_id : int, **fields : str | None) -> Task:
     """Update a task's descriptive fields.
@@ -194,6 +300,10 @@ def clarify(session : Session,
     session.commit()
     return task
 
+# -----------------------------------------------------------------------------
+# Lifecycle transitions
+# -----------------------------------------------------------------------------
+
 def plan(session : Session, task_id : int, version_id : int) -> Task:
     """Plan a refined task into a version.
 
@@ -217,11 +327,9 @@ def plan(session : Session, task_id : int, version_id : int) -> Task:
         raise InvalidTransitionError(f"task '{task_id}' isn't refined.")
 
     version = session.query(Version).filter_by(id=version_id).first()
-    if version is None:
-        raise NotFoundError(f"Version '{version_id}' doesn't exist.")
-
-    if version.status == VersionStatus.RELEASED:
-        raise ValidationError(f"version '{version_id}' is already released.")
+    
+    _require_existing_version(version, version_id)
+    _require_unreleased(version)
 
     if task.project_id is not None and task.project_id != version.project_id:
         raise ValidationError(f"task '{task_id}' belongs to a different project than the version.")
@@ -419,6 +527,159 @@ def defer(session : Session, task_id : int) -> Task:
     _log_transition(session, task, "deferred", previous)
     session.commit()
     return task
+
+def move_to_version(session : Session, task_id : int, version_id : int) -> Task:
+    """Move a planned, doing or waiting task to another version of its project.
+
+    The task keeps its state; only its version changes.
+
+    Args:
+        session: Database session to use.
+        task_id: Id of the task.
+        version_id: Id of the version to move the task to.
+
+    Returns:
+        The moved Task.
+
+    Raises:
+        NotFoundError: If no task or version has this id.
+        InvalidTransitionError: If the task isn't planned, doing or waiting.
+        ValidationError: If the task's current version or the target version
+            is already released, the target is the task's current version, or
+            the target belongs to a different project than the task.
+    """
+    task = get(session, task_id)
+
+    if task.state not in (TaskState.PLANNED, TaskState.DOING, TaskState.WAITING):
+        raise InvalidTransitionError(f"task '{task_id}' isn't planned, doing or waiting.")
+
+    version = session.query(Version).filter_by(id=version_id).first()
+
+    _require_existing_version(version, version_id)
+    if task.version is not None:
+        _require_unreleased(task.version)
+    _require_unreleased(version)
+
+    if task.version_id == version.id:
+        raise ValidationError(f"task '{task_id}' is already in version '{version.number}'.")
+    if task.project_id != version.project_id:
+        raise ValidationError(f"task '{task_id}' belongs to a different project than the version.")
+
+    previous_version_id = task.version_id
+    task.version = version
+
+    _log_transition(session, task, "moved", task.state,
+                    from_version_id=previous_version_id, version_id=version.id)
+    session.commit()
+    return task
+
+def cancel(session : Session, task_id : int) -> Task:
+    """Cancel a task that won't be done.
+
+    The task keeps its version, so the version's history still shows it.
+
+    Args:
+        session: Database session to use.
+        task_id: Id of the task.
+
+    Returns:
+        The cancelled Task.
+
+    Raises:
+        NotFoundError: If no task has this id.
+        InvalidTransitionError: If the task is already done or cancelled.
+        ValidationError: If the task's version is already released.
+    """
+    task = get(session, task_id)
+
+    if task.state in (TaskState.DONE, TaskState.CANCELLED):
+        raise InvalidTransitionError(f"task '{task_id}' is already done or cancelled.")
+    if task.version is not None:
+        _require_unreleased(task.version)
+
+    previous = task.state
+    task.state = TaskState.CANCELLED
+    task.blocked_reason = None
+    task.closed_at = datetime.utcnow()
+
+    _log_transition(session, task, "cancelled", previous)
+    session.commit()
+    return task
+
+def restore(session : Session, task_id : int) -> Task:
+    """Bring a cancelled task back to refined, out of any version.
+
+    Args:
+        session: Database session to use.
+        task_id: Id of the task.
+
+    Returns:
+        The restored Task.
+
+    Raises:
+        NotFoundError: If no task has this id.
+        InvalidTransitionError: If the task isn't cancelled.
+        ValidationError: If the task's version is already released.
+    """
+    task = get(session, task_id)
+
+    if task.state != TaskState.CANCELLED:
+        raise InvalidTransitionError(f"task '{task_id}' isn't cancelled.")
+    if task.version is not None:
+        _require_unreleased(task.version)
+
+    task.state = TaskState.REFINED
+    task.version_id = None
+    task.closed_at = None
+
+    _log_transition(session, task, "restored", TaskState.CANCELLED)
+    session.commit()
+    return task
+
+def change_state(session : Session, task_id : int, target : TaskState, reason : str = "") -> Task:
+    """Move a task to a target state through the matching lifecycle transition.
+
+    Covers the working states and cancelling: planned to doing, doing to
+    waiting or done, waiting or done back to doing, any open task to cancelled.
+
+    Args:
+        session: Database session to use.
+        task_id: Id of the task.
+        target: State to move the task to.
+        reason: Why the task is blocked; only used when the target is waiting.
+
+    Returns:
+        The updated Task.
+
+    Raises:
+        NotFoundError: If no task has this id.
+        InvalidTransitionError: If the task can't go from its state to the target.
+        ValidationError: If the task's version is already released, or the
+            target is waiting and the reason is empty.
+    """
+    task = get(session, task_id)
+
+    if task.version is not None:
+        _require_unreleased(task.version)
+    if target == TaskState.CANCELLED:
+        return cancel(session, task_id)
+    if target == TaskState.WAITING:
+        return block(session, task_id, reason)
+    if target == TaskState.DONE:
+        return complete(session, task_id)
+    if target == TaskState.DOING:
+        if task.state == TaskState.PLANNED:
+            return start(session, task_id)
+        if task.state == TaskState.WAITING:
+            return unblock(session, task_id)
+        if task.state == TaskState.DONE:
+            return reopen(session, task_id)
+    raise InvalidTransitionError(
+        f"task '{task_id}' can't go from {task.state.name} to {target.name}.")
+
+# -----------------------------------------------------------------------------
+# Deletion
+# -----------------------------------------------------------------------------
 
 def delete(session : Session, task_id : int) -> None:
     """Delete a task.
