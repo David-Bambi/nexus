@@ -108,6 +108,19 @@ def list(session : Session, project_key : str) -> list:
     return session.query(Version).filter(Version.project_id == project.id).all()
 
 
+def list_all(session : Session) -> list:
+    """List the versions of every project.
+
+    Args:
+        session: Database session to use.
+
+    Returns:
+        All versions, grouped by project (oldest project first) and in each
+        project's own order.
+    """
+    return session.query(Version).order_by(Version.project_id, Version.position, Version.id).all()
+
+
 def get(session : Session, project_key : str, number : str) -> Version:
     """Look up a version by its number within a project.
 

@@ -3,7 +3,7 @@ from typing import Callable, TextIO
 
 from sqlalchemy.orm import Session
 
-from src.cli import commands
+from src.cli import commands, views  # noqa: F401  (registers the commands)
 from src.cli.errors import UsageError
 from src.cli.resolve import resolve
 from src.cli.session import open_session
@@ -51,12 +51,10 @@ def dispatch(session : Session, argv : list[str], out : TextIO) -> None:
         return
 
     target = resolve(session, word)
-    if len(argv) > 1 and target.kind != "project":
-        raise UsageError(f"unexpected argument after '{word}'")
     viewer = commands.VIEWERS.get(target.kind)
     if viewer is None:
         raise UsageError(f"cannot show a {target.kind}")
-    viewer(session, target, out)
+    viewer(session, target, argv[1:], out)
 
 
 def main(argv : list[str] | None = None,

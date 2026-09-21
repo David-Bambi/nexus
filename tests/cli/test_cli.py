@@ -134,20 +134,8 @@ def test_viewer_receives_the_resolved_target(run, data, monkeypatch):
     """
     _, planned, _ = data
     monkeypatch.setitem(commands.VIEWERS, "task",
-                        lambda session, target, out: out.write(target.entity.title + "\n"))
+                        lambda session, target, args, out: out.write(target.entity.title + "\n"))
     assert run(planned.ref)[:2] == (EXIT_OK, "Planned\n")
-
-
-def test_extra_argument_after_a_task_ref_is_a_usage_error(run, data, monkeypatch):
-    """
-    Given a task ref followed by another argument
-    When running nexus
-    Then it is a usage error with exit code 2
-    """
-    _, planned, _ = data
-    monkeypatch.setitem(commands.VIEWERS, "task", lambda session, target, out: None)
-    code, _, err = run(planned.ref, "extra")
-    assert code == EXIT_USAGE and "unexpected argument" in err
 
 
 def test_kind_without_viewer_is_a_usage_error(run, data, monkeypatch):
