@@ -346,3 +346,20 @@ def set_criterion_done(session : Session, criterion_id : int, done : bool) -> De
                    {"criterion_id": criterion.id, "description": criterion.description})
     session.commit()
     return criterion
+
+
+def list_tasks(session : Session, version_id : int) -> list:
+    """List the tasks planned in a version.
+
+    Args:
+        session: Database session to use.
+        version_id: Id of the version.
+
+    Returns:
+        The version's tasks, ordered by position.
+
+    Raises:
+        NotFoundError: If no version has this id.
+    """
+    _get_by_id(session, version_id)
+    return session.query(Task).filter(Task.version_id == version_id).order_by(Task.position).all()

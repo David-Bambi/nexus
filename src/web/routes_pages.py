@@ -120,6 +120,7 @@ def _render_version(version, error):
     return render_template(
         "version.html",
         version=version,
+        tasks=versions.list_tasks(_session(), version.id),
         changelog=events.changelog(_session(), version.id),
         error=error,
     )
