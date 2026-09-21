@@ -15,3 +15,7 @@ introduces the first screens (see spec §9/§12 in
 - Each page embeds the mockup image and a short caption of what it shows
   and which task states/transitions it covers.
 - Mockup image files live under `docs/functional/assets/`.
+
+## Pages
+
+- [Command line](cli.md): the `nexus` CLI, refs and the import format.

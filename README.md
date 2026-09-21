@@ -63,6 +63,28 @@ The backup and migrations run on app start, as usual. The service name
 (`nexus`) and URL are hardcoded: if you changed `NEXUS_PORT`, the check will
 time out even though the service is up.
 
+## Command line
+
+`uv sync` installs the `nexus` command. It works on the same database as the
+service (`NEXUS_HOME` / `NEXUS_DATABASE_URL` apply). Tasks and versions have
+short refs (`t-4k2`, `v-9xa`), shown in the web UI too.
+
+```bash
+uv run nexus tasks                          # also: versions, projects, version
+uv run nexus NX                             # project detail (by key)
+uv run nexus NX 1.0                         # version detail, tasks, definition of done
+uv run nexus t-4k2                          # task detail (or a v- ref)
+uv run nexus add task NX 1.0 -t "Title" -s S  # planned task; omit the version for the inbox
+uv run nexus "buy a USB-C cable"            # capture into the inbox
+uv run nexus import plan.json --dry-run     # import projects/versions/tasks, all or nothing
+uv run nexus import - --text < ideas.txt    # one inbox task per line
+```
+
+Exit codes: 0 ok, 1 refused by a data rule, 2 wrong command line. The CLI
+cannot edit or change task states yet. It applies pending migrations when it
+starts, so it can upgrade the real database before the service is
+redeployed. Import format and details: `docs/functional/cli.md`.
+
 ## Configuration
 
 Environment variables, all optional (see `.env.example`):
