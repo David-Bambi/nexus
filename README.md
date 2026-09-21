@@ -49,6 +49,20 @@ loginctl enable-linger
 
 Manage it with `systemctl --user status nexus`, `restart nexus`, `stop nexus`.
 
+### Deploy the current checkout (Linux)
+
+```bash
+scripts/deploy.sh          # refuses a dirty git tree
+scripts/deploy.sh --force  # deploy despite uncommitted changes
+```
+
+Runs `uv run pytest -q`, `uv sync --frozen`, then
+`systemctl --user restart nexus`, and polls `http://127.0.0.1:8765/` for up
+to 20 s. On failure it prints the last 20 journal lines and exits non-zero.
+The backup and migrations run on app start, as usual. The service name
+(`nexus`) and URL are hardcoded: if you changed `NEXUS_PORT`, the check will
+time out even though the service is up.
+
 ## Configuration
 
 Environment variables, all optional (see `.env.example`):

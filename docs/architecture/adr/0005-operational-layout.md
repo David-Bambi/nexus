@@ -35,6 +35,13 @@ Accepted
   (`Restart=on-failure`), a launchd agent, or a Windows scheduled task (XML).
   Command: `uv run --frozen --directory <repo> python -m src.main`. Usage
   and environment variables are in the repository's `README.md`.
+- **Deploy**: `scripts/deploy.sh [--force]` updates the systemd user service
+  from the current checkout: it refuses a dirty git tree (unless `--force`),
+  runs `pytest -q` and `uv sync --frozen`, restarts `nexus`, then polls
+  `http://127.0.0.1:8765/` for up to 20 s (last 20 journal lines on failure).
+  The pre-migration backup is the one taken on start, not a separate step.
+  The service name and URL are hardcoded, so a custom `NEXUS_PORT` makes the
+  check time out.
 
 See [overview](../overview.md#startup-sequence) for the startup order.
 
