@@ -264,3 +264,22 @@ def test_only_post_is_allowed_and_no_cors_is_granted(client):
     preflight = client.options("/mcp", headers={"Origin": "https://evil.example",
                                                 "Access-Control-Request-Method": "POST"})
     assert not any(h.lower().startswith("access-control-allow") for h in preflight.headers.keys())
+
+
+def test_unexpected_tool_failure_is_a_readable_error_result_and_is_logged(client, app, monkeypatch, caplog):
+    """
+    Given a tool failing with an unexpected exception
+    When calling it over HTTP
+    Then the assistant gets an error result (not an HTML 500) and the traceback is logged
+    """
+    from src.mcp_server import tools
+
+    def boom(session, args):
+        raise RuntimeError("secret detail")
+
+    monkeypatch.setitem(tools.TOOLS, "inbox", tools.Tool("inbox", "", tools.TOOLS["inbox"].schema, boom, read_only=True))
+    response = rpc(client, "tools/call", {"name": "inbox", "arguments": {}})
+    result = response.get_json()["result"]
+    assert response.status_code == 200 and result["isError"] is True
+    assert "internal error" in result["content"][0]["text"] and "secret detail" not in json.dumps(result)
+    assert "secret detail" in caplog.text

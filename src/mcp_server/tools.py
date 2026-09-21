@@ -387,7 +387,7 @@ def list_tools() -> list[dict]:
             for t in TOOLS.values()]
 
 
-def _error(message : str) -> dict:
+def failure(message : str) -> dict:
     """A tool result reporting a failure the assistant can read and react to."""
     return {"content": [{"type": "text", "text": message}], "isError": True}
 
@@ -415,7 +415,7 @@ def call_tool(session : Session, name : str, arguments : object) -> dict:
         data = found.handler(session, validate({} if arguments is None else arguments, found.schema))
     except DomainError as error:
         session.rollback()
-        return _error(str(error))
+        return failure(str(error))
     except Exception:
         session.rollback()
         raise

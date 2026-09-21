@@ -1,9 +1,11 @@
 import json
+from types import SimpleNamespace
 
 import pytest
 
 from src.mcp_server import tools
 from src.models.event import Event
+from src.models.task import Task
 from src.services import events, projects, tasks, versions
 
 
@@ -349,3 +351,142 @@ def test_a_refused_write_leaves_no_partial_change(session, world):
     _, _, _, inbox = world
     refused(session, "complete_task", ref=inbox.ref)
     assert not session.new and not session.dirty
+
+
+# Gaps found by measuring coverage ------------------------------------------------------------------
+
+def test_unexpected_errors_roll_back_and_propagate(session, world, monkeypatch):
+    """
+    Given a handler failing with something that isn't a domain error
+    When calling the tool
+    Then the session is rolled back and the exception reaches the caller
+    """
+    def boom(session, args):
+        session.add(Task(ref="t-boo", title="half done"))
+        raise RuntimeError("boom")
+
+    monkeypatch.setitem(tools.TOOLS, "capture_task", tools.Tool("capture_task", "", tools.TOOLS["capture_task"].schema, boom))
+    with pytest.raises(RuntimeError):
+        call(session, "capture_task", title="x")
+    assert not session.new and tasks.get_by_ref(session, world[1].ref)
+
+
+def test_update_task_refuses_a_blank_title_and_bad_size(session, world):
+    """
+    Given a task
+    When updating its title to blank or its size to an unknown one
+    Then both are refused and nothing changes
+    """
+    _, planned, _, _ = world
+    assert "'title' must not be blank" in refused(session, "update_task", ref=planned.ref, title="  ")
+    assert "must be one of" in refused(session, "update_task", ref=planned.ref, size="XXL")
+    assert tasks.get_by_ref(session, planned.ref).title == "Planned task"
+
+
+def test_versions_can_be_named_by_number_in_write_tools(session, world):
+    """
+    Given a version
+    When planning a task and adding one to it by number plus project
+    Then both land in that version
+    """
+    version, _, refined, _ = world
+    assert ok(session, "plan_task", ref=refined.ref, version="1.0", project="nx")["version_ref"] == version.ref
+    assert ok(session, "add_task", project="nx", version="1.0", title="Again")["version_ref"] == version.ref
+    assert "'project' is required" in refused(session, "plan_task", ref=refined.ref, version="1.0")
+
+
+def test_criterion_can_be_unchecked(session, world):
+    """
+    Given a checked criterion
+    When unchecking it through the tool
+    Then it is unchecked
+    """
+    version, _, _, _ = world
+    ok(session, "set_criterion_done", version=version.ref, index=1, done=True)
+    shown = ok(session, "set_criterion_done", version=version.ref, index=1, done=False)
+    assert shown["definition_of_done"][0]["done"] is False
+
+
+def test_list_filters_refuse_unknown_references(session, world):
+    """
+    Given a project or version that doesn't exist
+    When filtering tasks or versions by it
+    Then a readable error is returned
+    """
+    assert "doesn't exist" in refused(session, "list_tasks", project="ghost")
+    assert "doesn't exist" in refused(session, "list_tasks", version="v-zzz")
+    assert "doesn't exist" in refused(session, "list_versions", project="ghost")
+
+
+def test_search_reports_truncation_and_archived_projects_are_opt_in(session, world):
+    """
+    Given several matches and an archived project
+    When searching with a small limit and listing projects with and without archived
+    Then truncation is flagged, and archived projects only appear on request
+    """
+    assert ok(session, "search", term="task", limit=2)["truncated"] is True
+    projects.create(session, "old", "Old", "")
+    projects.archive(session, "old")
+    assert [p["key"] for p in ok(session, "list_projects")["projects"]] == ["nx"]
+    assert {p["key"] for p in ok(session, "list_projects", include_archived=True)["projects"]} == {"nx", "old"}
+
+
+def test_dashboard_lists_in_progress_versions_and_working_tasks(session, world):
+    """
+    Given a started version with a doing task and a waiting one
+    When reading the dashboard
+    Then progress, doing and waiting are reported
+    """
+    version, planned, _, _ = world
+    versions.start(session, version.id)
+    other = tasks.create_in_version(session, version.id, "Other")
+    tasks.start(session, planned.id)
+    tasks.start(session, other.id)
+    tasks.block(session, other.id, "why")
+    board = ok(session, "dashboard")
+    assert [(v["ref"], v["tasks_total"], v["criteria_total"]) for v in board["in_progress"]] == [(version.ref, 2, 2)]
+    assert [t["ref"] for t in board["doing"]] == [planned.ref] and [t["ref"] for t in board["waiting"]] == [other.ref]
+
+
+WRITE_CALLS = [
+    ("capture_task", lambda w: {"title": "T"}),
+    ("add_task", lambda w: {"project": "nx", "title": "T"}),
+    ("import_data", lambda w: {"text": "T"}),
+    ("update_task", lambda w: {"ref": w.planned.ref, "title": "New"}),
+    ("plan_task", lambda w: {"ref": w.refined.ref, "version": w.version.ref}),
+    ("unplan_task", lambda w: {"ref": w.planned.ref}),
+    ("start_task", lambda w: {"ref": w.planned.ref}),
+    ("complete_task", lambda w: {"ref": w.doing.ref}),
+    ("block_task", lambda w: {"ref": w.doing.ref, "reason": "why"}),
+    ("unblock_task", lambda w: {"ref": w.waiting.ref}),
+    ("set_criterion_done", lambda w: {"version": w.version.ref, "index": 1, "done": True}),
+]
+
+
+@pytest.mark.parametrize("name,arguments", WRITE_CALLS, ids=[n for n, _ in WRITE_CALLS])
+def test_every_write_tool_logs_the_mcp_actor(session, world, name, arguments):
+    """
+    Given each write tool
+    When it runs
+    Then every event it logged is attributed to mcp
+    """
+    version, planned, refined, _ = world
+    doing = tasks.create_in_version(session, version.id, "Doing")
+    tasks.start(session, doing.id)
+    waiting = tasks.create_in_version(session, version.id, "Waiting")
+    tasks.start(session, waiting.id)
+    tasks.block(session, waiting.id, "why")
+    known = SimpleNamespace(version=version, planned=planned, refined=refined, doing=doing, waiting=waiting)
+    before = session.query(Event).count()
+    ok(session, name, **arguments(known))
+    fresh = session.query(Event).order_by(Event.id).offset(before).all()
+    assert fresh and {e.actor for e in fresh} == {events.ACTOR_MCP}
+
+
+def test_the_write_calls_above_cover_every_write_tool():
+    """
+    Given the registry
+    When comparing its write tools with the ones exercised above
+    Then none is left out, so a new write tool can't skip the actor check
+    """
+    assert {t.name for t in tools.TOOLS.values() if not t.read_only} == {name for name, _ in WRITE_CALLS}

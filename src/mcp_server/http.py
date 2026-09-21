@@ -115,6 +115,11 @@ def _call_tool(request_id : object, params : dict):
         result = tools.call_tool(session, name, arguments)
     except tools.UnknownTool:
         return _rpc_error(request_id, INVALID_PARAMS, f"Unknown tool: {name}")
+    except Exception:
+        # A bug or a database failure: keep the assistant informed instead of
+        # answering with an HTML error page, and keep the detail in the log.
+        logger.exception("MCP tool %s failed", name)
+        result = tools.failure("internal error, see the server log")
     logger.info("MCP tool %s: %s", name, "error" if result["isError"] else "ok")
     return _rpc_result(request_id, result)
 
