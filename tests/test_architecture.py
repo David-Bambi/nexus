@@ -32,3 +32,21 @@ def test_services_never_import_flask_or_web():
             if _is_forbidden(module):
                 violations.append(f"{path}: imports {module}")
     assert not violations, "\n".join(violations)
+
+
+# The MCP tool layer is transport-agnostic too: only the HTTP endpoint
+# (mcp_server/http.py) may know about Flask.
+MCP_DIR = Path(__file__).resolve().parent.parent / "src" / "mcp_server"
+
+
+def test_mcp_tool_layer_never_imports_flask_or_web():
+    """Every file under mcp_server/ except http.py must stay free of flask and src.web."""
+    violations = []
+    for path in MCP_DIR.rglob("*.py"):
+        if path.name == "http.py":
+            continue
+        tree = ast.parse(path.read_text(), filename=str(path))
+        for module in _imported_modules(tree):
+            if _is_forbidden(module):
+                violations.append(f"{path}: imports {module}")
+    assert not violations, "\n".join(violations)

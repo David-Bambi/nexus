@@ -2,7 +2,7 @@ from typing import Callable, TextIO
 
 from sqlalchemy.orm import Session
 
-from src.cli.resolve import Target
+from src.services.resolve import Target
 
 # A named command: (session, arguments after the command name, output stream).
 Command = Callable[[Session, list[str], TextIO], None]

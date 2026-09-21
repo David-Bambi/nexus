@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from src.cli import add, commands, import_cmd, views  # noqa: F401  (register commands)
 from src.cli.errors import UsageError
-from src.cli.resolve import resolve
+from src.services.resolve import resolve
 from src.cli.session import open_session
 from src.services.errors import DomainError
 

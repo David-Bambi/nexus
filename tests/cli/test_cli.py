@@ -4,7 +4,7 @@ import pytest
 
 from src.cli import commands, format as fmt
 from src.cli.main import EXIT_ERROR, EXIT_OK, EXIT_USAGE, main
-from src.cli.resolve import resolve, resolve_version
+from src.services.resolve import resolve, resolve_version
 from src.services import projects, tasks, versions
 from src.services.errors import NotFoundError, ValidationError
 

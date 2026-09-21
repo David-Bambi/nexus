@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from src.cli import commands, format as fmt
 from src.cli.errors import UsageError
-from src.cli.resolve import Target, resolve_version
+from src.services.resolve import Target, resolve_version
 from src.models.task import Task
 from src.models.version import Version
 from src.services import projects, tasks, versions

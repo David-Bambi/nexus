@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from src.cli import commands
 from src.cli.errors import UsageError, UsageParser
-from src.cli.resolve import resolve_version
+from src.services.resolve import resolve_version
 from src.models.task import Task
 from src.services import events, tasks
 from src.services.errors import ValidationError

@@ -11,7 +11,7 @@ from src.services.errors import NotFoundError
 
 @dataclass(frozen=True)
 class Target:
-    """What a command-line reference points at."""
+    """What a reference (from the CLI, an MCP call, …) points at."""
 
     # "project", "version" or "task".
     kind: str
