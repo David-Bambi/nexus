@@ -89,7 +89,7 @@ def _guard():
 
     version = request.headers.get("MCP-Protocol-Version")
     if version is not None and version not in PROTOCOL_VERSIONS:
-        return _refused(400, "unsupported MCP-Protocol-Version")
+        return _refused(400, f"unsupported MCP-Protocol-Version {version!r}")
     return None
 
 
