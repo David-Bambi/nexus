@@ -232,14 +232,29 @@ def test_guard_runs_before_the_body_is_read(client):
     assert response.status_code == 421
 
 
-def test_unsupported_protocol_version_header_is_refused(client):
+def test_unsupported_protocol_version_header_is_refused_after_the_handshake(client, app):
     """
     Given an MCP-Protocol-Version this server doesn't speak
-    When posting
-    Then it is refused with 400; a supported one is served
+    When posting a tool call or a notification
+    Then it is refused with 400 and nothing runs; a supported one is served
     """
-    assert client.post("/mcp", json=CAPTURE, headers={"MCP-Protocol-Version": "1999-01-01"}).status_code == 400
+    bad = {"MCP-Protocol-Version": "1999-01-01"}
+    assert client.post("/mcp", json=CAPTURE, headers=bad).status_code == 400 and task_count(app) == 0
+    notification = {"jsonrpc": "2.0", "method": "notifications/initialized"}
+    assert client.post("/mcp", json=notification, headers=bad).status_code == 400
     assert client.post("/mcp", json=CAPTURE, headers={"MCP-Protocol-Version": PROTOCOL_VERSIONS[0]}).status_code == 200
+
+
+def test_initialize_accepts_a_newer_version_header_and_agrees_on_ours(client):
+    """
+    Given a client newer than this server, sending its own version in the header and the body
+    When it initializes
+    Then the handshake succeeds and the server answers with the newest version it speaks
+    """
+    response = rpc(client, "initialize", {"protocolVersion": "2026-07-28"},
+                   headers={"MCP-Protocol-Version": "2026-07-28"})
+    assert response.status_code == 200
+    assert response.get_json()["result"]["protocolVersion"] == PROTOCOL_VERSIONS[0]
 
 
 def test_oversized_bodies_are_refused(client, app):

@@ -87,17 +87,17 @@ def _guard():
     if request.mimetype != "application/json":
         return _refused(415, "Content-Type must be application/json")
 
-    version = request.headers.get("MCP-Protocol-Version")
-    if version is not None and version not in PROTOCOL_VERSIONS:
-        return _refused(400, f"unsupported MCP-Protocol-Version {version!r}")
     return None
 
 
 def _initialize(request_id : object, params : dict):
     """Answer the handshake, agreeing on a protocol version."""
     asked = params.get("protocolVersion")
+    agreed = asked if asked in PROTOCOL_VERSIONS else PROTOCOL_VERSIONS[0]
+    logger.info("MCP initialize: client asked %r (header %r), agreed %s", asked,
+                request.headers.get("MCP-Protocol-Version"), agreed)
     return _rpc_result(request_id, {
-        "protocolVersion": asked if asked in PROTOCOL_VERSIONS else PROTOCOL_VERSIONS[0],
+        "protocolVersion": agreed,
         "capabilities": {"tools": {"listChanged": False}},
         "serverInfo": {"name": "nexus", "version": _app_version()},
         "instructions": INSTRUCTIONS,
@@ -140,6 +140,13 @@ def endpoint():
         return _rpc_error(None, PARSE_ERROR, "invalid JSON", 400)
     if not isinstance(message, dict) or message.get("jsonrpc") != "2.0":
         return _rpc_error(None, INVALID_REQUEST, "expected a single JSON-RPC 2.0 message", 400)
+
+    # After the handshake every message must carry a version this server agreed
+    # to. The handshake itself may name any version, even a newer one than
+    # ours: that is what it negotiates.
+    version = request.headers.get("MCP-Protocol-Version")
+    if message.get("method") != "initialize" and version is not None and version not in PROTOCOL_VERSIONS:
+        return _refused(400, f"unsupported MCP-Protocol-Version {version!r}")
 
     # A notification, or a reply to the server (which never asks anything).
     if "id" not in message or "method" not in message:

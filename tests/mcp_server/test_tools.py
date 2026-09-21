@@ -40,6 +40,20 @@ def world(session):
     return version, planned, refined, inbox
 
 
+def _id_keys(data):
+    """Every key named id or ending in _id, at any depth (a raw database id leaking out)."""
+    found = []
+    if isinstance(data, dict):
+        for key, value in data.items():
+            if key == "id" or key.endswith("_id"):
+                found.append(key)
+            found += _id_keys(value)
+    elif isinstance(data, list):
+        for item in data:
+            found += _id_keys(item)
+    return found
+
+
 def _last_event(session):
     return session.query(Event).order_by(Event.id.desc()).first()
 
@@ -180,7 +194,8 @@ def test_list_and_show_tools_return_refs_and_no_integer_ids(session, world):
     assert [t["ref"] for t in shown["tasks"]] == [planned.ref]
     assert shown["definition_of_done"] == [{"index": 1, "description": "Ships", "done": False},
                                            {"index": 2, "description": "Documented", "done": False}]
-    assert "id" not in json.dumps(ok(session, "get_project", project="nx")).replace("ident", "")
+    assert not _id_keys(ok(session, "get_project", project="nx"))
+    assert not _id_keys(shown) and not _id_keys(listed)
 
 
 def test_list_tasks_filters(session, world):
