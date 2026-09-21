@@ -13,7 +13,7 @@
     {% for task in tasks %}
     <li>
         <a href="{{ url_for('pages.task_detail', task_id=task.id) }}">{{ task.title }}</a>
-        — {{ task.state.name }}
+        <code>{{ task.ref }}</code> — {{ task.state.name }}
     </li>
     {% else %}
     <li>No tasks yet.</li>

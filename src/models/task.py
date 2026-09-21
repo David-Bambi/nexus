@@ -29,6 +29,8 @@ class Task(Base):
     __tablename__ = "task"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    # Short unique reference (e.g. "t-4k2"), immutable; set by services/refs.
+    ref: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     # Nullable project/version is the GTD mechanism, not an edge case: no
     # project = raw capture, no version = not yet planned.
     project_id: Mapped[Optional[int]] = mapped_column(ForeignKey("project.id"))

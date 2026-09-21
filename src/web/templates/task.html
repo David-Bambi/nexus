@@ -10,6 +10,7 @@
 {% endif %}
 
 <h1>{{ task.title }}</h1>
+<p><strong>Ref:</strong> <code>{{ task.ref }}</code></p>
 <p><strong>State:</strong> {{ task.state.name }}</p>
 {% if task.project %}
 <p><strong>Project:</strong> <a href="{{ url_for('pages.project_detail', key=task.project.key) }}">{{ task.project.name }}</a></p>

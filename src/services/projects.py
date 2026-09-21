@@ -4,7 +4,8 @@ from src.models.project import Project, ProjectStatus
 from src.services import events
 from src.services.errors import ConflictError, NotFoundError
 
-def create(session : Session, key : str, name : str, description : str | None = None) -> Project:
+def create(session : Session, key : str, name : str, description : str | None = None,
+           actor : str = events.ACTOR_WEB) -> Project:
     """Create a project.
 
     Args:
@@ -12,6 +13,7 @@ def create(session : Session, key : str, name : str, description : str | None = 
         key: Unique slug identifying the project (used in URLs).
         name: Human-readable project name.
         description: Optional free-text description.
+        actor: Who made the change, recorded in the event log.
 
     Returns:
         The newly created Project.
@@ -27,7 +29,7 @@ def create(session : Session, key : str, name : str, description : str | None = 
                       description=description)
     session.add(project)
     session.flush()
-    events.log(session, events.ACTOR_WEB, "project", project.id, "created",
+    events.log(session, actor, "project", project.id, "created",
                {"key": key, "name": name})
     session.commit()
     return project

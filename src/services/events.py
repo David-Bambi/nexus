@@ -7,6 +7,9 @@ from src.models.task import Task
 # Actor recorded on every event written from the web interface.
 ACTOR_WEB = "web"
 
+# Actor recorded on every event written from the command line.
+ACTOR_CLI = "cli"
+
 
 def log(session : Session,
         actor : str,

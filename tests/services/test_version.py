@@ -187,7 +187,7 @@ def test_release_with_unfinished_tasks(session):
     projects.create(session, "nexus", "Nexus", "")
     version = versions.create(session, "nexus", "0.1.0", "First version", ["Ships"])
     versions.start(session, version.id)
-    task = Task(title="Write the docs", project_id=version.project_id,
+    task = Task(ref="t-tst", title="Write the docs", project_id=version.project_id,
                 version_id=version.id, state=TaskState.PLANNED)
     session.add(task)
     session.commit()

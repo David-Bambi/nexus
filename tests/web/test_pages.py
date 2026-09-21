@@ -1,3 +1,5 @@
+import re
+
 import pytest
 
 
@@ -880,3 +882,25 @@ def test_task_page_back_link_ignores_unsafe_next(client, target):
     page = client.get("/tasks/1", query_string={"next": target}).get_data(as_text=True)
     assert '<a href="/tasks">← Tasks</a>' in page
     assert "evil.example" not in page and "javascript:" not in page
+
+
+def test_task_refs_are_shown_on_detail_and_list(client):
+    """A task's ref appears on its detail page and in the tasks list."""
+    client.post("/tasks", data={"title": "Write the docs"})
+
+    detail = client.get("/tasks/1").data
+    ref = re.search(rb"<code>(t-[0-9a-z]+)</code>", detail)
+    assert ref is not None
+    assert ref.group(0) in client.get("/tasks").data
+
+
+def test_version_refs_are_shown_on_detail_and_list(client):
+    """A version's ref appears on its detail page and in the versions list."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    client.post("/projects/nexus/versions",
+                data={"number": "0.1.0", "title": "First version", "dod": "Ships"})
+
+    detail = client.get("/projects/nexus/versions/0.1.0").data
+    ref = re.search(rb"<code>(v-[0-9a-z]+)</code>", detail)
+    assert ref is not None
+    assert ref.group(0) in client.get("/projects/nexus/versions").data

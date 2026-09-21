@@ -78,5 +78,5 @@ def test_migrated_database_accepts_cancelled_tasks(tmp_path):
     create_app(_config_for(database))
     with closing(sqlite3.connect(database)) as connection:
         connection.execute(
-            "INSERT INTO task (title, state, position, created_at, updated_at) "
-            "VALUES ('Dropped', 'CANCELLED', 0, '2026-09-21', '2026-09-21')")
+            "INSERT INTO task (ref, title, state, position, created_at, updated_at) "
+            "VALUES ('t-drp', 'Dropped', 'CANCELLED', 0, '2026-09-21', '2026-09-21')")

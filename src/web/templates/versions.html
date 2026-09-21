@@ -15,7 +15,7 @@
     {% for version in versions %}
     <li>
         <a href="{{ url_for('pages.version_detail', key=project.key, number=version.number) }}">{{ version.number }} — {{ version.title }}</a>
-        — {{ version.status.name }}
+        <code>{{ version.ref }}</code> — {{ version.status.name }}
     </li>
     {% else %}
     <li>No versions yet.</li>

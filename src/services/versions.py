@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from src.models.definition_of_done import DefinitionOfDoneCriterion
 from src.models.version import Version, VersionStatus
 from src.models.task import Task,TaskState
-from src.services import events, projects
+from src.services import events, projects, refs
 from src.services.errors import ConflictError, NotFoundError, ValidationError
 
 def create(session : Session,
@@ -14,7 +14,8 @@ def create(session : Session,
            title : str,
            dod : list,
            goal : str | None = None,
-           target_date : date | None = None) -> Version:
+           target_date : date | None = None,
+           actor : str = events.ACTOR_WEB) -> Version:
     """Create a version under a project.
 
     Args:
@@ -25,6 +26,7 @@ def create(session : Session,
         dod: Definition-of-done criteria (one or more description strings).
         goal: Optional free-text goal for the version.
         target_date: Optional planning date.
+        actor: Who made the change, recorded in the event log.
 
     Returns:
         The newly created Version.
@@ -42,7 +44,8 @@ def create(session : Session,
     if session.query(Version).filter_by(project_id=project.id, number=number).first() is not None:
         raise ConflictError(f"project '{project_key}' already has a version '{number}'")
 
-    version = Version(project_id=project.id,
+    version = Version(ref=refs.generate(session, Version),
+                      project_id=project.id,
                       number=number,
                       title=title,
                       goal=goal,
@@ -54,7 +57,7 @@ def create(session : Session,
 
     session.add(version)
     session.flush()
-    events.log(session, events.ACTOR_WEB, "version", version.id, "created",
+    events.log(session, actor, "version", version.id, "created",
                {"number": number, "title": title})
     session.commit()
     return version
@@ -128,6 +131,25 @@ def get(session : Session, project_key : str, number : str) -> Version:
     else:
         return version
 
+
+def get_by_ref(session : Session, ref : str) -> Version:
+    """Look up a version by its short ref.
+
+    Args:
+        session: Database session to use.
+        ref: Ref of the version (e.g. "v-9xa"), case-insensitive.
+
+    Returns:
+        The matching Version.
+
+    Raises:
+        NotFoundError: If no version has this ref.
+    """
+    version = session.query(Version).filter_by(ref=ref.strip().lower()).first()
+    if not version:
+        raise NotFoundError(f"Version '{ref}' doesn't exist.")
+    else:
+        return version
 
 def _get_by_id(session : Session, version_id : int) -> Version:
     """Look up a version by its id.

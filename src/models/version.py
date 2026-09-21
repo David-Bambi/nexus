@@ -23,6 +23,8 @@ class Version(Base):
     __tablename__ = "version"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    # Short unique reference (e.g. "v-4k2"), immutable; set by services/refs.
+    ref: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     
     project_id: Mapped[int] = mapped_column(ForeignKey("project.id"), nullable=False)
     

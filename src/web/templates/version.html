@@ -6,6 +6,7 @@
 <p><a href="{{ url_for('pages.versions_list', key=version.project.key) }}">← Versions</a></p>
 
 <h1>{{ version.number }} — {{ version.title }}</h1>
+<p><strong>Ref:</strong> <code>{{ version.ref }}</code></p>
 <p><strong>Status:</strong> {{ version.status.name }}</p>
 {% if version.goal %}
 <p>{{ version.goal }}</p>
@@ -25,7 +26,7 @@
 {% set task_url = url_for('pages.version_task_add', key=version.project.key, number=version.number) %}
 <ul>
     {% for task in tasks %}
-        <li><a href="{{ url_for('pages.task_detail', task_id=task.id, next=page_url)}}">
+        <li><code>{{ task.ref }}</code> <a href="{{ url_for('pages.task_detail', task_id=task.id, next=page_url)}}">
         {{ task.title }}</a> - {{ task.state.name }}
         {% if editable %}
         {% with state_action = url_for('pages.version_task_state', key=version.project.key, number=version.number, task_id=task.id) %}

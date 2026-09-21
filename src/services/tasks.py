@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from src.models.task import Task, TaskState
 from src.models.version import Version, VersionStatus
-from src.services import events, projects
+from src.services import events, projects, refs
 from src.services.errors import InvalidTransitionError, NotFoundError, ValidationError
 
 # Fields update() is allowed to touch; state, project/version linkage and
@@ -90,6 +90,25 @@ def get(session : Session, task_id : int) -> Task:
     else:
         return task
 
+def get_by_ref(session : Session, ref : str) -> Task:
+    """Look up a task by its short ref.
+
+    Args:
+        session: Database session to use.
+        ref: Ref of the task (e.g. "t-4k2"), case-insensitive.
+
+    Returns:
+        The matching Task.
+
+    Raises:
+        NotFoundError: If no task has this ref.
+    """
+    task = session.query(Task).filter_by(ref=ref.strip().lower()).first()
+    if task is None:
+        raise NotFoundError(f"Task '{ref}' doesn't exist.")
+    else:
+        return task
+
 def list(session : Session, limit : int | None = None) -> list:
     """List tasks.
 
@@ -111,20 +130,21 @@ def list(session : Session, limit : int | None = None) -> list:
 # Creation
 # -----------------------------------------------------------------------------
 
-def capture(session : Session, title : str) -> Task:
+def capture(session : Session, title : str, actor : str = events.ACTOR_WEB) -> Task:
     """Quickly capture a task title, with no other detail yet.
 
     Args:
         session: Database session to use.
         title: Short title for the task.
+        actor: Who made the change, recorded in the event log.
 
     Returns:
         The newly created Task, in the inbox state.
     """
-    task = Task(title=title, state=TaskState.INBOX)
+    task = Task(ref=refs.generate(session, Task), title=title, state=TaskState.INBOX)
     session.add(task)
     session.flush()
-    events.log(session, events.ACTOR_WEB, "task", task.id, "created", {"title": title})
+    events.log(session, actor, "task", task.id, "created", {"title": title})
     session.commit()
     return task
 
@@ -133,7 +153,8 @@ def create(session : Session,
            project_key : str | None = None,
            body : str | None = None,
            context : str | None = None,
-           size : str | None = None) -> Task:
+           size : str | None = None,
+           actor : str = events.ACTOR_WEB) -> Task:
     """Create a task with its detail already known.
 
     Args:
@@ -143,6 +164,7 @@ def create(session : Session,
         body: Optional free-text detail.
         context: Optional context tag (e.g. "@ordi").
         size: Optional effort size ("XS", "S", "M", "L").
+        actor: Who made the change, recorded in the event log.
 
     Returns:
         The newly created Task, in the inbox state.
@@ -152,7 +174,8 @@ def create(session : Session,
     """
     project = projects.get(session, project_key) if project_key else None
 
-    task = Task(title=title,
+    task = Task(ref=refs.generate(session, Task),
+                title=title,
                 project_id=project.id if project else None,
                 body=body,
                 context=context,
@@ -160,7 +183,7 @@ def create(session : Session,
                 state=TaskState.INBOX)
     session.add(task)
     session.flush()
-    events.log(session, events.ACTOR_WEB, "task", task.id, "created", {"title": title})
+    events.log(session, actor, "task", task.id, "created", {"title": title})
     session.commit()
     return task
 
@@ -169,7 +192,8 @@ def create_in_version(session : Session,
                       title : str,
                       context : str | None = None,
                       size : str | None = None,
-                      body : str | None = None) -> Task:
+                      body : str | None = None,
+                      actor : str = events.ACTOR_WEB) -> Task:
     """Create a task directly in a version, already planned.
 
     Skips the inbox and refine steps: the task belongs to the version and to
@@ -182,6 +206,7 @@ def create_in_version(session : Session,
         context: Optional context tag (e.g. "@ordi").
         size: Optional effort size ("XS", "S", "M", "L").
         body: Optional free-text detail.
+        actor: Who made the change, recorded in the event log.
 
     Returns:
         The newly created Task, in the planned state.
@@ -196,7 +221,8 @@ def create_in_version(session : Session,
     _require_valid_title(title)
 
 
-    task = Task(project_id=version.project_id,
+    task = Task(ref=refs.generate(session, Task),
+                project_id=version.project_id,
                 version_id=version_id,
                 title=title,
                 state=TaskState.PLANNED,
@@ -207,7 +233,7 @@ def create_in_version(session : Session,
     session.add(task)
     session.flush()
     events.log(session, 
-               events.ACTOR_WEB, 
+               actor,
                "task",
                 task.id, 
                 "created",  
