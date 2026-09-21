@@ -30,9 +30,11 @@ nav:
           - "0005 — Operational layout": architecture/adr/0005-operational-layout.md
           - "0006 — CLI shares the database": architecture/adr/0006-cli-shares-the-database.md
           - "0007 — Importer as MCP entry point": architecture/adr/0007-importer-mcp-entry-point.md
+          - "0008 — MCP over HTTP on the service": architecture/adr/0008-mcp-over-http-on-the-service.md
   - Functional:
       - Overview: functional/index.md
       - Command line: functional/cli.md
+      - MCP server: functional/mcp.md
   - Python:
       - Overview: python/index.md
       - SQLAlchemy: python/sqlalchemy.md

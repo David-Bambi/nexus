@@ -37,9 +37,9 @@ Accepted
   `projects.create` refuses ref-shaped keys and the command words `add`,
   `help`, `import`, `projects`, `tasks`, `version`, `versions`
   (`ValidationError`, shown by the web form).
-- **Actor**: `events.ACTOR_CLI = "cli"`. The creation services
-  (`projects.create`, `versions.create`, `tasks.capture`, `tasks.create`,
-  `tasks.create_in_version`) take an `actor` argument, default `web`.
+- **Actor**: `events.ACTOR_CLI = "cli"`. Every mutating service takes an
+  `actor` argument, default `web` (at first only the creation services did;
+  widened by [0008](0008-mcp-over-http-on-the-service.md)).
 
 ## Why
 
@@ -60,7 +60,6 @@ internal and a project key alone can't name a task.
 - `services/` stays framework-agnostic; `tests/test_architecture.py`
   enforces it.
 - The CLI cannot edit, change a task's state or toggle a DoD criterion.
-  Only the creation services take `actor`; other mutations still log `web`.
 - Task title validation for capture/create lives in the CLI and the importer,
   not in the services.
 

@@ -19,15 +19,18 @@ log is never updated or deleted.
 Near-zero cost now, impossible to retrofit later. It provides per-task
 history, an automatic per-version changelog, and — critically — traceability
 of what an agent will have modified once agentic capabilities arrive. The
-`actor` field is `"web"` or `"cli"` (see
-[0006](0006-cli-shares-the-database.md)) and will later distinguish `agent`.
+`actor` field is `"web"`, `"cli"` (see
+[0006](0006-cli-shares-the-database.md)) or `"mcp"` (see
+[0008](0008-mcp-over-http-on-the-service.md)), which tells what an agent
+modified.
 
 ## Implementation
 
 Written through `services/events.log(session, actor, entity_type,
 entity_id, action, payload=None)`. `actor` is required; services pass the
-constant `events.ACTOR_WEB` (`"web"`) or `events.ACTOR_CLI` (`"cli"`); only
-the creation services take it as an argument, the others still log `web`.
+constant `events.ACTOR_WEB` (`"web"`), `events.ACTOR_CLI` (`"cli"`) or
+`events.ACTOR_MCP` (`"mcp"`). Every mutating service takes an `actor`
+argument, default `web`.
 
 **Same transaction.** `log()` only `session.add()`s the event; the calling
 service commits it with the mutation, so both are stored or neither. A

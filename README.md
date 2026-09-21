@@ -86,9 +86,26 @@ uv run nexus import - --text < ideas.txt    # one inbox task per line
 ```
 
 Exit codes: 0 ok, 1 refused by a data rule, 2 wrong command line. The CLI
-cannot edit or change task states yet. It applies pending migrations when it
+cannot edit or change task states (the MCP server can). It applies pending migrations when it
 starts, so it can upgrade the real database before the service is
 redeployed. Import format and details: `docs/functional/cli.md`.
+
+## MCP server
+
+The running service also speaks the Model Context Protocol, so an AI
+assistant can read and update your projects (20 tools: list, get, search,
+capture, add, update, plan, start, complete, block, import...). Register it
+once in Claude Code:
+
+```bash
+claude mcp add --transport http nexus http://127.0.0.1:8765/mcp
+```
+
+Read-only tools can be auto-allowed; write tools prompt for approval, and
+their events are logged with actor `mcp`. Deleting and releasing stay in the
+web UI. Security: the endpoint has no authentication and relies on the
+loopback binding plus a Host/Origin/Content-Type check; it is unavailable
+while the service is down. Tools and rules: `docs/functional/mcp.md`.
 
 ## Configuration
 

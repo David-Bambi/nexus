@@ -118,7 +118,7 @@ target/state pair raises `InvalidTransitionError`; `NotFoundError` and
 Within `services/`, mutations and cross-cutting reads are split into
 separate modules: `services/tasks.py` (and `projects.py`, `versions.py`)
 own single-entity commands, while `services/views.py` holds read-only,
-page-shaped queries (`inbox`, `to_refine`, `search`, `dashboard`) that
+page-shaped queries (`inbox`, `to_refine`, `search`, `dashboard`, `list_tasks`) that
 don't belong to any one entity. Both stay framework-agnostic per ADR-0001.
 
 Two further modules are read-only: `services/events.py` also holds the
@@ -136,20 +136,33 @@ the live DoD; a breaking change for anything reading the export).
 `src/cli/` is a second adapter over `services/`, next to `web/`
 ([0006](adr/0006-cli-shares-the-database.md)): it shares the service's
 SQLite database and calls the services directly, with no HTTP. Modules:
-`main.py` (dispatch, exit codes), `resolve.py` (project key / `t-` / `v-`
-reference to a row), `views.py` (read commands), `add.py`, `import_cmd.py`,
+`main.py` (dispatch, exit codes), `views.py` (read commands), `add.py`, `import_cmd.py`,
 `session.py`, `format.py`, `errors.py`, `commands.py` (registries). Usage:
 [Command line](../functional/cli.md).
 
-Two services exist for it: `services/refs.py` (ref generation and shape
-check) and `services/importer.py` (bulk import, the future MCP entry point,
-[0007](adr/0007-importer-mcp-entry-point.md)). Events written by the CLI
-carry actor `cli` (`events.ACTOR_CLI`); only the creation services take an
-`actor` argument, other mutations still log `web`.
+Three services exist for it: `services/refs.py` (ref generation and shape
+check), `services/resolve.py` (project key / `t-` / `v-` reference to a row,
+shared with the MCP server) and `services/importer.py` (bulk import, the MCP
+entry point, [0007](adr/0007-importer-mcp-entry-point.md)). Events written by
+the CLI carry actor `cli` (`events.ACTOR_CLI`). Every mutating service takes
+an `actor` argument (default `web`, also `mcp`).
+
+## MCP server
+
+`src/mcp_server/` is a third adapter over `services/`
+([0008](adr/0008-mcp-over-http-on-the-service.md)), serving AI assistants
+through `POST /mcp` on the running service. Modules: `tools.py` (20 tools,
+each a schema plus a handler calling services) and `serialize.py` (rows to
+JSON, no integer ids), both transport-agnostic and Flask-free (enforced by
+`tests/test_architecture.py`); `http.py` (the Flask blueprint: origin/host
+guard, JSON-RPC dispatch, error shaping) is the only module that knows HTTP.
+Tool calls run on the app's per-request session, roll back on refusal, and
+log events with actor `mcp` (`events.ACTOR_MCP`). Usage:
+[MCP server](../functional/mcp.md).
 
 ## Web pages
 
-Routes are unprefixed full-page adapters (package `web/pages/`, one `pages` blueprint defined in `_shared.py`; modules `projects`, `versions`, `tasks`, `inbox`):
+Besides the `/mcp` endpoint (see above), routes are unprefixed full-page adapters (package `web/pages/`, one `pages` blueprint defined in `_shared.py`; modules `projects`, `versions`, `tasks`, `inbox`):
 
 - `/` is the dashboard: in-progress versions with done/total progress,
   `doing` and `waiting` tasks, inbox and refine counters

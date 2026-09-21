@@ -3,7 +3,7 @@ status: accepted
 date: 2026-09-21
 ---
 
-# 0007 — The importer is the entry point for a future MCP server
+# 0007 — The importer is the entry point for the MCP server
 
 ## Status
 
@@ -13,7 +13,7 @@ Accepted
 
 `services/importer.py` turns a JSON document (projects, versions, tasks)
 into rows. It is transport-agnostic: no file, stdin or terminal access, so
-the CLI (`nexus import`) and a future MCP server call the same functions.
+the CLI (`nexus import`) and the MCP server call the same functions.
 
 - `parse_text(text)`: one task title per line becomes an inbox-task document.
 - `validate(session, data) -> list[str]`: collects **all** problems, each
@@ -35,7 +35,7 @@ the CLI (`nexus import`) and a future MCP server call the same functions.
 
 ## Why
 
-The MCP server is a separate future plan. Putting the rules in a service
+Putting the rules in a service
 now means agents get the same validation, atomicity and `actor` tagging
 ([0002](0002-append-only-event-log.md)) as the CLI, with no logic to
 duplicate in a transport layer. Validating everything up front turns a bad
@@ -46,9 +46,9 @@ import.
 
 - The existing export (`services/export.dump_json`) is **not** re-importable:
   it carries raw integer ids and different shapes.
-- Actor for imports is chosen by the caller (`cli` today).
-- The MCP server itself, and whether it also exposes the read commands, are
-  not built.
+- Actor for imports is chosen by the caller (`cli` or `mcp`).
+- The MCP server ([0008](0008-mcp-over-http-on-the-service.md)) exposes
+  this as the `import_data` tool, next to the read tools.
 
 ## Alternative rejected
 

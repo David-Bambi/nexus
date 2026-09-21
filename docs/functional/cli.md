@@ -91,5 +91,5 @@ The JSON export (`/export.json`) is a backup format and can't be imported.
 
 ## Not in scope
 
-The CLI cannot edit, change a task's state or toggle a DoD criterion, and
-there is no MCP server yet.
+The CLI cannot edit, change a task's state or toggle a DoD criterion. Those
+are available to an AI assistant through the [MCP server](mcp.md).
