@@ -62,7 +62,7 @@ def create(session : Session,
     session.commit()
     return version
 
-def reorder(session : Session, project_key : str, ordered_ids : list) -> None:
+def reorder(session : Session, project_key : str, ordered_ids : list, actor : str = events.ACTOR_WEB) -> None:
     """Reorder a project's versions.
 
     Args:
@@ -70,6 +70,7 @@ def reorder(session : Session, project_key : str, ordered_ids : list) -> None:
         project_key: Key of the owning project.
         ordered_ids: Version ids in the desired order; must match exactly
             the set of the project's version ids.
+        actor: Who made the change, recorded in the event log.
 
     Raises:
         NotFoundError: If no project has this key.
@@ -86,7 +87,7 @@ def reorder(session : Session, project_key : str, ordered_ids : list) -> None:
     for position, version_id in enumerate(ordered_ids):
         versions_by_id[version_id].position = position
 
-    events.log(session, events.ACTOR_WEB, "project", project.id, "versions_reordered",
+    events.log(session, actor, "project", project.id, "versions_reordered",
                {"ordered_ids": ordered_ids})
     session.commit()
 
@@ -184,12 +185,13 @@ def _get_by_id(session : Session, version_id : int) -> Version:
         return version
 
 
-def start(session : Session, version_id : int) -> Version:
+def start(session : Session, version_id : int, actor : str = events.ACTOR_WEB) -> Version:
     """Start a version.
 
     Args:
         session: Database session to use.
         version_id: Id of the version.
+        actor: Who made the change, recorded in the event log.
 
     Returns:
         The started Version.
@@ -202,7 +204,7 @@ def start(session : Session, version_id : int) -> Version:
 
     if version.status == VersionStatus.PLANNED:
         version.status = VersionStatus.IN_PROGRESS
-        events.log(session, events.ACTOR_WEB, "version", version.id, "started",
+        events.log(session, actor, "version", version.id, "started",
                    {"from": VersionStatus.PLANNED.name, "to": VersionStatus.IN_PROGRESS.name})
         session.commit()
         return version
@@ -210,12 +212,13 @@ def start(session : Session, version_id : int) -> Version:
         raise ValidationError("The version is already started")
 
 
-def release(session : Session, version_id : int) -> Version:
+def release(session : Session, version_id : int, actor : str = events.ACTOR_WEB) -> Version:
     """Release a version.
 
     Args:
         session: Database session to use.
         version_id: Id of the version.
+        actor: Who made the change, recorded in the event log.
 
     Returns:
         The released Version.
@@ -239,7 +242,7 @@ def release(session : Session, version_id : int) -> Version:
     if version.status == VersionStatus.IN_PROGRESS:
         version.status = VersionStatus.RELEASED
         version.released_at = datetime.utcnow()
-        events.log(session, events.ACTOR_WEB, "version", version.id, "released",
+        events.log(session, actor, "version", version.id, "released",
                    {"from": VersionStatus.IN_PROGRESS.name, "to": VersionStatus.RELEASED.name})
         session.commit()
         return version
@@ -268,13 +271,14 @@ def _get_editable_criterion(session : Session, criterion_id : int) -> Definition
     return criterion
 
 
-def add_criterion(session : Session, version_id : int, description : str) -> DefinitionOfDoneCriterion:
+def add_criterion(session : Session, version_id : int, description : str, actor : str = events.ACTOR_WEB) -> DefinitionOfDoneCriterion:
     """Append a criterion to a version's definition of done.
 
     Args:
         session: Database session to use.
         version_id: Id of the version.
         description: Text of the new criterion.
+        actor: Who made the change, recorded in the event log.
 
     Returns:
         The newly created DefinitionOfDoneCriterion, unchecked, in last position.
@@ -297,19 +301,20 @@ def add_criterion(session : Session, version_id : int, description : str) -> Def
     criterion = DefinitionOfDoneCriterion(description=description, position=position)
     version.definition_of_done.append(criterion)
     session.flush()
-    events.log(session, events.ACTOR_WEB, "version", version.id, "dod_added",
+    events.log(session, actor, "version", version.id, "dod_added",
                {"criterion_id": criterion.id, "description": description})
     session.commit()
     return criterion
 
 
-def update_criterion(session : Session, criterion_id : int, description : str) -> DefinitionOfDoneCriterion:
+def update_criterion(session : Session, criterion_id : int, description : str, actor : str = events.ACTOR_WEB) -> DefinitionOfDoneCriterion:
     """Change the description of a criterion.
 
     Args:
         session: Database session to use.
         criterion_id: Id of the criterion.
         description: New text of the criterion.
+        actor: Who made the change, recorded in the event log.
 
     Returns:
         The updated DefinitionOfDoneCriterion.
@@ -327,18 +332,19 @@ def update_criterion(session : Session, criterion_id : int, description : str) -
 
     previous = criterion.description
     criterion.description = description
-    events.log(session, events.ACTOR_WEB, "version", criterion.version_id, "dod_updated",
+    events.log(session, actor, "version", criterion.version_id, "dod_updated",
                {"criterion_id": criterion.id, "from": previous, "to": description})
     session.commit()
     return criterion
 
 
-def delete_criterion(session : Session, criterion_id : int) -> None:
+def delete_criterion(session : Session, criterion_id : int, actor : str = events.ACTOR_WEB) -> None:
     """Delete a criterion from a version's definition of done.
 
     Args:
         session: Database session to use.
         criterion_id: Id of the criterion.
+        actor: Who made the change, recorded in the event log.
 
     Raises:
         NotFoundError: If no criterion has this id.
@@ -352,18 +358,19 @@ def delete_criterion(session : Session, criterion_id : int) -> None:
         raise ValidationError("Definition of done for the version must contain at least one entry.")
 
     version.definition_of_done.remove(criterion)
-    events.log(session, events.ACTOR_WEB, "version", version.id, "dod_deleted",
+    events.log(session, actor, "version", version.id, "dod_deleted",
                {"criterion_id": criterion_id, "description": criterion.description})
     session.commit()
 
 
-def set_criterion_done(session : Session, criterion_id : int, done : bool) -> DefinitionOfDoneCriterion:
+def set_criterion_done(session : Session, criterion_id : int, done : bool, actor : str = events.ACTOR_WEB) -> DefinitionOfDoneCriterion:
     """Check or uncheck a criterion.
 
     Args:
         session: Database session to use.
         criterion_id: Id of the criterion.
         done: True to check the criterion, False to uncheck it.
+        actor: Who made the change, recorded in the event log.
 
     Returns:
         The updated DefinitionOfDoneCriterion.
@@ -376,7 +383,7 @@ def set_criterion_done(session : Session, criterion_id : int, done : bool) -> De
 
     if criterion.done != done:
         criterion.done = done
-        events.log(session, events.ACTOR_WEB, "version", criterion.version_id,
+        events.log(session, actor, "version", criterion.version_id,
                    "dod_checked" if done else "dod_unchecked",
                    {"criterion_id": criterion.id, "description": criterion.description})
     session.commit()

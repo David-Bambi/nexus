@@ -1,4 +1,8 @@
+import pytest
+
+from src.models.task import TaskState
 from src.services import projects, tasks, versions, views
+from src.services.errors import NotFoundError
 
 # Inbox --------------------------------------------------------------------------------------------
 
@@ -351,3 +355,75 @@ def test_dashboard_progress_ignores_cancelled_tasks(session):
 
     [progress] = views.dashboard(session).versions
     assert (progress.done, progress.total) == (1, 1)
+
+
+# List tasks ---------------------------------------------------------------------------------------
+
+@pytest.fixture
+def board(session):
+    """Two projects, a version in the first, and tasks in several states and places."""
+    projects.create(session, "nx", "Nexus", "")
+    projects.create(session, "other", "Other", "")
+    version = versions.create(session, "nx", "1.0", "First", ["Ships"])
+    loose = tasks.capture(session, "Loose")
+    in_project = tasks.create(session, "In project", project_key="nx")
+    planned = tasks.create_in_version(session, version.id, "Planned")
+    doing = tasks.create_in_version(session, version.id, "Doing")
+    tasks.start(session, doing.id)
+    elsewhere = tasks.create(session, "Elsewhere", project_key="other")
+    return version, loose, in_project, planned, doing, elsewhere
+
+
+def _titles(result):
+    return [t.title for t in result]
+
+
+def test_list_tasks_without_filters_returns_everything_oldest_first(session, board):
+    """
+    Given tasks in several states and projects
+    When listing without filters
+    Then all come back in creation order
+    """
+    assert _titles(views.list_tasks(session)) == ["Loose", "In project", "Planned", "Doing", "Elsewhere"]
+
+
+def test_list_tasks_filters_by_states(session, board):
+    """
+    Given tasks in several states
+    When filtering on one state, then on two
+    Then a task matches if it is in any of the given states
+    """
+    assert _titles(views.list_tasks(session, states=[TaskState.DOING])) == ["Doing"]
+    assert _titles(views.list_tasks(session, states=[TaskState.DOING, TaskState.PLANNED])) == ["Planned", "Doing"]
+
+
+def test_list_tasks_filters_by_project_and_version(session, board):
+    """
+    Given tasks spread over projects and a version
+    When filtering by project, by version, and by both
+    Then only matching tasks are returned
+    """
+    version = board[0]
+    assert _titles(views.list_tasks(session, project_key="nx")) == ["In project", "Planned", "Doing"]
+    assert _titles(views.list_tasks(session, version_id=version.id)) == ["Planned", "Doing"]
+    assert _titles(views.list_tasks(session, project_key="other", version_id=version.id)) == []
+    assert _titles(views.list_tasks(session, project_key="nx", states=[TaskState.INBOX])) == ["In project"]
+
+
+def test_list_tasks_limit_keeps_the_most_recent_oldest_first(session, board):
+    """
+    Given five tasks
+    When listing with a limit of two
+    Then the two most recently created come back, oldest first
+    """
+    assert _titles(views.list_tasks(session, limit=2)) == ["Doing", "Elsewhere"]
+
+
+def test_list_tasks_unknown_project_raises(session, board):
+    """
+    Given no project with the key
+    When filtering on it
+    Then a not-found error is raised
+    """
+    with pytest.raises(NotFoundError):
+        views.list_tasks(session, project_key="ghost")

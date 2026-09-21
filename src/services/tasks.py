@@ -54,7 +54,8 @@ def _require_valid_title(title : str) -> None:
         raise ValidationError("The title must be specified.")
 
 
-def _log_transition(session : Session, task : Task, action : str, previous : TaskState, **extra : object) -> None:
+def _log_transition(session : Session, task : Task, action : str, previous : TaskState,
+                    actor : str = events.ACTOR_WEB, **extra : object) -> None:
     """Log a task state change in the event log.
 
     Args:
@@ -62,10 +63,11 @@ def _log_transition(session : Session, task : Task, action : str, previous : Tas
         task: The task, already moved to its new state.
         action: Event action (e.g. "started").
         previous: The state the task was in before the change.
+        actor: Who made the change, recorded in the event log.
         **extra: Additional payload entries (e.g. reason).
     """
     payload = {"from": previous.name, "to": task.state.name, **extra}
-    events.log(session, events.ACTOR_WEB, "task", task.id, action, payload)
+    events.log(session, actor, "task", task.id, action, payload)
 
 # -----------------------------------------------------------------------------
 # Reading
@@ -245,13 +247,14 @@ def create_in_version(session : Session,
 # Editing
 # -----------------------------------------------------------------------------
 
-def update(session : Session, task_id : int, **fields : str | None) -> Task:
+def update(session : Session, task_id : int, actor : str = events.ACTOR_WEB, **fields : str | None) -> Task:
     """Update a task's descriptive fields.
 
     Args:
         session: Database session to use.
         task_id: Id of the task.
         **fields: Values for any of "title", "body", "context", "size".
+        actor: Who made the change, recorded in the event log.
 
     Returns:
         The updated Task.
@@ -274,7 +277,7 @@ def update(session : Session, task_id : int, **fields : str | None) -> Task:
         setattr(task, name, value)
 
     if changes:
-        events.log(session, events.ACTOR_WEB, "task", task.id, "updated", changes)
+        events.log(session, actor, "task", task.id, "updated", changes)
 
     session.commit()
     return task
@@ -285,7 +288,8 @@ def clarify(session : Session,
             body : str | None,
             project_key : str | None,
             context : str | None,
-            size : str | None) -> Task:
+            size : str | None,
+            actor : str = events.ACTOR_WEB) -> Task:
     """Clarify a captured task into a refined one, ready to be planned.
 
     Also reactivates a task deferred to someday, back into refined.
@@ -298,6 +302,7 @@ def clarify(session : Session,
         project_key: Optional key of the owning project.
         context: Optional context tag (e.g. "@ordi").
         size: Optional effort size ("XS", "S", "M", "L").
+        actor: Who made the change, recorded in the event log.
 
     Returns:
         The clarified Task, in the refined state.
@@ -322,7 +327,7 @@ def clarify(session : Session,
     task.size = size
     task.state = TaskState.REFINED
 
-    _log_transition(session, task, "clarified", previous)
+    _log_transition(session, task, "clarified", previous, actor=actor)
     session.commit()
     return task
 
@@ -330,13 +335,14 @@ def clarify(session : Session,
 # Lifecycle transitions
 # -----------------------------------------------------------------------------
 
-def plan(session : Session, task_id : int, version_id : int) -> Task:
+def plan(session : Session, task_id : int, version_id : int, actor : str = events.ACTOR_WEB) -> Task:
     """Plan a refined task into a version.
 
     Args:
         session: Database session to use.
         task_id: Id of the task.
         version_id: Id of the version to plan the task into.
+        actor: Who made the change, recorded in the event log.
 
     Returns:
         The planned Task.
@@ -364,16 +370,17 @@ def plan(session : Session, task_id : int, version_id : int) -> Task:
     task.version_id = version.id
     task.state = TaskState.PLANNED
 
-    _log_transition(session, task, "planned", TaskState.REFINED, version_id=version.id)
+    _log_transition(session, task, "planned", TaskState.REFINED, version_id=version.id, actor=actor)
     session.commit()
     return task
 
-def unplan(session : Session, task_id : int) -> Task:
+def unplan(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -> Task:
     """Unplan a planned task back to refined.
 
     Args:
         session: Database session to use.
         task_id: Id of the task.
+        actor: Who made the change, recorded in the event log.
 
     Returns:
         The unplanned Task.
@@ -390,16 +397,17 @@ def unplan(session : Session, task_id : int) -> Task:
     task.version_id = None
     task.state = TaskState.REFINED
 
-    _log_transition(session, task, "unplanned", TaskState.PLANNED)
+    _log_transition(session, task, "unplanned", TaskState.PLANNED, actor=actor)
     session.commit()
     return task
 
-def start(session : Session, task_id : int) -> Task:
+def start(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -> Task:
     """Start a planned task.
 
     Args:
         session: Database session to use.
         task_id: Id of the task.
+        actor: Who made the change, recorded in the event log.
 
     Returns:
         The started Task.
@@ -415,17 +423,18 @@ def start(session : Session, task_id : int) -> Task:
 
     task.state = TaskState.DOING
 
-    _log_transition(session, task, "started", TaskState.PLANNED)
+    _log_transition(session, task, "started", TaskState.PLANNED, actor=actor)
     session.commit()
     return task
 
-def block(session : Session, task_id : int, reason : str) -> Task:
+def block(session : Session, task_id : int, reason : str, actor : str = events.ACTOR_WEB) -> Task:
     """Block a task that's being worked on.
 
     Args:
         session: Database session to use.
         task_id: Id of the task.
         reason: Why the task is blocked.
+        actor: Who made the change, recorded in the event log.
 
     Returns:
         The blocked Task.
@@ -446,16 +455,17 @@ def block(session : Session, task_id : int, reason : str) -> Task:
     task.state = TaskState.WAITING
     task.blocked_reason = reason
 
-    _log_transition(session, task, "blocked", TaskState.DOING, reason=reason)
+    _log_transition(session, task, "blocked", TaskState.DOING, reason=reason, actor=actor)
     session.commit()
     return task
 
-def unblock(session : Session, task_id : int) -> Task:
+def unblock(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -> Task:
     """Unblock a waiting task.
 
     Args:
         session: Database session to use.
         task_id: Id of the task.
+        actor: Who made the change, recorded in the event log.
 
     Returns:
         The unblocked Task.
@@ -472,16 +482,17 @@ def unblock(session : Session, task_id : int) -> Task:
     task.state = TaskState.DOING
     task.blocked_reason = None
 
-    _log_transition(session, task, "unblocked", TaskState.WAITING)
+    _log_transition(session, task, "unblocked", TaskState.WAITING, actor=actor)
     session.commit()
     return task
 
-def complete(session : Session, task_id : int) -> Task:
+def complete(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -> Task:
     """Complete a task that's being worked on.
 
     Args:
         session: Database session to use.
         task_id: Id of the task.
+        actor: Who made the change, recorded in the event log.
 
     Returns:
         The completed Task.
@@ -498,16 +509,17 @@ def complete(session : Session, task_id : int) -> Task:
     task.state = TaskState.DONE
     task.closed_at = datetime.utcnow()
 
-    _log_transition(session, task, "completed", TaskState.DOING)
+    _log_transition(session, task, "completed", TaskState.DOING, actor=actor)
     session.commit()
     return task
 
-def reopen(session : Session, task_id : int) -> Task:
+def reopen(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -> Task:
     """Reopen a completed task.
 
     Args:
         session: Database session to use.
         task_id: Id of the task.
+        actor: Who made the change, recorded in the event log.
 
     Returns:
         The reopened Task.
@@ -524,16 +536,17 @@ def reopen(session : Session, task_id : int) -> Task:
     task.state = TaskState.DOING
     task.closed_at = None
 
-    _log_transition(session, task, "reopened", TaskState.DONE)
+    _log_transition(session, task, "reopened", TaskState.DONE, actor=actor)
     session.commit()
     return task
 
-def defer(session : Session, task_id : int) -> Task:
+def defer(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -> Task:
     """Defer a task to someday, with no fixed schedule.
 
     Args:
         session: Database session to use.
         task_id: Id of the task.
+        actor: Who made the change, recorded in the event log.
 
     Returns:
         The deferred Task.
@@ -550,11 +563,11 @@ def defer(session : Session, task_id : int) -> Task:
     previous = task.state
     task.state = TaskState.SOMEDAY
 
-    _log_transition(session, task, "deferred", previous)
+    _log_transition(session, task, "deferred", previous, actor=actor)
     session.commit()
     return task
 
-def move_to_version(session : Session, task_id : int, version_id : int) -> Task:
+def move_to_version(session : Session, task_id : int, version_id : int, actor : str = events.ACTOR_WEB) -> Task:
     """Move a planned, doing or waiting task to another version of its project.
 
     The task keeps its state; only its version changes.
@@ -563,6 +576,7 @@ def move_to_version(session : Session, task_id : int, version_id : int) -> Task:
         session: Database session to use.
         task_id: Id of the task.
         version_id: Id of the version to move the task to.
+        actor: Who made the change, recorded in the event log.
 
     Returns:
         The moved Task.
@@ -595,11 +609,11 @@ def move_to_version(session : Session, task_id : int, version_id : int) -> Task:
     task.version = version
 
     _log_transition(session, task, "moved", task.state,
-                    from_version_id=previous_version_id, version_id=version.id)
+                    from_version_id=previous_version_id, version_id=version.id, actor=actor)
     session.commit()
     return task
 
-def cancel(session : Session, task_id : int) -> Task:
+def cancel(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -> Task:
     """Cancel a task that won't be done.
 
     The task keeps its version, so the version's history still shows it.
@@ -607,6 +621,7 @@ def cancel(session : Session, task_id : int) -> Task:
     Args:
         session: Database session to use.
         task_id: Id of the task.
+        actor: Who made the change, recorded in the event log.
 
     Returns:
         The cancelled Task.
@@ -628,16 +643,17 @@ def cancel(session : Session, task_id : int) -> Task:
     task.blocked_reason = None
     task.closed_at = datetime.utcnow()
 
-    _log_transition(session, task, "cancelled", previous)
+    _log_transition(session, task, "cancelled", previous, actor=actor)
     session.commit()
     return task
 
-def restore(session : Session, task_id : int) -> Task:
+def restore(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -> Task:
     """Bring a cancelled task back to refined, out of any version.
 
     Args:
         session: Database session to use.
         task_id: Id of the task.
+        actor: Who made the change, recorded in the event log.
 
     Returns:
         The restored Task.
@@ -658,11 +674,11 @@ def restore(session : Session, task_id : int) -> Task:
     task.version_id = None
     task.closed_at = None
 
-    _log_transition(session, task, "restored", TaskState.CANCELLED)
+    _log_transition(session, task, "restored", TaskState.CANCELLED, actor=actor)
     session.commit()
     return task
 
-def change_state(session : Session, task_id : int, target : TaskState, reason : str = "") -> Task:
+def change_state(session : Session, task_id : int, target : TaskState, reason : str = "", actor : str = events.ACTOR_WEB) -> Task:
     """Move a task to a target state through the matching lifecycle transition.
 
     Covers the working states and cancelling: planned to doing, doing to
@@ -673,6 +689,7 @@ def change_state(session : Session, task_id : int, target : TaskState, reason : 
         task_id: Id of the task.
         target: State to move the task to.
         reason: Why the task is blocked; only used when the target is waiting.
+        actor: Who made the change, recorded in the event log.
 
     Returns:
         The updated Task.
@@ -688,18 +705,18 @@ def change_state(session : Session, task_id : int, target : TaskState, reason : 
     if task.version is not None:
         _require_unreleased(task.version)
     if target == TaskState.CANCELLED:
-        return cancel(session, task_id)
+        return cancel(session, task_id, actor=actor)
     if target == TaskState.WAITING:
-        return block(session, task_id, reason)
+        return block(session, task_id, reason, actor=actor)
     if target == TaskState.DONE:
-        return complete(session, task_id)
+        return complete(session, task_id, actor=actor)
     if target == TaskState.DOING:
         if task.state == TaskState.PLANNED:
-            return start(session, task_id)
+            return start(session, task_id, actor=actor)
         if task.state == TaskState.WAITING:
-            return unblock(session, task_id)
+            return unblock(session, task_id, actor=actor)
         if task.state == TaskState.DONE:
-            return reopen(session, task_id)
+            return reopen(session, task_id, actor=actor)
     raise InvalidTransitionError(
         f"task '{task_id}' can't go from {task.state.name} to {target.name}.")
 
@@ -707,17 +724,18 @@ def change_state(session : Session, task_id : int, target : TaskState, reason : 
 # Deletion
 # -----------------------------------------------------------------------------
 
-def delete(session : Session, task_id : int) -> None:
+def delete(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -> None:
     """Delete a task.
 
     Args:
         session: Database session to use.
         task_id: Id of the task.
+        actor: Who made the change, recorded in the event log.
 
     Raises:
         NotFoundError: If no task has this id.
     """
     task = get(session, task_id)
-    events.log(session, events.ACTOR_WEB, "task", task.id, "deleted", {"title": task.title})
+    events.log(session, actor, "task", task.id, "deleted", {"title": task.title})
     session.delete(task)
     session.commit()

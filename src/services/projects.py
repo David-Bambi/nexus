@@ -85,12 +85,13 @@ def list(session : Session, include_archived : bool = False) -> list:
         query = query.filter(Project.status != ProjectStatus.ARCHIVED)
     return query.all()
 
-def archive(session : Session, key : str) -> Project:
+def archive(session : Session, key : str, actor : str = events.ACTOR_WEB) -> Project:
     """Archive a project.
 
     Args:
         session: Database session to use.
         key: Unique slug identifying the project.
+        actor: Who made the change, recorded in the event log.
 
     Returns:
         The archived Project.
@@ -101,23 +102,24 @@ def archive(session : Session, key : str) -> Project:
     project = get(session, key)
     previous = project.status
     project.status = ProjectStatus.ARCHIVED
-    events.log(session, events.ACTOR_WEB, "project", project.id, "archived",
+    events.log(session, actor, "project", project.id, "archived",
                {"from": previous.name, "to": ProjectStatus.ARCHIVED.name})
     session.commit()
     return project
 
-def delete(session : Session, key : str) -> None:
+def delete(session : Session, key : str, actor : str = events.ACTOR_WEB) -> None:
     """Delete a project.
 
     Args:
         session: Database session to use.
         key: Unique slug identifying the project.
+        actor: Who made the change, recorded in the event log.
 
     Raises:
         NotFoundError: If no project has this key.
     """
     project = get(session, key)
-    events.log(session, events.ACTOR_WEB, "project", project.id, "deleted",
+    events.log(session, actor, "project", project.id, "deleted",
                {"key": key, "name": project.name})
     session.delete(project)
     session.commit()

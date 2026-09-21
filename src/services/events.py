@@ -10,6 +10,9 @@ ACTOR_WEB = "web"
 # Actor recorded on every event written from the command line.
 ACTOR_CLI = "cli"
 
+# Actor recorded on every event written through the MCP endpoint.
+ACTOR_MCP = "mcp"
+
 
 def log(session : Session,
         actor : str,

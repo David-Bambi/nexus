@@ -95,6 +95,40 @@ def to_refine(session : Session, context : str | None = None, project_key : str 
     return query.all()
 
 
+def list_tasks(session : Session, states : list[TaskState] | None = None, project_key : str | None = None,
+               version_id : int | None = None, limit : int | None = None) -> list:
+    """List tasks matching any combination of filters.
+
+    Args:
+        session: Database session to use.
+        states: Optional states to keep; a task matches if it is in any of them.
+        project_key: Optional project key to filter on.
+        version_id: Optional id of the version to filter on.
+        limit: Optional maximum number of tasks to return.
+
+    Returns:
+        Matching tasks in creation order, oldest first. With a limit, only
+        the `limit` most recently created ones (still oldest first).
+
+    Raises:
+        NotFoundError: If project_key is given but no project has this key.
+    """
+    query = session.query(Task).options(joinedload(Task.project), joinedload(Task.version))
+
+    if states:
+        query = query.filter(Task.state.in_(states))
+    if project_key:
+        query = query.filter(Task.project_id == projects.get(session, project_key).id)
+    if version_id is not None:
+        query = query.filter(Task.version_id == version_id)
+
+    if limit is None:
+        return query.order_by(Task.created_at, Task.id).all()
+
+    recent = query.order_by(Task.created_at.desc(), Task.id.desc()).limit(limit).all()
+    return recent[::-1]
+
+
 def search(session : Session, term : str, limit : int | None = None) -> list:
     """Search tasks by a substring of their title or body.
 
