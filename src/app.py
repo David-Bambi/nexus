@@ -8,6 +8,7 @@ from sqlalchemy.engine import make_url
 
 from src.config import Config
 from src.db import get_engine, get_session_factory
+from src.mcp_server.http import bp as mcp_bp
 from src.web.pages import bp as pages_bp
 
 # Repo root, used to locate alembic.ini regardless of the working directory.
@@ -57,6 +58,7 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         session_factory.remove()
 
     app.register_blueprint(pages_bp)
+    app.register_blueprint(mcp_bp)
 
     return app
 
