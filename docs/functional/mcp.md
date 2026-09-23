@@ -51,10 +51,11 @@ Write tools (all `destructiveHint: false`; `idempotentHint` on
 | `block_task` | Doing to waiting, `reason` required |
 | `unblock_task` | Waiting to doing |
 | `set_criterion_done` | Check or uncheck a DoD criterion by its number |
+| `start_version` | Planned to in progress; returns the version like `get_version` |
+| `release_version` | In progress to released; refused while a task is unfinished (cancelled ones don't count) or a criterion is unchecked |
 
 Not exposed, use the web UI: deleting tasks or projects, archiving,
-releasing or starting versions, adding/editing/deleting DoD criteria, and
-arbitrary state changes.
+adding/editing/deleting DoD criteria, and arbitrary state changes.
 
 ## Identification
 

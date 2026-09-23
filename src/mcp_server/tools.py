@@ -372,6 +372,26 @@ def set_criterion_done(session : Session, args : dict) -> dict:
     return serialize.version(version, versions.list_tasks(session, version.id))
 
 
+def _version_transition(name : str, description : str, action : Callable) -> None:
+    """Register a tool that changes a version's status with one lifecycle function.
+
+    Args:
+        name: Tool name.
+        description: Tool description.
+        action: The versions.* function, called as action(session, id, actor=...).
+    """
+    def handler(session : Session, args : dict) -> dict:
+        version = action(session, _version_of(session, args).id, actor=ACTOR)
+        return serialize.version(version, versions.list_tasks(session, version.id))
+    tool(name, description, {"version": _VERSION, "project": _PROJECT}, ["version"])(handler)
+
+
+_version_transition("start_version", "Start a planned version (planned to in progress).", versions.start)
+_version_transition("release_version",
+                    "Release a version in progress. Refused while a task is unfinished (cancelled ones don't count) "
+                    "or a definition-of-done criterion is unchecked.", versions.release)
+
+
 # -----------------------------------------------------------------------------
 # Calling
 # -----------------------------------------------------------------------------

@@ -35,6 +35,8 @@ Usage: [MCP server](../../functional/mcp.md).
 - **Scope**: 9 read tools and 11 write tools. Deleting, archiving,
   releasing or starting versions, DoD add/edit/delete and arbitrary state
   changes are deliberately not exposed; they stay in the web UI.
+  Starting and releasing versions were later exposed by
+  [0009](0009-version-lifecycle-in-cli-and-mcp.md) (13 write tools, 22 in all).
 - **Write safety**: rely on the client's permissions (Claude Code prompts for
   write tools; read-only tools carry `readOnlyHint`). No server-side
   read-only mode.

@@ -37,6 +37,9 @@ command line. Errors go to stderr.
 | `nexus <project> <version>` | Version detail, its tasks, definition of done as `[x]` / `[ ]` with a count |
 | `nexus <t-ref>` | Task detail |
 | `nexus <v-ref>` | Version detail |
+| `nexus <project> <version> check\|uncheck <n>` | Check or uncheck DoD criterion `n` (from 1) |
+| `nexus <project> <version> start` | Planned to in progress |
+| `nexus <project> <version> release` | In progress to released |
 | `nexus add task <project> [<version>] [-t T] [-b B] [-c C] [-s SIZE]` | Create a task |
 | `nexus "<description>"` | Capture into the inbox |
 | `nexus import <file\|->` | Bulk import, see below |
@@ -46,13 +49,20 @@ with a version it creates a task already planned. `--size` is `XS`, `S`,
 `M` or `L`. Without `--title`, it prompts on a terminal and fails otherwise.
 A lone argument that is blank or contains whitespace is a capture.
 
+Version actions also work after a `v-` ref (`nexus v-9xa start`) and print
+the version detail afterwards. A criterion number out of range is a usage
+error (exit 2). `release` is refused (exit 1) while a task is unfinished
+(cancelled tasks don't count) or a criterion is unchecked.
+
 ```bash
 nexus add task NX 1.0 -t "Write the CLI page" -s S
 nexus "buy a USB-C cable"
 nexus NX 1.0
+nexus NX 1.0 check 2
+nexus v-9xa release
 ```
 
-Everything the CLI creates is logged with actor `cli`
+Everything the CLI creates or changes is logged with actor `cli`
 ([0002](../architecture/adr/0002-append-only-event-log.md)).
 
 ## Import
@@ -91,5 +101,5 @@ The JSON export (`/export.json`) is a backup format and can't be imported.
 
 ## Not in scope
 
-The CLI cannot edit, change a task's state or toggle a DoD criterion. Those
-are available to an AI assistant through the [MCP server](mcp.md).
+The CLI cannot edit or change a task's state. Those are available to an AI
+assistant through the [MCP server](mcp.md).

@@ -67,7 +67,7 @@ def test_every_tool_is_described_with_a_strict_schema_and_annotations():
     Then each has a description, an object schema with no extra properties, and hints matching its kind
     """
     listed = tools.list_tools()
-    assert len(listed) == len(tools.TOOLS) == 20
+    assert len(listed) == len(tools.TOOLS) == 22
     for item in listed:
         assert item["description"]
         assert item["inputSchema"]["type"] == "object" and item["inputSchema"]["additionalProperties"] is False
@@ -357,6 +357,25 @@ def test_set_criterion_done_by_index(session, world):
     assert _last_event(session).actor == events.ACTOR_MCP
 
 
+def test_version_goes_from_planned_to_released_through_tools(session, world):
+    """
+    Given a planned version with a planned task and two unchecked criteria
+    When starting it, then releasing it before and after finishing its work
+    Then it starts, the early release is refused, and the final one releases it
+    """
+    version, planned, _, _ = world
+    assert ok(session, "start_version", version="1.0", project="nx")["status"] == "IN_PROGRESS"
+    assert "already started" in refused(session, "start_version", version=version.ref)
+    assert "unfinished tasks" in refused(session, "release_version", version=version.ref)
+    tasks.start(session, planned.id)
+    tasks.complete(session, planned.id)
+    assert "unchecked" in refused(session, "release_version", version=version.ref)
+    for index in (1, 2):
+        ok(session, "set_criterion_done", version=version.ref, index=index, done=True)
+    assert ok(session, "release_version", version=version.ref)["status"] == "RELEASED"
+    assert _last_event(session).actor == events.ACTOR_MCP
+
+
 def test_a_refused_write_leaves_no_partial_change(session, world):
     """
     Given a write refused by a service
@@ -475,6 +494,8 @@ WRITE_CALLS = [
     ("block_task", lambda w: {"ref": w.doing.ref, "reason": "why"}),
     ("unblock_task", lambda w: {"ref": w.waiting.ref}),
     ("set_criterion_done", lambda w: {"version": w.version.ref, "index": 1, "done": True}),
+    ("start_version", lambda w: {"version": w.version.ref}),
+    ("release_version", lambda w: {"version": w.ready.ref}),
 ]
 
 
@@ -491,7 +512,11 @@ def test_every_write_tool_logs_the_mcp_actor(session, world, name, arguments):
     waiting = tasks.create_in_version(session, version.id, "Waiting")
     tasks.start(session, waiting.id)
     tasks.block(session, waiting.id, "why")
-    known = SimpleNamespace(version=version, planned=planned, refined=refined, doing=doing, waiting=waiting)
+    ready = versions.create(session, "nx", "2.0", "Ready", ["Done"])
+    versions.start(session, ready.id)
+    versions.set_criterion_done(session, ready.definition_of_done[0].id, True)
+    known = SimpleNamespace(version=version, planned=planned, refined=refined, doing=doing, waiting=waiting,
+                            ready=ready)
     before = session.query(Event).count()
     ok(session, name, **arguments(known))
     fresh = session.query(Event).order_by(Event.id).offset(before).all()

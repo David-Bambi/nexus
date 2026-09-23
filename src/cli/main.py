@@ -18,12 +18,15 @@ USAGE = """usage: nexus <command> | <reference> [<version>]
   nexus projects           all projects
   nexus <project>          project detail and its versions
   nexus <project> <version>  version detail, tasks and definition of done
+  nexus <project> <version> check|uncheck <n>  check a definition-of-done criterion
+  nexus <project> <version> start|release      change the version status
   nexus <task>             task detail
   nexus add task <project> [<version>] [--title T] [--body B] [--context C] [--size S]
   nexus "<description>"     capture a task into the inbox
   nexus import <file|->
 
-A reference is a project key, a task ref (t-4k2) or a version ref (v-9xa)."""
+A reference is a project key, a task ref (t-4k2) or a version ref (v-9xa);
+a version ref can stand for <project> <version>."""
 
 # Exit codes.
 EXIT_OK = 0

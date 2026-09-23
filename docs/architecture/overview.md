@@ -136,7 +136,7 @@ the live DoD; a breaking change for anything reading the export).
 `src/cli/` is a second adapter over `services/`, next to `web/`
 ([0006](adr/0006-cli-shares-the-database.md)): it shares the service's
 SQLite database and calls the services directly, with no HTTP. Modules:
-`main.py` (dispatch, exit codes), `views.py` (read commands), `add.py`, `import_cmd.py`,
+`main.py` (dispatch, exit codes), `views.py` (read commands, version actions), `add.py`, `import_cmd.py`,
 `session.py`, `format.py`, `errors.py`, `commands.py` (registries). Usage:
 [Command line](../functional/cli.md).
 
@@ -151,7 +151,7 @@ an `actor` argument (default `web`, also `mcp`).
 
 `src/mcp_server/` is a third adapter over `services/`
 ([0008](adr/0008-mcp-over-http-on-the-service.md)), serving AI assistants
-through `POST /mcp` on the running service. Modules: `tools.py` (20 tools,
+through `POST /mcp` on the running service. Modules: `tools.py` (22 tools,
 each a schema plus a handler calling services) and `serialize.py` (rows to
 JSON, no integer ids), both transport-agnostic and Flask-free (enforced by
 `tests/test_architecture.py`); `http.py` (the Flask blueprint: origin/host

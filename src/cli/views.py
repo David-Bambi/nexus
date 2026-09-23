@@ -8,7 +8,7 @@ from src.cli.errors import UsageError
 from src.services.resolve import Target, resolve_version
 from src.models.task import Task
 from src.models.version import Version
-from src.services import projects, tasks, versions
+from src.services import events, projects, tasks, versions
 
 
 def _date(value : object) -> str | None:
@@ -97,13 +97,65 @@ def show_version(session : Session, version : Version, out : TextIO) -> None:
     print(fmt.section(f"Definition of done ({checked}/{len(criteria)})", dod or "(none)"), file=out)
 
 
+# -----------------------------------------------------------------------------
+# Version actions
+# -----------------------------------------------------------------------------
+
+def _criterion_id(version : Version, number : str) -> int:
+    """Id of a version's criterion given its number, counted from 1.
+
+    Raises:
+        UsageError: If the number is not an integer in range.
+    """
+    criteria = version.definition_of_done
+    if not number.isdigit() or not 1 <= int(number) <= len(criteria):
+        raise UsageError(f"criterion number must be between 1 and {len(criteria)}")
+    return criteria[int(number) - 1].id
+
+
+def _check(session : Session, version : Version, args : list[str], done : bool) -> None:
+    """Check or uncheck the criterion numbered by the single argument."""
+    if len(args) != 1:
+        raise UsageError(f"'{'check' if done else 'uncheck'}' takes one criterion number")
+    versions.set_criterion_done(session, _criterion_id(version, args[0]), done, actor=events.ACTOR_CLI)
+
+
+def _change_status(action, word : str):
+    """A version action that runs one status change, e.g. versions.start, with no argument."""
+    def run(session : Session, version : Version, args : list[str]) -> None:
+        _no_arguments(args, word)
+        action(session, version.id, actor=events.ACTOR_CLI)
+    return run
+
+
+# Actions after a version reference, by word: (session, version, arguments after the word).
+VERSION_ACTIONS = {
+    "check": lambda session, version, args: _check(session, version, args, True),
+    "uncheck": lambda session, version, args: _check(session, version, args, False),
+    "start": _change_status(versions.start, "start"),
+    "release": _change_status(versions.release, "release"),
+}
+
+
+def _act_on_version(session : Session, version : Version, args : list[str], out : TextIO) -> None:
+    """Run the action named by args[0] on a version, if any, then show the version.
+
+    Raises:
+        UsageError: If args[0] is not a version action.
+    """
+    if args:
+        action = VERSION_ACTIONS.get(args[0])
+        if action is None:
+            raise UsageError(f"unknown version action '{args[0]}'")
+        action(session, version, args[1:])
+    show_version(session, version, out)
+
+
 def _view_project(session : Session, target : Target, args : list[str], out : TextIO) -> None:
-    """`nexus <project> [<version>]`: project detail, or one of its versions."""
+    """`nexus <project> [<version> [<action>]]`: project detail, or one of its versions."""
     project = target.entity
     if args:
-        if len(args) > 1:
-            raise UsageError(f"unexpected argument after '{args[0]}'")
-        show_version(session, resolve_version(session, project.key, args[0]), out)
+        _act_on_version(session, resolve_version(session, project.key, args[0]), args[1:], out)
         return
     print(fmt.detail([("Key", project.key),
                       ("Name", project.name),
@@ -113,9 +165,8 @@ def _view_project(session : Session, target : Target, args : list[str], out : Te
 
 
 def _view_version(session : Session, target : Target, args : list[str], out : TextIO) -> None:
-    """`nexus <version ref>`: version detail."""
-    _no_arguments(args, target.entity.ref)
-    show_version(session, target.entity, out)
+    """`nexus <version ref> [<action>]`: version detail, after an optional action."""
+    _act_on_version(session, target.entity, args, out)
 
 
 def _view_task(session : Session, target : Target, args : list[str], out : TextIO) -> None:

@@ -59,7 +59,9 @@ internal and a project key alone can't name a task.
   by `create_app`).
 - `services/` stays framework-agnostic; `tests/test_architecture.py`
   enforces it.
-- The CLI cannot edit, change a task's state or toggle a DoD criterion.
+- The CLI cannot edit or change a task's state. (It could not toggle a DoD
+  criterion or change a version's status either until
+  [0009](0009-version-lifecycle-in-cli-and-mcp.md).)
 - Task title validation for capture/create lives in the CLI and the importer,
   not in the services.
 

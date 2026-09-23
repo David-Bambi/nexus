@@ -78,6 +78,7 @@ below use `uv run`; drop it if `nexus` is installed.
 uv run nexus tasks                          # also: versions, projects, version
 uv run nexus NX                             # project detail (by key)
 uv run nexus NX 1.0                         # version detail, tasks, definition of done
+uv run nexus NX 1.0 check 2                 # also: uncheck <n>, start, release (or after a v- ref)
 uv run nexus t-4k2                          # task detail (or a v- ref)
 uv run nexus add task NX 1.0 -t "Title" -s S  # planned task; omit the version for the inbox
 uv run nexus "buy a USB-C cable"            # capture into the inbox
@@ -93,8 +94,8 @@ redeployed. Import format and details: `docs/functional/cli.md`.
 ## MCP server
 
 The running service also speaks the Model Context Protocol, so an AI
-assistant can read and update your projects (20 tools: list, get, search,
-capture, add, update, plan, start, complete, block, import...). Register it
+assistant can read and update your projects (22 tools: list, get, search,
+capture, add, update, plan, start, complete, block, release, import...). Register it
 once in Claude Code:
 
 ```bash

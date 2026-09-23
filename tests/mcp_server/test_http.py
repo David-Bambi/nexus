@@ -58,7 +58,7 @@ def test_ping_and_tools_list(client):
     """
     assert rpc(client, "ping").get_json() == {"jsonrpc": "2.0", "id": 1, "result": {}}
     listed = rpc(client, "tools/list").get_json()["result"]["tools"]
-    assert len(listed) == 20 and {"name", "description", "inputSchema", "annotations"} <= set(listed[0])
+    assert len(listed) == 22 and {"name", "description", "inputSchema", "annotations"} <= set(listed[0])
 
 
 def test_notifications_and_client_replies_get_202_and_no_body(client):

@@ -136,3 +136,55 @@ def test_single_word_is_still_a_reference(run, session, version):
     Then the project is shown, not captured as a task
     """
     assert "Nexus" in run("nx")[1] and tasks.list(session) == []
+
+
+@pytest.mark.parametrize("by_ref", [False, True])
+def test_check_and_uncheck_a_criterion(run, session, version, by_ref):
+    """
+    Given a version with one unchecked criterion
+    When running `nexus nx 0.1.0 check 1` (or `nexus <ref> check 1`), then `uncheck 1`
+    Then the criterion is checked then unchecked, by the cli actor, and the version is shown
+    """
+    target = [version.ref] if by_ref else ["nx", "0.1.0"]
+    code, out, _ = run(*target, "check", "1")
+    assert code == EXIT_OK and "[x] Ships" in out and version.definition_of_done[0].done
+    assert events.history(session, "version", version.id)[-1].actor == events.ACTOR_CLI
+    code, out, _ = run(*target, "uncheck", "1")
+    assert code == EXIT_OK and "[ ] Ships" in out
+    assert not versions.get_by_ref(session, version.ref).definition_of_done[0].done
+
+
+@pytest.mark.parametrize("argv", [("check",), ("check", "2"), ("check", "0"), ("check", "x"), ("check", "1", "2")])
+def test_bad_criterion_number_is_a_usage_error(run, version, argv):
+    """
+    Given a version with one criterion
+    When running `check` with no, an out-of-range, a non-numeric or two numbers
+    Then it is a usage error and nothing changes
+    """
+    assert run("nx", "0.1.0", *argv)[0] == EXIT_USAGE and not version.definition_of_done[0].done
+
+
+def test_start_and_release_a_version(run, session, version):
+    """
+    Given a planned version with one criterion
+    When starting it, releasing it too early, checking the criterion, then releasing it
+    Then it goes to IN_PROGRESS, the early release fails, and it ends RELEASED, by the cli actor
+    """
+    code, out, _ = run("nx", "0.1.0", "start")
+    assert code == EXIT_OK and "IN_PROGRESS" in out
+    code, _, err = run("nx", "0.1.0", "release")
+    assert code == EXIT_ERROR and "unchecked" in err
+    run("nx", "0.1.0", "check", "1")
+    code, out, _ = run(version.ref, "release")
+    assert code == EXIT_OK and "RELEASED" in out
+    assert {e.actor for e in events.history(session, "version", version.id)[-3:]} == {events.ACTOR_CLI}
+
+
+@pytest.mark.parametrize("argv", [("frobnicate",), ("start", "now")])
+def test_unknown_version_action_or_extra_argument_is_a_usage_error(run, version, argv):
+    """
+    Given a version
+    When running an unknown action, or `start` with an extra argument
+    Then it is a usage error
+    """
+    assert run("nx", "0.1.0", *argv)[0] == EXIT_USAGE
