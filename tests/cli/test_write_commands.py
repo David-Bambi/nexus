@@ -164,6 +164,49 @@ def test_bad_criterion_number_is_a_usage_error(run, version, argv):
     assert run("nx", "0.1.0", *argv)[0] == EXIT_USAGE and not version.definition_of_done[0].done
 
 
+@pytest.mark.parametrize("by_ref", [False, True])
+def test_add_edit_and_remove_criteria(run, session, version, by_ref):
+    """
+    Given a version with one criterion
+    When adding one, rewording the first, then removing it
+    Then the version shows each change, made by the cli actor
+    """
+    target = [version.ref] if by_ref else ["nx", "0.1.0"]
+    code, out, _ = run(*target, "add-criterion", "Docs", "written")
+    assert code == EXIT_OK and "[ ] Docs written" in out
+    code, out, _ = run(*target, "edit-criterion", "1", "Shipped")
+    assert code == EXIT_OK and "[ ] Shipped" in out and "Ships" not in out
+    code, out, _ = run(*target, "remove-criterion", "1")
+    assert code == EXIT_OK and "Shipped" not in out and "Docs written" in out
+    assert events.history(session, "version", version.id)[-1].actor == events.ACTOR_CLI
+    assert [c.description for c in versions.get_by_ref(session, version.ref).definition_of_done] == ["Docs written"]
+
+
+@pytest.mark.parametrize("argv", [("add-criterion",), ("edit-criterion", "1"), ("edit-criterion", "2", "X"),
+                                  ("remove-criterion",), ("remove-criterion", "x"), ("remove-criterion", "1", "2")])
+def test_bad_criterion_edit_is_a_usage_error(run, version, argv):
+    """
+    Given a version with one criterion
+    When adding with no text, editing with no text or a bad number, or removing with no, a bad or two numbers
+    Then it is a usage error and the criterion is unchanged
+    """
+    assert run("nx", "0.1.0", *argv)[0] == EXIT_USAGE
+    assert [c.description for c in version.definition_of_done] == ["Ships"]
+
+
+def test_criterion_edits_refused_by_the_services_are_domain_errors(run, version):
+    """
+    Given a version with one criterion
+    When removing that last criterion, or setting a blank text
+    Then it is an error reported by the services and nothing changes
+    """
+    code, _, err = run("nx", "0.1.0", "remove-criterion", "1")
+    assert code == EXIT_ERROR and "at least one" in err
+    code, _, err = run("nx", "0.1.0", "edit-criterion", "1", " ")
+    assert code == EXIT_ERROR and "empty" in err
+    assert [c.description for c in version.definition_of_done] == ["Ships"]
+
+
 def test_start_and_release_a_version(run, session, version):
     """
     Given a planned version with one criterion

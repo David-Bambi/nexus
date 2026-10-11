@@ -32,3 +32,6 @@ an assistant; having to switch to the web UI for it was the main gap. The
 release guard in `services/versions.py` already protects the data, so
 exposing the transitions adds no new rule. Deleting, archiving and DoD
 editing stay web-only.
+
+DoD editing was later exposed by
+[0010](0010-dod-editing-in-cli-and-mcp.md).

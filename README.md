@@ -78,7 +78,7 @@ below use `uv run`; drop it if `nexus` is installed.
 uv run nexus tasks                          # also: versions, projects, version
 uv run nexus NX                             # project detail (by key)
 uv run nexus NX 1.0                         # version detail, tasks, definition of done
-uv run nexus NX 1.0 check 2                 # also: uncheck <n>, start, release (or after a v- ref)
+uv run nexus NX 1.0 check 2                 # also: uncheck <n>, start, release, add-/edit-/remove-criterion (or after a v- ref)
 uv run nexus t-4k2                          # task detail (or a v- ref)
 uv run nexus add task NX 1.0 -t "Title" -s S  # planned task; omit the version for the inbox
 uv run nexus "buy a USB-C cable"            # capture into the inbox
@@ -94,8 +94,8 @@ redeployed. Import format and details: `docs/functional/cli.md`.
 ## MCP server
 
 The running service also speaks the Model Context Protocol, so an AI
-assistant can read and update your projects (22 tools: list, get, search,
-capture, add, update, plan, start, complete, block, release, import...). Register it
+assistant can read and update your projects (25 tools: list, get, search,
+capture, add, update, plan, start, complete, block, release, DoD editing, import...). Register it
 once in Claude Code:
 
 ```bash
@@ -103,8 +103,8 @@ claude mcp add --transport http nexus http://127.0.0.1:8765/mcp
 ```
 
 Read-only tools can be auto-allowed; write tools prompt for approval, and
-their events are logged with actor `mcp`. Deleting and releasing stay in the
-web UI. Security: the endpoint has no authentication and relies on the
+their events are logged with actor `mcp`. Deleting tasks or projects and
+archiving stay in the web UI. Security: the endpoint has no authentication and relies on the
 loopback binding plus a Host/Origin/Content-Type check; it is unavailable
 while the service is down. Tools and rules: `docs/functional/mcp.md`.
 

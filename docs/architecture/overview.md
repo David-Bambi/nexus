@@ -46,6 +46,9 @@ raise `ConflictError`. Rules:
 - Each mutation logs a `dod_*` event on the version, visible in its
   changelog (see [0002](adr/0002-append-only-event-log.md)).
 
+The web UI, the CLI and the MCP server all expose these operations
+([0010](adr/0010-dod-editing-in-cli-and-mcp.md)).
+
 `VersionProgress` (`services/views.py`) carries `dod_done` / `dod_total`
 next to the task counts; the dashboard and version page render a DoD bar
 beside the task bar. The version page also shows a task progress bar under
@@ -151,7 +154,7 @@ an `actor` argument (default `web`, also `mcp`).
 
 `src/mcp_server/` is a third adapter over `services/`
 ([0008](adr/0008-mcp-over-http-on-the-service.md)), serving AI assistants
-through `POST /mcp` on the running service. Modules: `tools.py` (22 tools,
+through `POST /mcp` on the running service. Modules: `tools.py` (25 tools,
 each a schema plus a handler calling services) and `serialize.py` (rows to
 JSON, no integer ids), both transport-agnostic and Flask-free (enforced by
 `tests/test_architecture.py`); `http.py` (the Flask blueprint: origin/host

@@ -61,7 +61,8 @@ internal and a project key alone can't name a task.
   enforces it.
 - The CLI cannot edit or change a task's state. (It could not toggle a DoD
   criterion or change a version's status either until
-  [0009](0009-version-lifecycle-in-cli-and-mcp.md).)
+  [0009](0009-version-lifecycle-in-cli-and-mcp.md), nor edit the DoD until
+  [0010](0010-dod-editing-in-cli-and-mcp.md).)
 - Task title validation for capture/create lives in the CLI and the importer,
   not in the services.
 

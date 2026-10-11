@@ -36,7 +36,9 @@ Usage: [MCP server](../../functional/mcp.md).
   releasing or starting versions, DoD add/edit/delete and arbitrary state
   changes are deliberately not exposed; they stay in the web UI.
   Starting and releasing versions were later exposed by
-  [0009](0009-version-lifecycle-in-cli-and-mcp.md) (13 write tools, 22 in all).
+  [0009](0009-version-lifecycle-in-cli-and-mcp.md) (13 write tools, 22 in all),
+  DoD add/edit/delete by [0010](0010-dod-editing-in-cli-and-mcp.md)
+  (16 write tools, 25 in all).
 - **Write safety**: rely on the client's permissions (Claude Code prompts for
   write tools; read-only tools carry `readOnlyHint`). No server-side
   read-only mode.

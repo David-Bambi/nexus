@@ -65,9 +65,10 @@ def test_every_tool_is_described_with_a_strict_schema_and_annotations():
     Given the tool registry
     When listing the tools
     Then each has a description, an object schema with no extra properties, and hints matching its kind
+    (only delete_criterion removes data)
     """
     listed = tools.list_tools()
-    assert len(listed) == len(tools.TOOLS) == 22
+    assert len(listed) == len(tools.TOOLS) == 25
     for item in listed:
         assert item["description"]
         assert item["inputSchema"]["type"] == "object" and item["inputSchema"]["additionalProperties"] is False
@@ -75,7 +76,7 @@ def test_every_tool_is_described_with_a_strict_schema_and_annotations():
         hints = item["annotations"]
         assert hints["readOnlyHint"] == tools.TOOLS[item["name"]].read_only
         assert ("destructiveHint" in hints) == (not hints["readOnlyHint"])
-        assert hints.get("destructiveHint", False) is False
+        assert hints.get("destructiveHint", False) == (item["name"] == "delete_criterion")
 
 
 def test_read_only_tools_are_exactly_the_read_ones():
@@ -357,6 +358,45 @@ def test_set_criterion_done_by_index(session, world):
     assert _last_event(session).actor == events.ACTOR_MCP
 
 
+def test_add_update_and_delete_criteria_by_index(session, world):
+    """
+    Given a version with two criteria
+    When adding a third, rewording the first, then deleting the second
+    Then the checklist follows each change, by the mcp actor
+    """
+    version, _, _, _ = world
+    shown = ok(session, "add_criterion", version=version.ref, description="Tested")
+    assert [c["description"] for c in shown["definition_of_done"]] == ["Ships", "Documented", "Tested"]
+    shown = ok(session, "update_criterion", version="1.0", project="nx", index=1, description="Shipped")
+    assert [c["description"] for c in shown["definition_of_done"]] == ["Shipped", "Documented", "Tested"]
+    shown = ok(session, "delete_criterion", version=version.ref, index=2)
+    assert [c["description"] for c in shown["definition_of_done"]] == ["Shipped", "Tested"]
+    assert _last_event(session).actor == events.ACTOR_MCP
+
+
+def test_criterion_edits_are_refused_by_the_rules(session, world):
+    """
+    Given a version with two criteria, and a released one
+    When using an out-of-range index, a blank text, deleting the last criterion or editing the released version
+    Then each is refused and the checklist is unchanged
+    """
+    version, _, _, _ = world
+    assert "between 1 and 2" in refused(session, "update_criterion", version=version.ref, index=3, description="X")
+    assert "between 1 and 2" in refused(session, "delete_criterion", version=version.ref, index=0)
+    assert "blank" in refused(session, "add_criterion", version=version.ref, description="  ")
+    assert "blank" in refused(session, "update_criterion", version=version.ref, index=1, description="")
+    ok(session, "delete_criterion", version=version.ref, index=1)
+    assert "at least one" in refused(session, "delete_criterion", version=version.ref, index=1)
+    released = versions.create(session, "nx", "2.0", "Done", ["Ok"])
+    versions.start(session, released.id)
+    versions.set_criterion_done(session, released.definition_of_done[0].id, True)
+    versions.release(session, released.id)
+    assert refused(session, "add_criterion", version=released.ref, description="Late")
+    assert refused(session, "update_criterion", version=released.ref, index=1, description="Late")
+    assert [c.description for c in released.definition_of_done] == ["Ok"]
+    assert [c.description for c in version.definition_of_done] == ["Documented"]
+
+
 def test_version_goes_from_planned_to_released_through_tools(session, world):
     """
     Given a planned version with a planned task and two unchecked criteria
@@ -494,6 +534,9 @@ WRITE_CALLS = [
     ("block_task", lambda w: {"ref": w.doing.ref, "reason": "why"}),
     ("unblock_task", lambda w: {"ref": w.waiting.ref}),
     ("set_criterion_done", lambda w: {"version": w.version.ref, "index": 1, "done": True}),
+    ("add_criterion", lambda w: {"version": w.version.ref, "description": "New"}),
+    ("update_criterion", lambda w: {"version": w.version.ref, "index": 1, "description": "New"}),
+    ("delete_criterion", lambda w: {"version": w.version.ref, "index": 1}),
     ("start_version", lambda w: {"version": w.version.ref}),
     ("release_version", lambda w: {"version": w.ready.ref}),
 ]

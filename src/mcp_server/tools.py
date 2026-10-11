@@ -39,6 +39,8 @@ class Tool:
     read_only: bool = False
     # True if calling it twice with the same arguments changes nothing more.
     idempotent: bool = False
+    # True if it removes data rather than only adding or changing it.
+    destructive: bool = False
 
 
 # Every tool by name, filled by the @tool decorator below.
@@ -120,7 +122,7 @@ def validate(arguments : object, schema : dict) -> dict:
 
 
 def tool(name : str, description : str, properties : dict | None = None, required : list[str] | None = None,
-         read_only : bool = False, idempotent : bool = False) -> Callable:
+         read_only : bool = False, idempotent : bool = False, destructive : bool = False) -> Callable:
     """Register a function as a tool.
 
     Args:
@@ -130,12 +132,13 @@ def tool(name : str, description : str, properties : dict | None = None, require
         required: Names of the required arguments.
         read_only: Whether the tool never changes anything.
         idempotent: Whether repeating the call changes nothing more.
+        destructive: Whether the tool removes data.
     """
     def register(handler : Callable[[Session, dict], dict]) -> Callable:
         schema = {"type": "object", "properties": properties or {}, "additionalProperties": False}
         if required:
             schema["required"] = required
-        TOOLS[name] = Tool(name, description, schema, handler, read_only, idempotent)
+        TOOLS[name] = Tool(name, description, schema, handler, read_only, idempotent, destructive)
         return handler
     return register
 
@@ -357,18 +360,63 @@ _transition("block_task", "Mark a task in progress as waiting on something.", ta
 _transition("unblock_task", "Resume a waiting task (waiting to doing).", tasks.unblock)
 
 
+# Schema of the argument numbering a criterion.
+_INDEX = _integer("Criterion number, from 1, as listed by get_version.")
+
+
 @tool("set_criterion_done", "Check or uncheck one definition-of-done criterion of a version.",
       {"version": _VERSION, "project": _PROJECT,
-       "index": _integer("Criterion number, from 1, as listed by get_version."),
+       "index": _INDEX,
        "done": _boolean("True to check it, false to uncheck it.")},
       ["version", "index", "done"], idempotent=True)
 def set_criterion_done(session : Session, args : dict) -> dict:
     """Check or uncheck a criterion."""
     version = _version_of(session, args)
+    versions.set_criterion_done(session, _criterion_at(version, args["index"]).id, args["done"], actor=ACTOR)
+    return serialize.version(version, versions.list_tasks(session, version.id))
+
+
+def _criterion_at(version, index : int):
+    """The criterion of a version at a position counted from 1.
+
+    Raises:
+        ValidationError: If the index is out of range.
+    """
     criteria = version.definition_of_done
-    if not 1 <= args["index"] <= len(criteria):
+    if not 1 <= index <= len(criteria):
         raise ValidationError(f"'index' must be between 1 and {len(criteria)}")
-    versions.set_criterion_done(session, criteria[args["index"] - 1].id, args["done"], actor=ACTOR)
+    return criteria[index - 1]
+
+
+@tool("add_criterion", "Append a definition-of-done criterion to a version that is not released.",
+      {"version": _VERSION, "project": _PROJECT, "description": _string("Text of the new criterion.")},
+      ["version", "description"])
+def add_criterion(session : Session, args : dict) -> dict:
+    """Append a criterion."""
+    version = _version_of(session, args)
+    versions.add_criterion(session, version.id, args["description"], actor=ACTOR)
+    return serialize.version(version, versions.list_tasks(session, version.id))
+
+
+@tool("update_criterion", "Change the text of one definition-of-done criterion of a version that is not released.",
+      {"version": _VERSION, "project": _PROJECT, "index": _INDEX,
+       "description": _string("New text of the criterion.")},
+      ["version", "index", "description"])
+def update_criterion(session : Session, args : dict) -> dict:
+    """Change a criterion's text."""
+    version = _version_of(session, args)
+    versions.update_criterion(session, _criterion_at(version, args["index"]).id, args["description"], actor=ACTOR)
+    return serialize.version(version, versions.list_tasks(session, version.id))
+
+
+@tool("delete_criterion", "Delete one definition-of-done criterion of a version that is not released. "
+      "Refused for the last remaining criterion. The numbers of the following criteria shift down by one.",
+      {"version": _VERSION, "project": _PROJECT, "index": _INDEX},
+      ["version", "index"], destructive=True)
+def delete_criterion(session : Session, args : dict) -> dict:
+    """Delete a criterion."""
+    version = _version_of(session, args)
+    versions.delete_criterion(session, _criterion_at(version, args["index"]).id, actor=ACTOR)
     return serialize.version(version, versions.list_tasks(session, version.id))
 
 
@@ -402,7 +450,7 @@ def list_tools() -> list[dict]:
              "description": t.description,
              "inputSchema": t.schema,
              "annotations": {"readOnlyHint": t.read_only,
-                             **({} if t.read_only else {"destructiveHint": False, "idempotentHint": t.idempotent}),
+                             **({} if t.read_only else {"destructiveHint": t.destructive, "idempotentHint": t.idempotent}),
                              "openWorldHint": False}}
             for t in TOOLS.values()]
 

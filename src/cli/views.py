@@ -120,6 +120,27 @@ def _check(session : Session, version : Version, args : list[str], done : bool) 
     versions.set_criterion_done(session, _criterion_id(version, args[0]), done, actor=events.ACTOR_CLI)
 
 
+def _add_criterion(session : Session, version : Version, args : list[str]) -> None:
+    """Append a criterion whose text is the arguments joined by spaces."""
+    if not args:
+        raise UsageError("'add-criterion' takes the criterion text")
+    versions.add_criterion(session, version.id, " ".join(args), actor=events.ACTOR_CLI)
+
+
+def _edit_criterion(session : Session, version : Version, args : list[str]) -> None:
+    """Change the text of the criterion numbered by the first argument to the rest, joined by spaces."""
+    if len(args) < 2:
+        raise UsageError("'edit-criterion' takes a criterion number and its new text")
+    versions.update_criterion(session, _criterion_id(version, args[0]), " ".join(args[1:]), actor=events.ACTOR_CLI)
+
+
+def _remove_criterion(session : Session, version : Version, args : list[str]) -> None:
+    """Delete the criterion numbered by the single argument."""
+    if len(args) != 1:
+        raise UsageError("'remove-criterion' takes one criterion number")
+    versions.delete_criterion(session, _criterion_id(version, args[0]), actor=events.ACTOR_CLI)
+
+
 def _change_status(action, word : str):
     """A version action that runs one status change, e.g. versions.start, with no argument."""
     def run(session : Session, version : Version, args : list[str]) -> None:
@@ -132,6 +153,9 @@ def _change_status(action, word : str):
 VERSION_ACTIONS = {
     "check": lambda session, version, args: _check(session, version, args, True),
     "uncheck": lambda session, version, args: _check(session, version, args, False),
+    "add-criterion": _add_criterion,
+    "edit-criterion": _edit_criterion,
+    "remove-criterion": _remove_criterion,
     "start": _change_status(versions.start, "start"),
     "release": _change_status(versions.release, "release"),
 }

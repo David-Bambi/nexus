@@ -19,6 +19,9 @@ USAGE = """usage: nexus <command> | <reference> [<version>]
   nexus <project>          project detail and its versions
   nexus <project> <version>  version detail, tasks and definition of done
   nexus <project> <version> check|uncheck <n>  check a definition-of-done criterion
+  nexus <project> <version> add-criterion <text>       add a criterion
+  nexus <project> <version> edit-criterion <n> <text>  reword a criterion
+  nexus <project> <version> remove-criterion <n>       delete a criterion
   nexus <project> <version> start|release      change the version status
   nexus <task>             task detail
   nexus add task <project> [<version>] [--title T] [--body B] [--context C] [--size S]

@@ -38,6 +38,9 @@ command line. Errors go to stderr.
 | `nexus <t-ref>` | Task detail |
 | `nexus <v-ref>` | Version detail |
 | `nexus <project> <version> check\|uncheck <n>` | Check or uncheck DoD criterion `n` (from 1) |
+| `nexus <project> <version> add-criterion <text…>` | Append a DoD criterion |
+| `nexus <project> <version> edit-criterion <n> <text…>` | Reword criterion `n` |
+| `nexus <project> <version> remove-criterion <n>` | Delete criterion `n`; later numbers shift down |
 | `nexus <project> <version> start` | Planned to in progress |
 | `nexus <project> <version> release` | In progress to released |
 | `nexus add task <project> [<version>] [-t T] [-b B] [-c C] [-s SIZE]` | Create a task |
@@ -52,7 +55,9 @@ A lone argument that is blank or contains whitespace is a capture.
 Version actions also work after a `v-` ref (`nexus v-9xa start`) and print
 the version detail afterwards. A criterion number out of range is a usage
 error (exit 2). `release` is refused (exit 1) while a task is unfinished
-(cancelled tasks don't count) or a criterion is unchecked.
+(cancelled tasks don't count) or a criterion is unchecked. Criterion text is
+the remaining words joined by spaces; editing a released version's DoD or
+removing its last criterion is refused (exit 1).
 
 ```bash
 nexus add task NX 1.0 -t "Write the CLI page" -s S

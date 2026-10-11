@@ -35,8 +35,8 @@ Read tools (`readOnlyHint`):
 | `search` | Substring of title or body; `limit` |
 | `dashboard` | In-progress versions, doing/waiting tasks, inbox and refine counts |
 
-Write tools (all `destructiveHint: false`; `idempotentHint` on
-`update_task` and `set_criterion_done`):
+Write tools (`destructiveHint: false` except `delete_criterion`;
+`idempotentHint` on `update_task` and `set_criterion_done`):
 
 | Tool | Purpose |
 |---|---|
@@ -51,11 +51,18 @@ Write tools (all `destructiveHint: false`; `idempotentHint` on
 | `block_task` | Doing to waiting, `reason` required |
 | `unblock_task` | Waiting to doing |
 | `set_criterion_done` | Check or uncheck a DoD criterion by its number |
+| `add_criterion` | Append a DoD criterion (`description`) |
+| `update_criterion` | Reword criterion number `index` (`description`) |
+| `delete_criterion` | Delete criterion number `index`; refused for the last one, later numbers shift down |
 | `start_version` | Planned to in progress; returns the version like `get_version` |
 | `release_version` | In progress to released; refused while a task is unfinished (cancelled ones don't count) or a criterion is unchecked |
 
-Not exposed, use the web UI: deleting tasks or projects, archiving,
-adding/editing/deleting DoD criteria, and arbitrary state changes.
+Version and criterion tools return the version like `get_version`. Criteria
+of a released version can't be changed; blank text is refused
+([0010](../architecture/adr/0010-dod-editing-in-cli-and-mcp.md)).
+
+Not exposed, use the web UI: deleting tasks or projects, archiving, and
+arbitrary state changes.
 
 ## Identification
 
