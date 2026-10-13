@@ -12,13 +12,13 @@ from src.services.errors import NotFoundError
 
 @dataclass
 class VersionProgress:
-    """An in-progress version with how far its tasks and its definition of done have got."""
+    """A version with how far its tasks and its definition of done have got."""
 
     # The version itself, with its project loaded.
     version: Version
     # Number of the version's tasks that are done.
     done: int
-    # Number of tasks planned into the version, whatever their state.
+    # Number of tasks planned into the version, cancelled ones excepted.
     total: int
     # Number of the version's definition-of-done criteria that are checked.
     dod_done: int
@@ -156,6 +156,44 @@ def search(session : Session, term : str, limit : int | None = None) -> list:
     return query.all()
 
 
+def version_progress(session : Session, versions : list) -> list:
+    """Count how far each version's tasks and definition of done have got.
+
+    Args:
+        session: Database session to use.
+        versions: The versions to measure.
+
+    Returns:
+        One VersionProgress per version, in the same order. Cancelled tasks
+        are left out of both task counts.
+    """
+    ids = [v.id for v in versions]
+
+    counts = {
+        version_id: (done, total)
+        for version_id, done, total in session.query(
+            Task.version_id,
+            func.sum(case((Task.state == TaskState.DONE, 1), else_=0)),
+            func.count(Task.id),
+        )
+        .filter(Task.version_id.in_(ids), Task.state != TaskState.CANCELLED)
+        .group_by(Task.version_id)
+    }
+
+    dod_counts = {
+        version_id: (done, total)
+        for version_id, done, total in session.query(
+            DefinitionOfDoneCriterion.version_id,
+            func.sum(case((DefinitionOfDoneCriterion.done.is_(True), 1), else_=0)),
+            func.count(DefinitionOfDoneCriterion.id),
+        )
+        .filter(DefinitionOfDoneCriterion.version_id.in_(ids))
+        .group_by(DefinitionOfDoneCriterion.version_id)
+    }
+
+    return [VersionProgress(v, *counts.get(v.id, (0, 0)), *dod_counts.get(v.id, (0, 0))) for v in versions]
+
+
 def dashboard(session : Session) -> DashboardView:
     """Gather what the overview page shows.
 
@@ -176,29 +214,6 @@ def dashboard(session : Session) -> DashboardView:
         .all()
     )
 
-    counts = {
-        version_id: (done, total)
-        for version_id, done, total in session.query(
-            Task.version_id,
-            func.sum(case((Task.state == TaskState.DONE, 1), else_=0)),
-            func.count(Task.id),
-        )
-        .filter(Task.version_id.in_([v.id for v in started]),
-                Task.state != TaskState.CANCELLED)
-        .group_by(Task.version_id)
-    }
-
-    dod_counts = {
-        version_id: (done, total)
-        for version_id, done, total in session.query(
-            DefinitionOfDoneCriterion.version_id,
-            func.sum(case((DefinitionOfDoneCriterion.done.is_(True), 1), else_=0)),
-            func.count(DefinitionOfDoneCriterion.id),
-        )
-        .filter(DefinitionOfDoneCriterion.version_id.in_([v.id for v in started]))
-        .group_by(DefinitionOfDoneCriterion.version_id)
-    }
-
     def in_state(state : TaskState) -> list:
         """List the tasks in the given state, oldest first."""
         return (
@@ -210,8 +225,7 @@ def dashboard(session : Session) -> DashboardView:
         )
 
     return DashboardView(
-        versions=[VersionProgress(v, *counts.get(v.id, (0, 0)), *dod_counts.get(v.id, (0, 0)))
-                  for v in started],
+        versions=version_progress(session, started),
         doing=in_state(TaskState.DOING),
         waiting=in_state(TaskState.WAITING),
         inbox_count=session.query(Task).filter(Task.state == TaskState.INBOX).count(),

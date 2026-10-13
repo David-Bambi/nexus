@@ -61,7 +61,7 @@ Version and criterion tools return the version like `get_version`. Criteria
 of a released version can't be changed; blank text is refused
 ([0010](../architecture/adr/0010-dod-editing-in-cli-and-mcp.md)).
 
-Not exposed, use the web UI: deleting tasks or projects, archiving, and
+Not exposed, use the web UI: deleting tasks, versions or projects, archiving, and
 arbitrary state changes.
 
 ## Identification

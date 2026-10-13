@@ -108,6 +108,18 @@ def version_release(key, number):
     return _render_version(version, error)
 
 
+@bp.route("/projects/<key>/versions/<number>/delete", methods=["POST"])
+def version_delete(key, number):
+    """Delete a version, then go back to its project's page."""
+    session = _session()
+    try:
+        version = versions.get(session, key, number)
+    except NotFoundError:
+        abort(404)
+    versions.delete(session, version.id)
+    return redirect(url_for("pages.project_detail", key=key))
+
+
 def _dod_mutation(key, number, criterion_id, mutate):
     """Apply a definition-of-done change to a version, then re-render its page.
 

@@ -15,10 +15,7 @@
     {% for progress in dashboard.versions %}
     <li>
         <a href="{{ url_for('pages.version_detail', key=progress.version.project.key, number=progress.version.number) }}">{{ progress.version.project.name }} {{ progress.version.number }} — {{ progress.version.title }}</a>
-        — {{ progress.done }}/{{ progress.total }} done
-        <progress value="{{ progress.done }}" max="{{ progress.total or 1 }}"></progress>
-        — DOD {{ progress.dod_done }}/{{ progress.dod_total }}
-        <progress value="{{ progress.dod_done }}" max="{{ progress.dod_total or 1 }}"></progress>
+        {% include "_version_progress.html" %}
     </li>
     {% else %}
     <li>No version in progress.</li>

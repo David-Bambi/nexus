@@ -54,8 +54,10 @@ next to the task counts; the dashboard and version page render a DoD bar
 beside the task bar. The version page also shows a task progress bar under
 its "Tasks" heading ("done/total done" + `<progress>`), computed in the
 template from the page's `tasks` list (state `DONE` over all tasks except
-`CANCELLED`). The dashboard's version progress excludes cancelled tasks from
-its total too.
+`CANCELLED`). `views.version_progress(session, versions)` returns one
+`VersionProgress` per given version, same order, cancelled tasks excluded
+from both task counts; the dashboard, the project page and the projects
+list use it.
 
 ## Task lifecycle
 
@@ -67,6 +69,8 @@ stateDiagram-v2
     planned --> refined
     planned --> doing
     doing --> waiting
+    doing --> refined
+    waiting --> refined
     waiting --> doing
     doing --> done
     done --> doing
@@ -81,6 +85,10 @@ stateDiagram-v2
     someday --> cancelled
     cancelled --> refined
 ```
+
+`planned`/`doing`/`waiting` → `refined` also happens when the task's
+version is deleted ([0011](adr/0011-deleting-a-version.md)); only
+`planned` → `refined` (`unplan`) is a task-level transition.
 
 `waiting` requires a non-empty `blocked_reason`. `cancelled` is a terminal
 state for abandoned work, distinct from `done`. Transition rules are
@@ -112,6 +120,14 @@ target/state pair raises `InvalidTransitionError`; `NotFoundError` and
   `NotFoundError` (task or version), `InvalidTransitionError` (task not
   planned/doing/waiting) and `ValidationError` (current or target version
   released, target is the current version, target in another project).
+- `versions.delete(session, version_id, actor)`: deletes a version (any
+  status) and its DoD. Planned, doing and waiting tasks go back to `refined`
+  without version or `blocked_reason` (task `unplanned` event); done,
+  cancelled and someday tasks keep their state and lose the version link.
+  Logs version `deleted`. Raises `NotFoundError`. See
+  [0011](adr/0011-deleting-a-version.md).
+- `versions.list(session, project_key)` returns the project's versions in
+  its own order (`position, id`).
 - `versions.release` ignores cancelled tasks: a task is unfinished when it is
   neither `done` nor `cancelled`.
 - Migration `3c1e5a7b9d20` rebuilds the `task_state` CHECK constraint to
@@ -121,7 +137,7 @@ target/state pair raises `InvalidTransitionError`; `NotFoundError` and
 Within `services/`, mutations and cross-cutting reads are split into
 separate modules: `services/tasks.py` (and `projects.py`, `versions.py`)
 own single-entity commands, while `services/views.py` holds read-only,
-page-shaped queries (`inbox`, `to_refine`, `search`, `dashboard`, `list_tasks`) that
+page-shaped queries (`inbox`, `to_refine`, `search`, `dashboard`, `version_progress`, `list_tasks`) that
 don't belong to any one entity. Both stay framework-agnostic per ADR-0001.
 
 Two further modules are read-only: `services/events.py` also holds the
@@ -170,6 +186,18 @@ Besides the `/mcp` endpoint (see above), routes are unprefixed full-page adapter
 - `/` is the dashboard: in-progress versions with done/total progress,
   `doing` and `waiting` tasks, inbox and refine counters
   (`views.dashboard()` returns a `DashboardView`).
+- `/projects` lists projects, each with its unreleased (planned and
+  in-progress) versions, status and progress. Released versions only appear
+  on the project page.
+- `/projects/<key>` lists all the project's versions in order, with status,
+  task and DoD progress, and links "Manage versions →" to the versions page
+  (creation form). Version progress rows are the shared partial
+  `_version_progress.html`, also used by the dashboard.
+- `POST /projects/<key>/versions/<number>/delete` (`version_delete`) calls
+  `versions.delete` and redirects to the project page; 404 if unknown. The
+  version page's "Delete version" button is disabled until the version
+  number is typed, with a note that unfinished tasks go back to refined
+  ([0011](adr/0011-deleting-a-version.md)).
 - The task page shows its History; the version page shows its Changelog.
 - The version page manages the DoD (checkbox, inline edit, delete, add form;
   read-only once released) through POST routes under

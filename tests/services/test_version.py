@@ -201,7 +201,7 @@ def test_reorder_versions(session):
     """Reorder a project's versions updates their position
     Given a project 'nexus' with versions '0.1.0' and '0.2.0'
     When reordering with '0.2.0' before '0.1.0'
-    Then '0.2.0' has position 0 and '0.1.0' has position 1
+    Then '0.2.0' has position 0 and '0.1.0' has position 1, and listing follows that order
     """
     projects.create(session, "nexus", "Nexus", "")
     v1 = versions.create(session, "nexus", "0.1.0", "First version", ["Ships"])
@@ -209,6 +209,7 @@ def test_reorder_versions(session):
     versions.reorder(session, "nexus", [v2.id, v1.id])
     assert v2.position == 0
     assert v1.position == 1
+    assert versions.list(session, "nexus") == [v2, v1]
 
 def test_reorder_project_not_found(session):
     """Reorder versions of a non existing project raises a NotFoundError
@@ -495,3 +496,96 @@ def test_release_ignores_cancelled_tasks(session):
     dropped = tasks.create_in_version(session, version.id, "Dropped")
     tasks.cancel(session, dropped.id)
     assert versions.release(session, version.id).status is VersionStatus.RELEASED
+
+
+# Delete ------------------------------------------------------------------------------------------
+
+def _task_in(session, version, title, state):
+    """Create a task in a version and move it to the given state."""
+    task = tasks.create_in_version(session, version.id, title)
+    if state in (TaskState.DOING, TaskState.WAITING, TaskState.DONE):
+        tasks.start(session, task.id)
+    if state == TaskState.WAITING:
+        tasks.block(session, task.id, "why")
+    if state == TaskState.DONE:
+        tasks.complete(session, task.id)
+    if state == TaskState.CANCELLED:
+        tasks.cancel(session, task.id)
+    return task
+
+
+def test_delete_version_sends_unfinished_tasks_back_to_refined(session):
+    """Deleting a version keeps its tasks, sending the unfinished ones back to refined
+    Given a version with a planned, a doing, a waiting, a done and a cancelled task
+    When deleting the version
+    Then it and its criteria are gone, the first three are refined without a version or block reason,
+    and the done and cancelled ones keep their state without a version
+    """
+    projects.create(session, "nexus", "Nexus", "")
+    version = versions.create(session, "nexus", "0.1.0", "First", ["Ships", "Docs"])
+    versions.start(session, version.id)
+    states = [TaskState.PLANNED, TaskState.DOING, TaskState.WAITING, TaskState.DONE, TaskState.CANCELLED]
+    created = [_task_in(session, version, s.name, s) for s in states]
+    version_id = version.id
+
+    versions.delete(session, version_id)
+
+    with pytest.raises(NotFoundError):
+        versions.get(session, "nexus", "0.1.0")
+    assert versions.list(session, "nexus") == []
+    assert [(t.state, t.version_id, t.blocked_reason) for t in created] == [
+        (TaskState.REFINED, None, None), (TaskState.REFINED, None, None), (TaskState.REFINED, None, None),
+        (TaskState.DONE, None, None), (TaskState.CANCELLED, None, None)]
+    assert session.query(Task).count() == 5
+
+
+def test_delete_version_logs_the_deletion_and_each_unplanned_task(session):
+    """Deleting a version logs it, plus an unplanned event per task sent back to refined
+    Given a version with a doing and a done task
+    When deleting it as the cli
+    Then the version has a deleted event, the doing task an unplanned one, the done task none, all by the cli
+    """
+    projects.create(session, "nexus", "Nexus", "")
+    version = versions.create(session, "nexus", "0.1.0", "First", ["Ships"])
+    doing = _task_in(session, version, "Doing", TaskState.DOING)
+    done = _task_in(session, version, "Done", TaskState.DONE)
+    version_id, ref = version.id, version.ref
+    done_events = len(events.history(session, "task", done.id))
+
+    versions.delete(session, version_id, actor=events.ACTOR_CLI)
+
+    deleted = events.history(session, "version", version_id)[-1]
+    assert (deleted.action, deleted.actor) == ("deleted", events.ACTOR_CLI)
+    assert deleted.payload == {"project": "nexus", "number": "0.1.0", "title": "First"}
+    unplanned = events.history(session, "task", doing.id)[-1]
+    assert (unplanned.action, unplanned.actor) == ("unplanned", events.ACTOR_CLI)
+    assert unplanned.payload == {"from": "DOING", "to": "REFINED", "version": ref}
+    assert len(events.history(session, "task", done.id)) == done_events
+
+
+def test_delete_released_version_is_allowed(session):
+    """A released version can be deleted too
+    Given a released version with a done task
+    When deleting it
+    Then it is gone and the task stays done
+    """
+    projects.create(session, "nexus", "Nexus", "")
+    version = versions.create(session, "nexus", "0.1.0", "First", ["Ships"])
+    versions.start(session, version.id)
+    done = _task_in(session, version, "Done", TaskState.DONE)
+    versions.set_criterion_done(session, version.definition_of_done[0].id, True)
+    versions.release(session, version.id)
+
+    versions.delete(session, version.id)
+
+    assert versions.list(session, "nexus") == [] and done.state == TaskState.DONE and done.version_id is None
+
+
+def test_delete_missing_version_raises(session):
+    """Deleting an unknown version is refused
+    Given no version
+    When deleting id 999
+    Then NotFoundError is raised
+    """
+    with pytest.raises(NotFoundError):
+        versions.delete(session, 999)

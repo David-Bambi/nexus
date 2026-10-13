@@ -14,6 +14,17 @@
     <li>
         <a href="{{ url_for('pages.project_detail', key=project.key) }}">{{ project.name }}</a>
         ({{ project.key }}) — {{ project.status.name }}
+        {% if progress_by_project[project.id] %}
+        <ul>
+            {% for progress in progress_by_project[project.id] %}
+            <li>
+                <a href="{{ url_for('pages.version_detail', key=project.key, number=progress.version.number) }}">{{ progress.version.number }} — {{ progress.version.title }}</a>
+                — {{ progress.version.status.name }}
+                {% include "_version_progress.html" %}
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
     </li>
     {% else %}
     <li>No projects yet.</li>

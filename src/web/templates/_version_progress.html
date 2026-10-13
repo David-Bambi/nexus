@@ -1,0 +1,5 @@
+{# Task and definition-of-done progress of one version; expects `progress` (a VersionProgress). #}
+— {{ progress.done }}/{{ progress.total }} done
+<progress value="{{ progress.done }}" max="{{ progress.total or 1 }}"></progress>
+— DOD {{ progress.dod_done }}/{{ progress.dod_total }}
+<progress value="{{ progress.dod_done }}" max="{{ progress.dod_total or 1 }}"></progress>

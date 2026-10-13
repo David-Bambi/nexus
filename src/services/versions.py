@@ -99,14 +99,15 @@ def list(session : Session, project_key : str) -> list:
         project_key: Key of the owning project.
 
     Returns:
-        All matching versions.
+        All matching versions, in the project's own order.
 
     Raises:
         NotFoundError: If no project has this key.
     """
     project = projects.get(session, project_key)
 
-    return session.query(Version).filter(Version.project_id == project.id).all()
+    return (session.query(Version).filter(Version.project_id == project.id)
+            .order_by(Version.position, Version.id).all())
 
 
 def list_all(session : Session) -> list:
@@ -248,6 +249,43 @@ def release(session : Session, version_id : int, actor : str = events.ACTOR_WEB)
         return version
     else:
         raise ValidationError("Cannot release this version.")
+
+# Task states that still count as work to do; deleting their version sends them back to refined.
+_UNFINISHED_STATES = (TaskState.PLANNED, TaskState.DOING, TaskState.WAITING)
+
+
+def delete(session : Session, version_id : int, actor : str = events.ACTOR_WEB) -> None:
+    """Delete a version and its definition of done.
+
+    Its unfinished tasks (planned, doing or waiting) go back to refined,
+    without a version, so they can be planned again. Its other tasks (done,
+    cancelled, someday) are kept but no longer belong to a version.
+
+    Args:
+        session: Database session to use.
+        version_id: Id of the version.
+        actor: Who made the change, recorded in the event log.
+
+    Raises:
+        NotFoundError: If no version has this id.
+    """
+    version = _get_by_id(session, version_id)
+
+    for task in version.tasks[:]:
+        if task.state in _UNFINISHED_STATES:
+            previous = task.state
+            task.state = TaskState.REFINED
+            task.blocked_reason = None
+            events.log(session, actor, "task", task.id, "unplanned",
+                       {"from": previous.name, "to": TaskState.REFINED.name, "version": version.ref})
+        task.version_id = None
+        version.tasks.remove(task)
+
+    events.log(session, actor, "version", version.id, "deleted",
+               {"project": version.project.key, "number": version.number, "title": version.title})
+    session.delete(version)
+    session.commit()
+
 
 def _get_editable_criterion(session : Session, criterion_id : int) -> DefinitionOfDoneCriterion:
     """Look up a criterion whose version still accepts changes.

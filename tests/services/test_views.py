@@ -357,6 +357,27 @@ def test_dashboard_progress_ignores_cancelled_tasks(session):
     assert (progress.done, progress.total) == (1, 1)
 
 
+
+def test_version_progress_measures_any_version_in_the_given_order(session):
+    """Version progress works for versions whatever their status, keeping their order
+    Given a planned version with a done task and a checked criterion, and an empty planned version
+    When measuring both, the empty one first, then measuring nothing
+    Then each gets its own counts in the order given, and nothing gives an empty list
+    """
+    projects.create(session, "nexus", "Nexus", "")
+    busy = versions.create(session, "nexus", "0.1.0", "Busy", ["Ships", "Docs"])
+    empty = versions.create(session, "nexus", "0.2.0", "Empty", ["Ships"])
+    finished = _refined_task(session, "Finished", busy)
+    _refined_task(session, "Pending", busy)
+    tasks.start(session, finished.id)
+    tasks.complete(session, finished.id)
+    versions.set_criterion_done(session, busy.definition_of_done[0].id, True)
+
+    result = views.version_progress(session, [empty, busy])
+    assert [(p.version.id, p.done, p.total, p.dod_done, p.dod_total) for p in result] == [
+        (empty.id, 0, 0, 0, 1), (busy.id, 1, 2, 1, 2)]
+    assert views.version_progress(session, []) == []
+
 # List tasks ---------------------------------------------------------------------------------------
 
 @pytest.fixture

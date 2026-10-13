@@ -121,6 +121,13 @@
 </form>
 {% endif %}
 
+<form method="post" action="{{ url_for('pages.version_delete', key=version.project.key, number=version.number) }}">
+    <p>Type <strong>{{ version.number }}</strong> to confirm deletion. Unfinished tasks go back to refined.</p>
+    <input type="text" id="delete-confirm-input" aria-label="Version number"
+           oninput="document.getElementById('delete-button').disabled = this.value !== {{ version.number | tojson | forceescape }};">
+    <button id="delete-button" type="submit" disabled>Delete version</button>
+</form>
+
 <h2>Changelog</h2>
 {% with event_items = changelog, show_entity = true %}
 {% include "_event_list.html" %}

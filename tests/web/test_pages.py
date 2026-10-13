@@ -30,6 +30,116 @@ def test_create_project_then_view_it(client):
     assert b"Nexus" in response.data
 
 
+def test_project_detail_lists_versions_with_status_and_progress(client):
+    """
+    Given a project with a released version and a planned one holding a task and a checked criterion
+    When opening the project page
+    Then both versions are listed in order, with their status, task and DOD progress, and link to their page
+    """
+    from src.services import projects, tasks, versions
+    session = client.application.extensions["db_session"]()
+    projects.create(session, "nx", "Nexus", "")
+    old = versions.create(session, "nx", "1", "Old", ["Ships"])
+    versions.start(session, old.id)
+    versions.set_criterion_done(session, old.definition_of_done[0].id, True)
+    versions.release(session, old.id)
+    new = versions.create(session, "nx", "2", "New", ["Ships", "Docs"])
+    tasks.create_in_version(session, new.id, "Work")
+    versions.set_criterion_done(session, new.definition_of_done[0].id, True)
+
+    html = client.get("/projects/nx").get_data(as_text=True)
+    assert html.index("1 — Old") < html.index("2 — New")
+    assert "RELEASED" in html and "PLANNED" in html
+    assert "0/1 done" in html and "DOD 1/2" in html and "DOD 1/1" in html
+    assert 'href="/projects/nx/versions/2"' in html
+
+
+def test_project_detail_without_versions_says_so(client):
+    """
+    Given a project with no version
+    When opening its page
+    Then it says there is none and still links to the versions page
+    """
+    client.post("/projects", data={"key": "nx", "name": "Nexus"})
+    html = client.get("/projects/nx").get_data(as_text=True)
+    assert "No versions yet." in html and 'href="/projects/nx/versions"' in html
+
+
+def test_projects_list_shows_unreleased_versions_with_progress(client):
+    """
+    Given a project with a released, an in-progress and a planned version, and a project with none
+    When opening the projects list
+    Then only the unreleased versions are shown under their project, with status and progress
+    """
+    from src.services import projects, tasks, versions
+    session = client.application.extensions["db_session"]()
+    projects.create(session, "nx", "Nexus", "")
+    projects.create(session, "em", "Empty", "")
+    old = versions.create(session, "nx", "1", "Old", ["Ships"])
+    versions.start(session, old.id)
+    versions.set_criterion_done(session, old.definition_of_done[0].id, True)
+    versions.release(session, old.id)
+    current = versions.create(session, "nx", "2", "Current", ["Ships", "Docs"])
+    versions.start(session, current.id)
+    tasks.create_in_version(session, current.id, "Work")
+    versions.create(session, "nx", "3", "Next", ["Ships"])
+
+    html = client.get("/projects").get_data(as_text=True)
+    assert "1 — Old" not in html
+    assert html.index("2 — Current") < html.index("3 — Next") < html.index("Empty")
+    assert "IN_PROGRESS" in html and "0/1 done" in html and "DOD 0/2" in html
+    assert 'href="/projects/nx/versions/3"' in html
+
+
+def test_version_page_has_a_delete_form_locked_until_the_number_is_typed(client):
+    """
+    Given a version
+    When opening its page
+    Then it has a disabled delete button, posting to the delete route, unlocked by typing the number
+    """
+    from src.services import projects, versions
+    session = client.application.extensions["db_session"]()
+    projects.create(session, "nx", "Nexus", "")
+    versions.create(session, "nx", "1.0", "First", ["Ships"])
+
+    html = client.get("/projects/nx/versions/1.0").get_data(as_text=True)
+    assert 'action="/projects/nx/versions/1.0/delete"' in html
+    assert '<button id="delete-button" type="submit" disabled>Delete version</button>' in html
+    assert "this.value !== &#34;1.0&#34;" in html
+
+
+def test_delete_version_keeps_its_tasks_and_returns_to_the_project(client):
+    """
+    Given a version with a planned task
+    When posting to its delete route
+    Then it redirects to the project page, the version is gone and the task is back to refined
+    """
+    from src.models.task import Task, TaskState
+    from src.services import projects, tasks, versions
+    session = client.application.extensions["db_session"]()
+    projects.create(session, "nx", "Nexus", "")
+    version = versions.create(session, "nx", "1.0", "First", ["Ships"])
+    task_id = tasks.create_in_version(session, version.id, "Work").id
+
+    response = client.post("/projects/nx/versions/1.0/delete")
+    assert response.status_code == 302 and response.headers["Location"].endswith("/projects/nx")
+    assert client.get("/projects/nx/versions/1.0").status_code == 404
+    assert "No versions yet." in client.get("/projects/nx").get_data(as_text=True)
+    task = client.application.extensions["db_session"]().get(Task, task_id)
+    assert (task.state, task.version_id) == (TaskState.REFINED, None)
+
+
+def test_delete_missing_version_returns_404_and_get_is_not_allowed(client):
+    """
+    Given a project without that version
+    When posting to the delete route of an unknown version, or getting it
+    Then it is 404, and 405 for GET
+    """
+    client.post("/projects", data={"key": "nx", "name": "Nexus"})
+    assert client.post("/projects/nx/versions/9/delete").status_code == 404
+    assert client.get("/projects/nx/versions/9/delete").status_code == 405
+
+
 def test_project_detail_missing_returns_404(client):
     """A project detail page for an unknown key returns 404."""
     response = client.get("/projects/does-not-exist")

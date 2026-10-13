@@ -103,7 +103,7 @@ claude mcp add --transport http nexus http://127.0.0.1:8765/mcp
 ```
 
 Read-only tools can be auto-allowed; write tools prompt for approval, and
-their events are logged with actor `mcp`. Deleting tasks or projects and
+their events are logged with actor `mcp`. Deleting tasks, versions or projects and
 archiving stay in the web UI. Security: the endpoint has no authentication and relies on the
 loopback binding plus a Host/Origin/Content-Type check; it is unavailable
 while the service is down. Tools and rules: `docs/functional/mcp.md`.
