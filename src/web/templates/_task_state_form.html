@@ -1,12 +1,12 @@
 {% set next_states = {"PLANNED": ["DOING", "CANCELLED"], "DOING": ["WAITING", "DONE", "CANCELLED"], "WAITING": ["DOING", "CANCELLED"], "DONE": ["DOING"]}[task.state.name] %}
 {% if next_states %}
-<form method="post" action="{{ state_action }}" style="display: inline;">
+<form class="form-inline state-form" method="post" action="{{ state_action }}">
     <select name="state" aria-label="State">
         {% for name in next_states %}
         <option value="{{ name }}">{{ name }}</option>
         {% endfor %}
     </select>
+    <button type="submit">Move</button>
     <input type="text" name="reason" placeholder="Reason (waiting)" aria-label="Reason (waiting)">
-    <button type="submit">Change state</button>
 </form>
 {% endif %}

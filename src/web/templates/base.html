@@ -2,36 +2,41 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}Nexus{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+    <script src="{{ url_for('static', filename='app.js') }}" defer></script>
 </head>
 <body>
-<nav>
-    <a href="{{ url_for('pages.home') }}">Dashboard</a>
-    | <a href="{{ url_for('pages.projects_list') }}">Projects</a>
-    | <a href="{{ url_for('pages.tasks_list') }}">Tasks</a>
-    | <a href="{{ url_for('pages.inbox') }}">Inbox</a>
-    | <a href="{{ url_for('pages.refine') }}">Refine</a>
-    | <a href="{{ url_for('pages.search') }}">Search</a>
-    | <a href="{{ url_for('pages.export_json') }}">Export</a>
-</nav>
+<a class="skip-link" href="#content">Skip to content</a>
+{# Main sections: (label, endpoint, path prefix marking the section as current). #}
+{% set sections = [
+    ("Dashboard", "pages.home", none),
+    ("Projects", "pages.projects_list", "/projects"),
+    ("Tasks", "pages.tasks_list", "/tasks"),
+    ("Inbox", "pages.inbox", "/inbox"),
+    ("Refine", "pages.refine", "/refine"),
+    ("Search", "pages.search", "/search"),
+] %}
+<header class="app-header">
+    <a class="app-brand" href="{{ url_for('pages.home') }}">Nexus</a>
+    <nav class="app-nav" aria-label="Main">
+        {% for label, endpoint, prefix in sections %}
+        {% set current = request.path.startswith(prefix) if prefix else request.path == "/" %}
+        <a href="{{ url_for(endpoint) }}"{% if current %} aria-current="page"{% endif %}>{{ label }}</a>
+        {% endfor %}
+        <a href="{{ url_for('pages.export_json') }}">Export</a>
+    </nav>
+    <form class="capture" method="post" action="{{ url_for('pages.capture') }}">
+        <input type="hidden" name="next" value="{{ request.path }}">
+        <input type="text" name="title" id="capture" placeholder="Capture a task (press c)"
+               aria-label="Capture a task" required>
+        <button class="button-primary" type="submit">Capture</button>
+    </form>
+</header>
 
-<form method="post" action="{{ url_for('pages.capture') }}">
-    <input type="hidden" name="next" value="{{ request.path }}">
-    <input type="text" name="title" id="capture" placeholder="Capture a task (press c)" required>
-    <button type="submit">Capture</button>
-</form>
-
+<main class="container" id="content" tabindex="-1">
 {% block content %}{% endblock %}
-
-<script>
-document.addEventListener("keydown", function (event) {
-    var target = event.target;
-    var typing = target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable;
-    if (!typing && event.key === "c") {
-        event.preventDefault();
-        document.getElementById("capture").focus();
-    }
-});
-</script>
+</main>
 </body>
 </html>

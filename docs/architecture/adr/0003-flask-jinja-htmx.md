@@ -14,6 +14,9 @@ Accepted
 Flask as the server, Jinja for templates, HTMX for interactivity,
 SQLAlchemy for persistence, Alembic for migrations, SQLite as the engine.
 
+Styling and client-side behaviour, and the fact that HTMX is not used so
+far: see [0012](0012-plain-static-css-and-js.md).
+
 ## Why
 
 HTMX gives the expected responsiveness (check a task, move a task to a

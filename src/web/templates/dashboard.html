@@ -1,48 +1,49 @@
 {% extends "base.html" %}
+{% import "_components.html" as ui %}
 
 {% block title %}Dashboard — Nexus{% endblock %}
 
 {% block content %}
-<h1>Dashboard</h1>
+{{ ui.page_header("Dashboard") }}
 
-<p>
-    <a href="{{ url_for('pages.inbox') }}">Inbox: {{ dashboard.inbox_count }}</a>
-    | <a href="{{ url_for('pages.refine') }}">To refine: {{ dashboard.refine_count }}</a>
-</p>
+<div class="stats">
+    {{ ui.stat(dashboard.inbox_count, "Inbox", url_for('pages.inbox')) }}
+    {{ ui.stat(dashboard.refine_count, "To refine", url_for('pages.refine')) }}
+</div>
 
 <h2>Versions in progress</h2>
-<ul>
+{% if dashboard.versions %}
+<div class="cards">
     {% for progress in dashboard.versions %}
-    <li>
-        <a href="{{ url_for('pages.version_detail', key=progress.version.project.key, number=progress.version.number) }}">{{ progress.version.project.name }} {{ progress.version.number }} — {{ progress.version.title }}</a>
-        {% include "_version_progress.html" %}
-    </li>
-    {% else %}
-    <li>No version in progress.</li>
+    {{ ui.version_card(progress) }}
     {% endfor %}
-</ul>
+</div>
+{% else %}
+<p class="empty">No version in progress.</p>
+{% endif %}
 
 <h2>Doing</h2>
-<ul>
+<ul class="list">
     {% for task in dashboard.doing %}
     <li>
-        <a href="{{ url_for('pages.task_detail', task_id=task.id) }}">{{ task.title }}</a>
-        {% if task.version %}— {{ task.version.number }}{% endif %}
+        {{ ui.task_link(task) }}
+        {{ ui.task_place(task) }}
     </li>
     {% else %}
-    <li>Nothing in progress.</li>
+    {{ ui.empty("Nothing in progress.") }}
     {% endfor %}
 </ul>
 
 <h2>Waiting</h2>
-<ul>
+<ul class="list">
     {% for task in dashboard.waiting %}
     <li>
-        <a href="{{ url_for('pages.task_detail', task_id=task.id) }}">{{ task.title }}</a>
-        — {{ task.blocked_reason }}
+        {{ ui.task_link(task) }}
+        {{ ui.task_place(task) }}
+        <span class="blocked-reason">{{ task.blocked_reason }}</span>
     </li>
     {% else %}
-    <li>Nothing blocked.</li>
+    {{ ui.empty("Nothing blocked.") }}
     {% endfor %}
 </ul>
 {% endblock %}

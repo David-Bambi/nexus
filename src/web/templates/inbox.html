@@ -1,33 +1,36 @@
 {% extends "base.html" %}
+{% import "_components.html" as ui %}
 
 {% block title %}Inbox — Nexus{% endblock %}
 
 {% block content %}
-<h1>Inbox</h1>
+{{ ui.page_header("Inbox") }}
 
-{% if error %}
-<p style="color: red;">{{ error }}</p>
-{% endif %}
+{{ ui.error_message(error) }}
 
 {% if task %}
-<h2>{{ task.title }}</h2>
-{% if task.body %}
-<p>{{ task.body }}</p>
-{% endif %}
+<article class="card inbox-card">
+    <p class="card-kicker">Oldest captured task {{ ui.ref_chip(task.ref) }}</p>
+    <h2 class="card-title">{{ task.title }}</h2>
+    {% if task.body %}
+    <p>{{ task.body }}</p>
+    {% endif %}
 
-<h3>Refine</h3>
-{% with clarify_action = url_for('pages.inbox_clarify', task_id=task.id), clarify_label = "Refine" %}
-{% include "_clarify_form.html" %}
-{% endwith %}
+    <h3>Refine</h3>
+    {% with clarify_action = url_for('pages.inbox_clarify', task_id=task.id), clarify_label = "Refine" %}
+    {% include "_clarify_form.html" %}
+    {% endwith %}
 
-<form method="post" action="{{ url_for('pages.inbox_defer', task_id=task.id) }}">
-    <button type="submit">Someday</button>
-</form>
-
-<form method="post" action="{{ url_for('pages.inbox_delete', task_id=task.id) }}">
-    <button type="submit">Delete</button>
-</form>
+    <div class="toolbar">
+        <form method="post" action="{{ url_for('pages.inbox_defer', task_id=task.id) }}">
+            <button type="submit">Someday</button>
+        </form>
+        <form method="post" action="{{ url_for('pages.inbox_delete', task_id=task.id) }}">
+            <button class="button-danger" type="submit">Delete</button>
+        </form>
+    </div>
+</article>
 {% else %}
-<p>Inbox is empty.</p>
+<p class="empty">Inbox is empty.</p>
 {% endif %}
 {% endblock %}

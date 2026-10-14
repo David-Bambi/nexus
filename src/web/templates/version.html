@@ -1,49 +1,84 @@
 {% extends "base.html" %}
+{% import "_components.html" as ui %}
 
 {% block title %}{{ version.number }} — {{ version.title }} — Nexus{% endblock %}
 
 {% block content %}
-<p><a href="{{ url_for('pages.versions_list', key=version.project.key) }}">← Versions</a></p>
-
-<h1>{{ version.number }} — {{ version.title }}</h1>
-<p><strong>Ref:</strong> <code>{{ version.ref }}</code></p>
-<p><strong>Status:</strong> {{ version.status.name }}</p>
-{% if version.goal %}
-<p>{{ version.goal }}</p>
-{% endif %}
-{% if version.target_date %}
-<p><strong>Target date:</strong> {{ version.target_date }}</p>
-{% endif %}
-
+{% set key = version.project.key %}
 {% set editable = version.status.name != "RELEASED" %}
-{% set page_url = url_for('pages.version_detail', key=version.project.key, number=version.number) %}
+{% set page_url = url_for('pages.version_detail', key=key, number=version.number) %}
+
+{{ ui.page_header(version.number ~ " — " ~ version.title, url_for('pages.project_detail', key=key), version.project.name) }}
+
+<p class="meta">
+    {{ ui.ref_chip(version.ref) }}
+    {{ ui.badge(version.status.name) }}
+    {% if version.target_date %}<span>Target date: {{ version.target_date }}</span>{% endif %}
+</p>
+{% if version.goal %}
+<p class="lead">{{ version.goal }}</p>
+{% endif %}
+
+{{ ui.error_message(error) }}
+
+{% if version.status.name in ("PLANNED", "IN_PROGRESS") %}
+<div class="toolbar">
+    {% if version.status.name == "PLANNED" %}
+    <form method="post" action="{{ url_for('pages.version_start', key=key, number=version.number) }}">
+        <button class="button-primary" type="submit">Start</button>
+    </form>
+    {% else %}
+    <form method="post" action="{{ url_for('pages.version_release', key=key, number=version.number) }}">
+        <button class="button-primary" type="submit">Release</button>
+    </form>
+    {% endif %}
+</div>
+{% endif %}
+
 <h2>Tasks</h2>
 {% set tasks_done = tasks | selectattr("state.name", "equalto", "DONE") | list | length %}
 {% set tasks_total = tasks | rejectattr("state.name", "equalto", "CANCELLED") | list | length %}
-<p>{{ tasks_done }}/{{ tasks_total }} done
+<p class="progress">{{ tasks_done }}/{{ tasks_total }} done
     <progress value="{{ tasks_done }}" max="{{ tasks_total or 1 }}"></progress>
 </p>
-{% set task_url = url_for('pages.version_task_add', key=version.project.key, number=version.number) %}
-<ul>
-    {% for task in tasks %}
-        <li><code>{{ task.ref }}</code> <a href="{{ url_for('pages.task_detail', task_id=task.id, next=page_url)}}">
-        {{ task.title }}</a> - {{ task.state.name }}
-        {% if editable %}
-        {% with state_action = url_for('pages.version_task_state', key=version.project.key, number=version.number, task_id=task.id) %}
-        {% include "_task_state_form.html" %}
-        {% endwith %}
-        {% endif %}
-        </li>
+
+{# One column per state; Cancelled only when it holds something. #}
+{% set columns = ["PLANNED", "DOING", "WAITING", "DONE"] %}
+{% if tasks | selectattr("state.name", "equalto", "CANCELLED") | list %}{% set columns = columns + ["CANCELLED"] %}{% endif %}
+<div class="board">
+    {% for state in columns %}
+    {% set column_tasks = tasks | selectattr("state.name", "equalto", state) | list %}
+    <section class="board-column" data-state="{{ state }}">
+        <h3>{{ ui.badge(state) }} <span class="count">{{ column_tasks | length }}</span></h3>
+        {% for task in column_tasks %}
+        <article class="board-card">
+            <div class="board-card-head">
+                {{ ui.ref_chip(task.ref) }}
+                {% if task.size %}<span class="size">{{ task.size }}</span>{% endif %}
+            </div>
+            {{ ui.task_link(task, next=page_url) }}
+            {% if task.state.name == "WAITING" and task.blocked_reason %}
+            <p class="blocked-reason">{{ task.blocked_reason }}</p>
+            {% endif %}
+            {% if editable %}
+            {% with state_action = url_for('pages.version_task_state', key=key, number=version.number, task_id=task.id) %}
+            {% include "_task_state_form.html" %}
+            {% endwith %}
+            {% endif %}
+        </article>
         {% else %}
-        <li>No tasks yet.</li>
+        <p class="empty">No tasks.</p>
+        {% endfor %}
+    </section>
     {% endfor %}
-</ul>
+</div>
+
 {% if editable %}
-<form method="post" action="{{ task_url }}">
-    <input type="text" name="title" aria-label="New task" required>
-    <input type="text" name="body" aria-label="Body">
-    <input type="text" name="context" aria-label="Context">
-    <select name="size">
+<form class="form-inline" method="post" action="{{ url_for('pages.version_task_add', key=key, number=version.number) }}">
+    <input type="text" name="title" placeholder="New task" aria-label="New task" required>
+    <input type="text" name="body" placeholder="Body" aria-label="Body">
+    <input type="text" name="context" placeholder="Context" aria-label="Context">
+    <select name="size" aria-label="Size">
         <option value="XS">XS</option>
         <option value="S">S</option>
         <option value="M">M</option>
@@ -51,23 +86,21 @@
     </select>
     <button type="submit">Add task</button>
 </form>
-{% endif %}
 
-{% if editable %}
 <h2>Candidate tasks</h2>
-<p>Refined tasks of {{ version.project.name }} not yet in a version.</p>
-<ul>
+<p class="hint">Refined tasks of {{ version.project.name }} not yet in a version.</p>
+<ul class="list">
     {% for task in candidates %}
     <li>
-        <a href="{{ url_for('pages.task_detail', task_id=task.id, next=page_url) }}">{{ task.title }}</a>
-        {% if task.context %}{{ task.context }}{% endif %}
-        {% if task.size %}[{{ task.size }}]{% endif %}
-        <form method="post" action="{{ url_for('pages.version_task_plan', key=version.project.key, number=version.number, task_id=task.id) }}" style="display: inline;">
-            <button type="submit" aria-label="Add to version">+</button>
+        <form method="post" action="{{ url_for('pages.version_task_plan', key=key, number=version.number, task_id=task.id) }}" class="form-inline">
+            <button class="button-primary" type="submit" aria-label="Add to version">+</button>
         </form>
+        {{ ui.task_link(task, next=page_url) }}
+        {% if task.context %}<span class="hint">{{ task.context }}</span>{% endif %}
+        {% if task.size %}<span class="size">{{ task.size }}</span>{% endif %}
     </li>
     {% else %}
-    <li>No candidate tasks.</li>
+    {{ ui.empty("No candidate tasks.") }}
     {% endfor %}
 </ul>
 {% endif %}
@@ -75,24 +108,24 @@
 <h2>Definition of done</h2>
 {% set dod_done = version.definition_of_done | selectattr("done") | list | length %}
 {% set dod_total = version.definition_of_done | length %}
-<p>{{ dod_done }}/{{ dod_total }} checked
+<p class="progress">{{ dod_done }}/{{ dod_total }} checked
     <progress value="{{ dod_done }}" max="{{ dod_total or 1 }}"></progress>
 </p>
-{% set dod_url = url_for('pages.version_dod_add', key=version.project.key, number=version.number) %}
-<ul>
+{% set dod_url = url_for('pages.version_dod_add', key=key, number=version.number) %}
+<ul class="list checklist">
     {% for criterion in version.definition_of_done %}
-    <li>
+    <li{% if criterion.done %} class="checked"{% endif %}>
         {% if editable %}
-        <form method="post" action="{{ dod_url }}/{{ criterion.id }}/toggle" style="display: inline;">
-            <input type="checkbox" aria-label="Done" {% if criterion.done %}checked{% endif %} onchange="this.form.submit()">
+        <form class="form-inline" method="post" action="{{ dod_url }}/{{ criterion.id }}/toggle">
+            <input type="checkbox" aria-label="Done" {% if criterion.done %}checked{% endif %} data-autosubmit>
             <noscript><button type="submit">Toggle</button></noscript>
         </form>
-        <form method="post" action="{{ dod_url }}/{{ criterion.id }}/edit" style="display: inline;">
+        <form class="form-inline grow" method="post" action="{{ dod_url }}/{{ criterion.id }}/edit">
             <input type="text" name="description" value="{{ criterion.description }}" aria-label="Description" required>
             <button type="submit">Save</button>
         </form>
-        <form method="post" action="{{ dod_url }}/{{ criterion.id }}/delete" style="display: inline;">
-            <button type="submit">Delete</button>
+        <form class="form-inline" method="post" action="{{ dod_url }}/{{ criterion.id }}/delete">
+            <button class="button-danger" type="submit">Delete</button>
         </form>
         {% else %}
         {% if criterion.done %}☑{% else %}☐{% endif %} {{ criterion.description }}
@@ -101,35 +134,23 @@
     {% endfor %}
 </ul>
 {% if editable %}
-<form method="post" action="{{ dod_url }}">
-    <input type="text" name="description" aria-label="New criterion" required>
+<form class="form-inline" method="post" action="{{ dod_url }}">
+    <input type="text" name="description" placeholder="New criterion" aria-label="New criterion" required>
     <button type="submit">Add criterion</button>
 </form>
 {% endif %}
 
-{% if error %}
-<p style="color: red;">{{ error }}</p>
-{% endif %}
-
-{% if version.status.name == "PLANNED" %}
-<form method="post" action="{{ url_for('pages.version_start', key=version.project.key, number=version.number) }}">
-    <button type="submit">Start</button>
-</form>
-{% elif version.status.name == "IN_PROGRESS" %}
-<form method="post" action="{{ url_for('pages.version_release', key=version.project.key, number=version.number) }}">
-    <button type="submit">Release</button>
-</form>
-{% endif %}
-
-<form method="post" action="{{ url_for('pages.version_delete', key=version.project.key, number=version.number) }}">
-    <p>Type <strong>{{ version.number }}</strong> to confirm deletion. Unfinished tasks go back to refined.</p>
-    <input type="text" id="delete-confirm-input" aria-label="Version number"
-           oninput="document.getElementById('delete-button').disabled = this.value !== {{ version.number | tojson | forceescape }};">
-    <button id="delete-button" type="submit" disabled>Delete version</button>
-</form>
-
 <h2>Changelog</h2>
-{% with event_items = changelog, show_entity = true %}
-{% include "_event_list.html" %}
-{% endwith %}
+{{ ui.event_list(changelog, show_entity=true) }}
+
+<section class="danger-zone">
+    <h2>Delete this version</h2>
+    <form method="post" action="{{ url_for('pages.version_delete', key=key, number=version.number) }}">
+        <p>Type <strong>{{ version.number }}</strong> to confirm deletion. Unfinished tasks go back to refined.</p>
+        <div class="form-inline">
+            <input type="text" aria-label="Version number" data-confirm="{{ version.number }}">
+            <button class="button-danger" type="submit" disabled>Delete version</button>
+        </div>
+    </form>
+</section>
 {% endblock %}

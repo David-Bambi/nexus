@@ -1,75 +1,41 @@
 {% extends "base.html" %}
+{% import "_components.html" as ui %}
 
 {% block title %}Versions — {{ project.name }} — Nexus{% endblock %}
 
 {% block content %}
-<p><a href="{{ url_for('pages.project_detail', key=project.key) }}">← {{ project.name }}</a></p>
+{{ ui.page_header("Versions", url_for('pages.project_detail', key=project.key), project.name) }}
 
-<h1>Versions</h1>
+{{ ui.error_message(error) }}
 
-{% if error %}
-<p style="color: red;">{{ error }}</p>
-{% endif %}
-
-<ul>
+<ul class="list">
     {% for version in versions %}
     <li>
         <a href="{{ url_for('pages.version_detail', key=project.key, number=version.number) }}">{{ version.number }} — {{ version.title }}</a>
-        <code>{{ version.ref }}</code> — {{ version.status.name }}
+        {{ ui.ref_chip(version.ref) }} {{ ui.badge(version.status.name) }}
     </li>
     {% else %}
-    <li>No versions yet.</li>
+    {{ ui.empty("No versions yet.") }}
     {% endfor %}
 </ul>
 
 <h2>New version</h2>
-<form method="post" action="{{ url_for('pages.versions_list', key=project.key) }}">
-    <label>Number <input type="text" name="number" required></label><br>
-    <label>Title <input type="text" name="title" required></label><br>
-    <label>Goal <textarea name="goal"></textarea></label><br>
-    <label>Target date <input type="date" name="target_date"></label><br>
-    <fieldset>
-        <legend>Definition of done</legend>
-        <div id="dod-rows">
-            <div class="dod-row">
+<form class="form-stacked" method="post" action="{{ url_for('pages.versions_list', key=project.key) }}">
+    {{ ui.field("Number", "number", required=true) }}
+    {{ ui.field("Title", "title", required=true) }}
+    {{ ui.field("Goal", "goal", kind="textarea") }}
+    {{ ui.field("Target date", "target_date", kind="date") }}
+    <fieldset class="field">
+        <legend class="field-label">Definition of done</legend>
+        <div id="dod-rows" class="dod-rows">
+            <div class="dod-row form-inline">
                 <input type="text" name="dod" aria-label="Criterion" required>
                 <button type="button" class="dod-remove">Remove</button>
             </div>
         </div>
         <button type="button" id="dod-add">Add criterion</button>
     </fieldset>
-    <button type="submit">Create</button>
+    <div class="form-actions"><button class="button-primary" type="submit">Create</button></div>
 </form>
 
-<script>
-(function () {
-    var rows = document.getElementById("dod-rows");
-    var template = rows.firstElementChild.cloneNode(true);
-
-    // Append an empty criterion row and focus it.
-    function addRow() {
-        var row = template.cloneNode(true);
-        row.querySelector("input").value = "";
-        rows.appendChild(row);
-        row.querySelector("input").focus();
-    }
-
-    document.getElementById("dod-add").addEventListener("click", addRow);
-
-    // Remove a row, always keeping at least one.
-    rows.addEventListener("click", function (event) {
-        if (event.target.classList.contains("dod-remove") && rows.children.length > 1) {
-            event.target.closest(".dod-row").remove();
-        }
-    });
-
-    // Enter adds a row instead of submitting the form.
-    rows.addEventListener("keydown", function (event) {
-        if (event.key === "Enter" && event.target.name === "dod") {
-            event.preventDefault();
-            addRow();
-        }
-    });
-})();
-</script>
 {% endblock %}

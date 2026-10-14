@@ -9,6 +9,34 @@ def test_home_page_returns_200(client):
     assert response.status_code == 200
 
 
+def test_pages_load_the_stylesheet_which_is_served(client):
+    """
+    Given the app
+    When opening a page, then fetching its stylesheet
+    Then the page links /static/app.css with a viewport meta, and the file is served as CSS with the tokens
+    """
+    html = client.get("/").get_data(as_text=True)
+    assert '<link rel="stylesheet" href="/static/app.css">' in html
+    assert '<meta name="viewport"' in html
+    response = client.get("/static/app.css")
+    assert response.status_code == 200 and response.mimetype == "text/css"
+    assert b"--color-accent" in response.data and b"prefers-color-scheme: dark" in response.data
+    response.close()
+
+
+def test_pages_load_the_shared_script_instead_of_inlining_it(client):
+    """
+    Given the app
+    When opening a page, then fetching its script
+    Then the page loads /static/app.js deferred with no inline shortcut code, and the file holds the capture shortcut
+    """
+    html = client.get("/").get_data(as_text=True)
+    assert '<script src="/static/app.js" defer></script>' in html and "keydown" not in html
+    response = client.get("/static/app.js")
+    assert response.status_code == 200 and b'getElementById("capture")' in response.data
+    response.close()
+
+
 def test_projects_list_returns_200(client):
     """The projects list page responds successfully."""
     response = client.get("/projects")
@@ -104,8 +132,8 @@ def test_version_page_has_a_delete_form_locked_until_the_number_is_typed(client)
 
     html = client.get("/projects/nx/versions/1.0").get_data(as_text=True)
     assert 'action="/projects/nx/versions/1.0/delete"' in html
-    assert '<button id="delete-button" type="submit" disabled>Delete version</button>' in html
-    assert "this.value !== &#34;1.0&#34;" in html
+    assert '<input type="text" aria-label="Version number" data-confirm="1.0">' in html
+    assert '<button class="button-danger" type="submit" disabled>Delete version</button>' in html
 
 
 def test_delete_version_keeps_its_tasks_and_returns_to_the_project(client):
@@ -427,7 +455,9 @@ def test_dashboard_shows_work_in_progress(client):
     assert b"0/2 done" in response.data
     assert b"Write the docs" in response.data
     assert b"Waiting for review" in response.data
-    assert b"Inbox: 1" in response.data
+    html = response.get_data(as_text=True)
+    assert re.search(r'href="/inbox">\s*<span class="stat-value">1</span>\s*<span class="stat-label">Inbox</span>', html)
+    assert '<article class="card">' in html and 'href="/projects/nexus/versions/0.1.0">0.1.0</a>' in html
 
 
 def test_dashboard_counters_link_to_queues(client):
@@ -485,6 +515,45 @@ def test_export_json_is_an_attachment_with_all_tables(client):
     assert [p["key"] for p in data["projects"]] == ["nexus"]
     assert [t["title"] for t in data["tasks"]] == ["Write the docs"]
     assert data["events"]
+
+
+@pytest.mark.parametrize("path,current", [
+    ("/", "Dashboard"), ("/projects", "Projects"), ("/projects/nx/versions", "Projects"),
+    ("/tasks", "Tasks"), ("/inbox", "Inbox"), ("/refine", "Refine"), ("/search", "Search"),
+])
+def test_nav_marks_the_current_section(client, path, current):
+    """
+    Given a project
+    When opening a page of each section, a nested project page included
+    Then exactly one nav item, the section's, is marked as the current page, and the content is in <main>
+    """
+    client.post("/projects", data={"key": "nx", "name": "Nexus"})
+    html = client.get(path).get_data(as_text=True)
+    marked = re.findall(r'<a href="[^"]*" aria-current="page">([^<]+)</a>', html)
+    assert marked == [current]
+    assert '<main class="container" id="content"' in html
+
+
+def test_pages_start_with_a_skip_link_to_the_content(client):
+    """
+    Given any page
+    When reading it
+    Then its first link skips to the main content, which can receive focus
+    """
+    html = client.get("/").get_data(as_text=True)
+    body = html.split("<body>")[1]
+    assert body.lstrip().startswith('<a class="skip-link" href="#content">Skip to content</a>')
+    assert '<main class="container" id="content" tabindex="-1">' in html
+
+
+def test_capture_shortcut_ignores_modifier_keys(client):
+    """
+    Given the shared script
+    When reading the capture shortcut
+    Then it skips key presses made with Ctrl, Cmd or Alt, so Ctrl+C still copies
+    """
+    script = client.get("/static/app.js").get_data(as_text=True)
+    assert "event.ctrlKey || event.metaKey || event.altKey" in script and "!modified" in script
 
 
 def test_nav_links_to_dashboard_and_export(client):
@@ -743,13 +812,13 @@ def test_task_state_select_moves_task(client):
     response = client.get("/tasks/1")
     assert b'name="state"' in response.data
     response = client.post("/tasks/1/state", data={"state": "DOING"})
-    assert b"<strong>State:</strong> DOING" in response.data
+    assert _shown_field(response, "state") == "DOING"
     response = client.post("/tasks/1/state", data={"state": "WAITING", "reason": "Review"})
-    assert b"<strong>State:</strong> WAITING" in response.data
+    assert _shown_field(response, "state") == "WAITING"
     assert b"Review" in response.data
     response = client.post("/tasks/1/state", data={"state": "DOING"})
     response = client.post("/tasks/1/state", data={"state": "DONE"})
-    assert b"<strong>State:</strong> DONE" in response.data
+    assert _shown_field(response, "state") == "DONE"
 
 
 @pytest.mark.parametrize("data, message", [
@@ -763,7 +832,7 @@ def test_task_state_invalid_shows_error(client, data, message):
     response = client.post("/tasks/1/state", data=data)
     assert response.status_code == 200
     assert message in response.data
-    assert b"<strong>State:</strong> PLANNED" in response.data
+    assert _shown_field(response, "state") == "PLANNED"
 
 
 def test_task_state_select_absent_for_inbox_task(client):
@@ -788,10 +857,11 @@ def test_version_task_state_select_moves_task(client):
     response = client.post("/projects/nexus/versions/0.1.0/task/1/state", data={"state": "DOING"})
     assert response.status_code == 200
     assert b"<h2>Tasks</h2>" in response.data
-    assert b"Write the docs</a> - DOING" in response.data
+    assert "Write the docs" in _board_column(response, "DOING")
     response = client.post(
         "/projects/nexus/versions/0.1.0/task/1/state", data={"state": "WAITING", "reason": "Review"})
-    assert b"Write the docs</a> - WAITING" in response.data
+    assert "Write the docs" in _board_column(response, "WAITING")
+    assert "Review" in _board_column(response, "WAITING")
 
 
 @pytest.mark.parametrize("data, message", [
@@ -817,7 +887,7 @@ def test_version_task_state_other_version_returns_404(client):
     client.post("/projects/nexus/versions/0.1.0/tasks/", data={"title": "Write the docs"})
     response = client.post("/projects/nexus/versions/0.2.0/task/1/state", data={"state": "DOING"})
     assert response.status_code == 404
-    assert b"<strong>State:</strong> PLANNED" in client.get("/tasks/1").data
+    assert _shown_field(client.get("/tasks/1"), "state") == "PLANNED"
 
 
 def test_version_task_state_released_version_refused(client):
@@ -833,7 +903,7 @@ def test_version_task_state_released_version_refused(client):
     assert b"/task/1/state" not in page.data
     response = client.post("/projects/nexus/versions/0.1.0/task/1/state", data={"state": "DOING"})
     assert b"already released" in response.data
-    assert b"<strong>State:</strong> DONE" in client.get("/tasks/1").data
+    assert _shown_field(client.get("/tasks/1"), "state") == "DONE"
 
 
 def test_version_page_shows_task_progress(client):
@@ -857,11 +927,11 @@ def test_task_cancel_and_restore(client):
     client.post("/projects/nexus/versions/0.1.0/tasks/", data={"title": "Write the docs"})
     assert b'action="/tasks/1/cancel"' in client.get("/tasks/1").data
     response = client.post("/tasks/1/cancel")
-    assert b"<strong>State:</strong> CANCELLED" in response.data
+    assert _shown_field(response, "state") == "CANCELLED"
     assert b'action="/tasks/1/cancel"' not in response.data
     assert b'action="/tasks/1/restore"' in response.data
     response = client.post("/tasks/1/restore")
-    assert b"<strong>State:</strong> REFINED" in response.data
+    assert _shown_field(response, "state") == "REFINED"
 
 
 def test_task_cancel_done_task_shows_error(client):
@@ -872,7 +942,7 @@ def test_task_cancel_done_task_shows_error(client):
     client.post("/tasks/1/state", data={"state": "DONE"})
     response = client.post("/tasks/1/cancel")
     assert b"already done or cancelled" in response.data
-    assert b"<strong>State:</strong> DONE" in response.data
+    assert _shown_field(response, "state") == "DONE"
 
 
 def test_version_page_cancelled_task_leaves_progress_total(client):
@@ -881,9 +951,69 @@ def test_version_page_cancelled_task_leaves_progress_total(client):
     client.post("/projects/nexus/versions/0.1.0/tasks/", data={"title": "First"})
     client.post("/projects/nexus/versions/0.1.0/tasks/", data={"title": "Second"})
     response = client.post("/projects/nexus/versions/0.1.0/task/2/state", data={"state": "CANCELLED"})
-    assert b"First</a> - PLANNED" in response.data
-    assert b"Second</a> - CANCELLED" in response.data
+    assert "First" in _board_column(response, "PLANNED")
+    assert "Second" in _board_column(response, "CANCELLED")
     assert b"0/1 done" in response.data
+
+
+def _shown_field(response, field):
+    """The text of one field of a task page's details panel, tags stripped (e.g. "DOING" for the state)."""
+    page = response.get_data(as_text=True)
+    cell = page.split(f'<dd data-field="{field}">')[1].split("</dd>")[0]
+    return re.sub(r"<[^>]+>", "", cell).strip()
+
+
+def test_refined_task_page_offers_its_project_open_versions_to_plan_into(client):
+    """
+    Given a refined task of a project with a planned and a released version
+    When opening the task page
+    Then the plan form lists only the planned version, and the details panel shows the state and project
+    """
+    _create_version(client, dod="Ships")
+    client.post("/projects/nexus/versions", data={"number": "0.2.0", "title": "Second", "dod": "Ships"})
+    client.post("/projects/nexus/versions/0.1.0/start")
+    client.post("/projects/nexus/versions/0.1.0/dod/1/toggle")
+    client.post("/projects/nexus/versions/0.1.0/release")
+    _refined_task(client, 1, "Write the docs")
+
+    response = client.get("/tasks/1")
+    plan_form = response.get_data(as_text=True).split('action="/tasks/1/plan"')[1].split("</form>")[0]
+    assert "0.2.0 — Second" in plan_form and "0.1.0" not in plan_form
+    assert _shown_field(response, "state") == "REFINED"
+
+
+def _board_column(response, state):
+    """The markup of one state's column on a version page's task board."""
+    page = response.get_data(as_text=True)
+    return page.split(f'<section class="board-column" data-state="{state}">')[1].split("</section>")[0]
+
+
+def test_version_board_shows_cancelled_column_only_when_needed(client):
+    """
+    Given a version with a planned task
+    When opening its page, then after cancelling the task
+    Then the board has Planned, Doing, Waiting and Done columns, and a Cancelled one only once a task is cancelled
+    """
+    _create_version(client)
+    client.post("/projects/nexus/versions/0.1.0/tasks/", data={"title": "First"})
+    page = client.get("/projects/nexus/versions/0.1.0").get_data(as_text=True)
+    assert re.findall(r'data-state="(\w+)"', page) == ["PLANNED", "DOING", "WAITING", "DONE"]
+    client.post("/tasks/1/state", data={"state": "CANCELLED"})
+    page = client.get("/projects/nexus/versions/0.1.0").get_data(as_text=True)
+    assert re.findall(r'data-state="(\w+)"', page)[-1] == "CANCELLED"
+
+
+def test_pages_have_no_inline_script_or_handler():
+    """
+    Given every page template
+    When reading its source
+    Then none holds a <script> block or an inline event handler: behaviour lives in static/app.js
+    """
+    from pathlib import Path
+    templates = Path(__file__).parents[2] / "src" / "web" / "templates"
+    offenders = [t.name for t in templates.glob("*.html")
+                 if re.search(r"<script>|\son(input|change|click|submit)=", t.read_text())]
+    assert offenders == []
 
 
 def _refined_task(client, task_id, title, project_key="nexus"):
@@ -913,7 +1043,7 @@ def test_version_candidate_plus_button_adds_it_to_the_version(client):
     response = client.post("/projects/nexus/versions/0.1.0/task/1/plan")
     assert response.status_code == 200
     page = response.get_data(as_text=True)
-    assert "Candidate</a> - PLANNED" in page
+    assert "Candidate" in _board_column(response, "PLANNED")
     assert "No candidate tasks." in page
 
 
@@ -946,7 +1076,7 @@ def test_task_page_moves_task_to_another_version(client):
     assert "0.2.0 — Second" in page
     assert "0.1.0 — " not in page.split('action="/tasks/1/move"')[1].split("</form>")[0]
     response = client.post("/tasks/1/move", data={"version_id": "2"})
-    assert b"<strong>Version:</strong> 0.2.0" in response.data
+    assert _shown_field(response, "version") == "0.2.0"
     assert b"Write the docs" in client.get("/projects/nexus/versions/0.2.0").data
     assert b"Write the docs" not in client.get("/projects/nexus/versions/0.1.0").data
 
@@ -994,14 +1124,54 @@ def test_task_page_back_link_ignores_unsafe_next(client, target):
     assert "evil.example" not in page and "javascript:" not in page
 
 
+def test_lists_use_the_shared_components(client):
+    """
+    Given a captured task and a project
+    When opening the tasks list, the projects list and an empty refine queue
+    Then states and statuses are badges, refs are chips and empty lists use the empty item
+    """
+    client.post("/tasks", data={"title": "Write the docs"})
+    client.post("/projects", data={"key": "nx", "name": "Nexus"})
+
+    assert '<span class="badge badge-inbox">INBOX</span>' in client.get("/tasks").get_data(as_text=True)
+    projects_page = client.get("/projects").get_data(as_text=True)
+    assert '<code class="ref">nx</code>' in projects_page
+    assert '<span class="badge badge-active">ACTIVE</span>' in projects_page
+    assert '<li class="empty">Nothing to refine.</li>' in client.get("/refine").get_data(as_text=True)
+
+
+def test_templates_have_no_inline_style_attribute():
+    """
+    Given every page template
+    When reading its source
+    Then none uses an inline style attribute: styling lives in static/app.css
+    """
+    from pathlib import Path
+    templates = Path(__file__).parents[2] / "src" / "web" / "templates"
+    offenders = [t.name for t in templates.glob("*.html") if "style=" in t.read_text()]
+    assert offenders == []
+
+
+def test_create_forms_use_labelled_fields(client):
+    """
+    Given the projects page
+    When reading its creation form
+    Then each control is a labelled field, with no line breaks for layout
+    """
+    html = client.get("/projects").get_data(as_text=True)
+    assert '<form class="form-stacked"' in html and "<br>" not in html
+    assert '<span class="field-label">Key</span>' in html
+    assert '<input type="text" name="key" value="" required>' in html
+
+
 def test_task_refs_are_shown_on_detail_and_list(client):
     """A task's ref appears on its detail page and in the tasks list."""
     client.post("/tasks", data={"title": "Write the docs"})
 
     detail = client.get("/tasks/1").data
-    ref = re.search(rb"<code>(t-[0-9a-z]+)</code>", detail)
+    ref = re.search(rb"<code[^>]*>(t-[0-9a-z]+)</code>", detail)
     assert ref is not None
-    assert ref.group(0) in client.get("/tasks").data
+    assert b'<code class="ref">' + ref.group(1) + b"</code>" in client.get("/tasks").data
 
 
 def test_version_refs_are_shown_on_detail_and_list(client):
@@ -1011,6 +1181,6 @@ def test_version_refs_are_shown_on_detail_and_list(client):
                 data={"number": "0.1.0", "title": "First version", "dod": "Ships"})
 
     detail = client.get("/projects/nexus/versions/0.1.0").data
-    ref = re.search(rb"<code>(v-[0-9a-z]+)</code>", detail)
+    ref = re.search(rb"<code[^>]*>(v-[0-9a-z]+)</code>", detail)
     assert ref is not None
-    assert ref.group(0) in client.get("/projects/nexus/versions").data
+    assert b'<code class="ref">' + ref.group(1) + b"</code>" in client.get("/projects/nexus/versions").data

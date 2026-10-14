@@ -50,9 +50,10 @@ The web UI, the CLI and the MCP server all expose these operations
 ([0010](adr/0010-dod-editing-in-cli-and-mcp.md)).
 
 `VersionProgress` (`services/views.py`) carries `dod_done` / `dod_total`
-next to the task counts; the dashboard and version page render a DoD bar
-beside the task bar. The version page also shows a task progress bar under
-its "Tasks" heading ("done/total done" + `<progress>`), computed in the
+next to the task counts; the dashboard's version cards and the version rows
+of the project and projects pages render a DoD bar beside the task bar. The
+version page shows a DoD bar under its "Definition of done" heading and a
+task progress bar under its "Tasks" heading ("done/total done" + `<progress>`), computed in the
 template from the page's `tasks` list (state `DONE` over all tasks except
 `CANCELLED`). `views.version_progress(session, versions)` returns one
 `VersionProgress` per given version, same order, cancelled tasks excluded
@@ -183,29 +184,47 @@ log events with actor `mcp` (`events.ACTOR_MCP`). Usage:
 
 Besides the `/mcp` endpoint (see above), routes are unprefixed full-page adapters (package `web/pages/`, one `pages` blueprint defined in `_shared.py`; modules `projects`, `versions`, `tasks`, `inbox`):
 
-- `/` is the dashboard: in-progress versions with done/total progress,
-  `doing` and `waiting` tasks, inbox and refine counters
-  (`views.dashboard()` returns a `DashboardView`).
+Templates (`src/web/templates/`) extend `base.html` and import the shared
+macros of `_components.html` as `ui` (`page_header`, `field`,
+`error_message`, `empty`, `badge`, `ref_chip`, `task_link`, `task_place`,
+`stat`, `version_card`, `version_progress`, `version_row`, `event_list`).
+Two includes remain: `_clarify_form.html` and `_task_state_form.html`.
+Styling and behaviour live in `src/web/static/app.css` and `app.js`; no
+inline style or script ([0012](adr/0012-plain-static-css-and-js.md),
+[UI conventions](ui.md)).
+
+- `/` is the dashboard: inbox and refine counters as stat tiles linking to
+  their queue, in-progress versions as cards with task and DoD progress,
+  and `doing` / `waiting` task lists showing each task's project and
+  version (`views.dashboard()` returns a `DashboardView`).
 - `/projects` lists projects, each with its unreleased (planned and
   in-progress) versions, status and progress. Released versions only appear
   on the project page.
-- `/projects/<key>` lists all the project's versions in order, with status,
-  task and DoD progress, and links "Manage versions →" to the versions page
-  (creation form). Version progress rows are the shared partial
-  `_version_progress.html`, also used by the dashboard.
+- `/projects/<key>` shows the project's key and status as chips, lists all
+  its versions in order (`ui.version_row`: status, task and DoD progress),
+  and links "Manage versions →" to the versions page (creation form).
+  "Delete project" sits in a "danger zone" at the bottom, enabled once the
+  project key is typed.
 - `POST /projects/<key>/versions/<number>/delete` (`version_delete`) calls
   `versions.delete` and redirects to the project page; 404 if unknown. The
-  version page's "Delete version" button is disabled until the version
+  version page's "Delete version" button, in its danger zone, is disabled
+  until the version
   number is typed, with a note that unfinished tasks go back to refined
   ([0011](adr/0011-deleting-a-version.md)).
-- The task page shows its History; the version page shows its Changelog.
+- The task page shows its History; the version page shows its Changelog
+  (both `ui.event_list`, drawn as a timeline). The task page has two
+  columns: actions, edit form and history, beside a sticky details panel
+  (state, ref, project, version...); the panel goes on top on narrow
+  screens.
 - The version page manages the DoD (checkbox, inline edit, delete, add form;
   read-only once released) through POST routes under
   `/projects/<key>/versions/<number>/dod` (add) and `/dod/<id>/toggle`,
   `/dod/<id>/edit`, `/dod/<id>/delete`. The version creation form takes one
   `dod` field per criterion (dynamic rows; newline-separated text is still
   accepted).
-- The version page lists its planned tasks, each linked to
+- The version page shows its tasks as a board: one column per state
+  (`PLANNED`, `DOING`, `WAITING`, `DONE`, plus `CANCELLED` only when it
+  holds a task), one card per task, each linked to
   `/tasks/<id>?next=<version page path>`. The version page builds `next` from
   the version's own URL (`url_for('pages.version_detail', ...)`), not
   `request.path`, because after a POST the request path is a POST-only URL.
@@ -221,8 +240,9 @@ Besides the `/mcp` endpoint (see above), routes are unprefixed full-page adapter
 - `POST /tasks/<id>/state` (`task_state`, `web/pages/tasks.py`) reads the
   form fields `state` (a `TaskState` name; unknown gives the error
   "unknown state.") and `reason`, calls `tasks.change_state`, and re-renders
-  the task page with the error if any. The "State" select with a reason
-  input is the shared partial `_task_state_form.html` (variables `task`,
+  the task page with the error if any. The "State" select with a "Move"
+  button and a reason input (shown only when `WAITING` is selected, via CSS
+  `:has()`) is the shared partial `_task_state_form.html` (variables `task`,
   `state_action`), included by `task.html` and `version.html`. It offers only
   the valid next working states (planned: doing; doing: waiting, done;
   waiting: doing; done: doing), plus `CANCELLED` from planned, doing and
@@ -238,9 +258,11 @@ Besides the `/mcp` endpoint (see above), routes are unprefixed full-page adapter
   project versions) to `task.html`, which shows a "Move to version" select of
   the project's open versions other than the current one; hidden if there is
   none, or for tasks not planned/doing/waiting.
+  For a refined task, the "Plan" form offers the same open versions as a
+  select (a version id field if the project has none).
 - `POST /projects/<key>/versions/<number>/task/<task_id>/state`
   (`version_task_state`, `web/pages/versions.py`) is the same change from the
-  version page: each task row includes the partial, only while the version
+  version page: each board card includes the partial, only while the version
   isn't released. It reads `state` and `reason`, returns 404 for an unknown
   project, version or task, or a task of another version, and re-renders the
   version page with the error on an unknown state or a service refusal.
@@ -254,8 +276,13 @@ Besides the `/mcp` endpoint (see above), routes are unprefixed full-page adapter
   version or task, and shows the error on `InvalidTransitionError` /
   `ValidationError` (task not refined, released version, other project).
 - `GET /export.json` downloads the export as an attachment.
-- The nav bar links Dashboard, Projects, Tasks, Inbox, Refine, Search and
-  Export.
+- The header holds the brand, the nav bar (Dashboard, Projects, Tasks,
+  Inbox, Refine, Search, Export; the current section, matched by path
+  prefix, carries `aria-current="page"`) and the capture bar (`c` focuses
+  it). A "Skip to content" link targets `<main id="content">`.
+- The inbox shows the oldest captured task as a card with its clarify form;
+  refine and search use labelled filter fields; other lists use `.list`
+  rows.
 
 ## Runtime modules
 

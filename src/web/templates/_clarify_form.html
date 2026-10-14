@@ -1,8 +1,9 @@
-<form method="post" action="{{ clarify_action }}">
-    <label>Title <input type="text" name="title" value="{{ task.title }}" required></label><br>
-    <label>Body <textarea name="body">{{ task.body or '' }}</textarea></label><br>
-    <label>Project key <input type="text" name="project_key" value="{{ task.project.key if task.project else '' }}"></label><br>
-    <label>Context <input type="text" name="context" value="{{ task.context or '' }}"></label><br>
-    <label>Size <input type="text" name="size" value="{{ task.size or '' }}"></label><br>
-    <button type="submit">{{ clarify_label }}</button>
+{% import "_components.html" as ui %}
+<form class="form-stacked" method="post" action="{{ clarify_action }}">
+    {{ ui.field("Title", "title", task.title, required=true) }}
+    {{ ui.field("Body", "body", task.body, kind="textarea") }}
+    {{ ui.field("Project key", "project_key", task.project.key if task.project else "") }}
+    {{ ui.field("Context", "context", task.context) }}
+    {{ ui.field("Size", "size", task.size) }}
+    <div class="form-actions"><button class="button-primary" type="submit">{{ clarify_label }}</button></div>
 </form>

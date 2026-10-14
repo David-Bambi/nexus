@@ -1,138 +1,156 @@
 {% extends "base.html" %}
+{% import "_components.html" as ui %}
 
 {% block title %}{{ task.title }} — Nexus{% endblock %}
 
 {% block content %}
+{% set state = task.state.name %}
 {% if next %}
-<p><a href="{{ next }}">← Back</a></p>
+{{ ui.page_header(task.title, next, "Back") }}
 {% else %}
-<p><a href="{{ url_for('pages.tasks_list') }}">← Tasks</a></p>
+{{ ui.page_header(task.title, url_for('pages.tasks_list'), "Tasks") }}
 {% endif %}
 
-<h1>{{ task.title }}</h1>
-<p><strong>Ref:</strong> <code>{{ task.ref }}</code></p>
-<p><strong>State:</strong> {{ task.state.name }}</p>
-{% if task.project %}
-<p><strong>Project:</strong> <a href="{{ url_for('pages.project_detail', key=task.project.key) }}">{{ task.project.name }}</a></p>
-{% endif %}
-{% if task.version %}
-<p><strong>Version:</strong> {{ task.version.number }}</p>
-{% endif %}
-{% if task.context %}
-<p><strong>Context:</strong> {{ task.context }}</p>
-{% endif %}
-{% if task.size %}
-<p><strong>Size:</strong> {{ task.size }}</p>
-{% endif %}
-{% if task.body %}
-<p>{{ task.body }}</p>
-{% endif %}
-{% if task.state.name == "WAITING" %}
-<p><strong>Blocked reason:</strong> {{ task.blocked_reason }}</p>
-{% endif %}
+<div class="detail">
+<div class="detail-main">
+    {% if task.body %}
+    <p class="lead">{{ task.body }}</p>
+    {% endif %}
+    {% if state == "WAITING" %}
+    <p class="blocked-reason"><strong>Blocked reason:</strong> {{ task.blocked_reason }}</p>
+    {% endif %}
 
-{% if error %}
-<p style="color: red;">{{ error }}</p>
-{% endif %}
+    {{ ui.error_message(error) }}
 
-{% if task.state.name in ("INBOX", "SOMEDAY") %}
-<h2>Clarify</h2>
-{% with clarify_action = url_for('pages.task_clarify', task_id=task.id), clarify_label = "Clarify" %}
-{% include "_clarify_form.html" %}
-{% endwith %}
-{% endif %}
+    {% if state in ("INBOX", "SOMEDAY") %}
+    <h2>Clarify</h2>
+    {% with clarify_action = url_for('pages.task_clarify', task_id=task.id), clarify_label = "Clarify" %}
+    {% include "_clarify_form.html" %}
+    {% endwith %}
+    {% endif %}
 
-{% if task.state.name == "REFINED" %}
-<form method="post" action="{{ url_for('pages.task_plan', task_id=task.id, next=next) }}">
-    <label>Version id <input type="number" name="version_id" required></label>
-    <button type="submit">Plan</button>
-</form>
-{% endif %}
+    <h2>Actions</h2>
+    <div class="toolbar">
+        {% if state == "PLANNED" %}
+        <form method="post" action="{{ url_for('pages.task_start', task_id=task.id, next=next) }}">
+            <button class="button-primary" type="submit">Start</button>
+        </form>
+        <form method="post" action="{{ url_for('pages.task_unplan', task_id=task.id, next=next) }}">
+            <button type="submit">Unplan</button>
+        </form>
+        {% endif %}
 
-{% if task.state.name == "PLANNED" %}
-<form method="post" action="{{ url_for('pages.task_unplan', task_id=task.id, next=next) }}">
-    <button type="submit">Unplan</button>
-</form>
-<form method="post" action="{{ url_for('pages.task_start', task_id=task.id, next=next) }}">
-    <button type="submit">Start</button>
-</form>
-{% endif %}
+        {% if state == "DOING" %}
+        <form method="post" action="{{ url_for('pages.task_complete', task_id=task.id, next=next) }}">
+            <button class="button-primary" type="submit">Complete</button>
+        </form>
+        <form class="form-inline" method="post" action="{{ url_for('pages.task_block', task_id=task.id, next=next) }}">
+            <input type="text" name="reason" placeholder="Blocked on…" aria-label="Reason" required>
+            <button type="submit">Block</button>
+        </form>
+        {% endif %}
 
-{% if task.state.name == "DOING" %}
-<form method="post" action="{{ url_for('pages.task_block', task_id=task.id, next=next) }}">
-    <label>Reason <input type="text" name="reason" required></label>
-    <button type="submit">Block</button>
-</form>
-<form method="post" action="{{ url_for('pages.task_complete', task_id=task.id, next=next) }}">
-    <button type="submit">Complete</button>
-</form>
-{% endif %}
+        {% if state == "WAITING" %}
+        <form method="post" action="{{ url_for('pages.task_unblock', task_id=task.id, next=next) }}">
+            <button class="button-primary" type="submit">Unblock</button>
+        </form>
+        {% endif %}
 
-{% if task.state.name == "WAITING" %}
-<form method="post" action="{{ url_for('pages.task_unblock', task_id=task.id, next=next) }}">
-    <button type="submit">Unblock</button>
-</form>
-{% endif %}
+        {% if state == "DONE" %}
+        <form method="post" action="{{ url_for('pages.task_reopen', task_id=task.id, next=next) }}">
+            <button type="submit">Reopen</button>
+        </form>
+        {% endif %}
 
-{% if task.state.name == "DONE" %}
-<form method="post" action="{{ url_for('pages.task_reopen', task_id=task.id, next=next) }}">
-    <button type="submit">Reopen</button>
-</form>
-{% endif %}
+        {% if state == "CANCELLED" %}
+        <form method="post" action="{{ url_for('pages.task_restore', task_id=task.id, next=next) }}">
+            <button class="button-primary" type="submit">Restore to refined</button>
+        </form>
+        {% endif %}
 
-{% with state_action = url_for('pages.task_state', task_id=task.id, next=next) %}
-{% include "_task_state_form.html" %}
-{% endwith %}
+        {% if state in ("INBOX", "REFINED") %}
+        <form method="post" action="{{ url_for('pages.task_defer', task_id=task.id, next=next) }}">
+            <button type="submit">Defer to someday</button>
+        </form>
+        {% endif %}
 
-{% if task.state.name in ("INBOX", "REFINED") %}
-<form method="post" action="{{ url_for('pages.task_defer', task_id=task.id, next=next) }}">
-    <button type="submit">Defer to someday</button>
-</form>
-{% endif %}
+        {% with state_action = url_for('pages.task_state', task_id=task.id, next=next) %}
+        {% include "_task_state_form.html" %}
+        {% endwith %}
 
-{% if task.state.name in ("PLANNED", "DOING", "WAITING") %}
-{% set targets = versions | rejectattr("status.name", "equalto", "RELEASED") | rejectattr("id", "equalto", task.version_id) | list %}
-{% if targets %}
-<form method="post" action="{{ url_for('pages.task_move', task_id=task.id, next=next) }}">
-    <label>Version
-        <select name="version_id">
+        {% if state not in ("DONE", "CANCELLED") %}
+        <form method="post" action="{{ url_for('pages.task_cancel', task_id=task.id, next=next) }}">
+            <button class="button-danger" type="submit">Cancel task</button>
+        </form>
+        {% endif %}
+    </div>
+
+    {# Versions of the task's project that can still receive it. #}
+    {% set open_versions = versions | rejectattr("status.name", "equalto", "RELEASED") | list %}
+    {% if state == "REFINED" %}
+    <form class="form-inline" method="post" action="{{ url_for('pages.task_plan', task_id=task.id, next=next) }}">
+        {% if open_versions %}
+        <select name="version_id" aria-label="Version">
+            {% for target in open_versions %}
+            <option value="{{ target.id }}">{{ target.number }} — {{ target.title }}</option>
+            {% endfor %}
+        </select>
+        {% else %}
+        <input type="number" name="version_id" placeholder="Version id" aria-label="Version id" required>
+        {% endif %}
+        <button type="submit">Plan</button>
+    </form>
+    {% endif %}
+
+    {% if state in ("PLANNED", "DOING", "WAITING") %}
+    {% set targets = open_versions | rejectattr("id", "equalto", task.version_id) | list %}
+    {% if targets %}
+    <form class="form-inline" method="post" action="{{ url_for('pages.task_move', task_id=task.id, next=next) }}">
+        <select name="version_id" aria-label="Version">
             {% for target in targets %}
             <option value="{{ target.id }}">{{ target.number }} — {{ target.title }}</option>
             {% endfor %}
         </select>
-    </label>
-    <button type="submit">Move to version</button>
-</form>
-{% endif %}
-{% endif %}
+        <button type="submit">Move to version</button>
+    </form>
+    {% endif %}
+    {% endif %}
 
-{% if task.state.name not in ("DONE", "CANCELLED") %}
-<form method="post" action="{{ url_for('pages.task_cancel', task_id=task.id, next=next) }}">
-    <button type="submit">Cancel task</button>
-</form>
-{% endif %}
+    <h2>Edit</h2>
+    <form class="form-stacked" method="post" action="{{ url_for('pages.task_update', task_id=task.id, next=next) }}">
+        {{ ui.field("Title", "title", task.title, required=true) }}
+        {{ ui.field("Body", "body", task.body, kind="textarea") }}
+        {{ ui.field("Context", "context", task.context) }}
+        {{ ui.field("Size", "size", task.size) }}
+        <div class="form-actions"><button class="button-primary" type="submit">Save</button></div>
+    </form>
 
-{% if task.state.name == "CANCELLED" %}
-<form method="post" action="{{ url_for('pages.task_restore', task_id=task.id, next=next) }}">
-    <button type="submit">Restore to refined</button>
-</form>
-{% endif %}
+    <h2>History</h2>
+    {{ ui.event_list(history) }}
 
-<h2>Edit</h2>
-<form method="post" action="{{ url_for('pages.task_update', task_id=task.id, next=next) }}">
-    <label>Title <input type="text" name="title" value="{{ task.title }}" required></label><br>
-    <label>Body <textarea name="body">{{ task.body or '' }}</textarea></label><br>
-    <label>Context <input type="text" name="context" value="{{ task.context or '' }}"></label><br>
-    <label>Size <input type="text" name="size" value="{{ task.size or '' }}"></label><br>
-    <button type="submit">Save</button>
-</form>
+    <section class="danger-zone">
+        <h2>Delete this task</h2>
+        <form method="post" action="{{ url_for('pages.task_delete', task_id=task.id, next=next) }}">
+            <button class="button-danger" type="submit">Delete</button>
+        </form>
+    </section>
+</div>
 
-<form method="post" action="{{ url_for('pages.task_delete', task_id=task.id, next=next) }}">
-    <button type="submit">Delete</button>
-</form>
-
-<h2>History</h2>
-{% with event_items = history, show_entity = false %}
-{% include "_event_list.html" %}
-{% endwith %}
+<aside class="detail-panel" aria-label="Task details">
+    <dl class="meta-panel">
+        <dt>State</dt>
+        <dd data-field="state">{{ ui.badge(state) }}</dd>
+        <dt>Ref</dt>
+        <dd>{{ ui.ref_chip(task.ref) }}</dd>
+        <dt>Project</dt>
+        <dd>{% if task.project %}<a href="{{ url_for('pages.project_detail', key=task.project.key) }}">{{ task.project.name }}</a>{% else %}—{% endif %}</dd>
+        <dt>Version</dt>
+        <dd data-field="version">{% if task.version %}<a href="{{ url_for('pages.version_detail', key=task.version.project.key, number=task.version.number) }}">{{ task.version.number }}</a>{% else %}—{% endif %}</dd>
+        <dt>Context</dt>
+        <dd>{{ task.context or "—" }}</dd>
+        <dt>Size</dt>
+        <dd>{% if task.size %}<span class="size">{{ task.size }}</span>{% else %}—{% endif %}</dd>
+    </dl>
+</aside>
+</div>
 {% endblock %}
