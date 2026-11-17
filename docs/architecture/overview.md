@@ -202,8 +202,10 @@ macros of `_components.html` as `ui` (`page_header`, `field`,
 `error_message`, `empty`, `badge`, `ref_chip`, `task_link`, `task_place`,
 `stat`, `version_card`, `version_progress`, `version_row`, `event_list`,
 `context_select`, `size_select`, `mode_select`, `domain_label`). The AI
-labels (`ai_domains`, `ai_modes`, `ai_natures`) are Jinja globals set in
-`_shared.py`, so imported macros see them.
+labels (`ai_domains`, `ai_modes`, `ai_natures`) and the size data
+(`size_guide` = `ai.SIZE_GUIDE`, `size_weights` = `ai.SIZE_WEIGHTS`) are
+Jinja globals set in `_shared.py`, so imported macros see them;
+`size_select` builds its options from `size_guide`.
 Two includes remain: `_clarify_form.html` and `_task_state_form.html`.
 Styling and behaviour live in `src/web/static/app.css` and `app.js`; no
 inline style or script ([0012](adr/0012-plain-static-css-and-js.md),
@@ -219,12 +221,16 @@ inline style or script ([0012](adr/0012-plain-static-css-and-js.md),
 - `/projects/<key>` shows the project's key and status as chips, lists all
   its versions in order (`ui.version_row`: status, task and DoD progress),
   and links "Manage versions →" to the versions page (creation form).
-  Then the "AI usage" table and the "AI settings" form, saved by
+  Then the "AI usage" table, the "Weight by size" table
+  (`Profile.by_size`) and the "AI settings" form, saved by
   `POST /projects/<key>/ai` (`project_ai_settings`): percentages are checked
   before anything is saved, an error re-renders the page with 400
   ([AI usage](../functional/ai-usage.md#screens)).
   "Delete project" sits in a "danger zone" at the bottom, enabled once the
   project key is typed.
+- `/sizes` (`sizes`, module `tasks`) shows the task-size guide from
+  `ai.SIZE_GUIDE`, `ai.SIZE_WEIGHTS` and `ai.SIZE_RULES`
+  ([task size guide](../guides/task-size.md)).
 - `POST /projects/<key>/versions/<number>/delete` (`version_delete`) calls
   `versions.delete` and redirects to the project page; 404 if unknown. The
   version page's "Delete version" button, in its danger zone, is disabled

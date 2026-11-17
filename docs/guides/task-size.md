@@ -13,6 +13,12 @@ task with no size counts as M.
 
 ## Rules
 
-- Hesitating between two sizes? Take the bigger one.
+- When you hesitate between two sizes, take the bigger one.
 - A task bigger than L is split.
 - A task mixing defining and doing is split too.
+
+## In the app
+
+The same table and rules are shown at `/sizes`. Their text comes from
+`SIZE_GUIDE` and `SIZE_RULES` in `src/services/ai.py`: change the wording
+in both places.

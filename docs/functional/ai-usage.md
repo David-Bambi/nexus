@@ -38,7 +38,7 @@ can override the default nature of any domain.
 
 - **Task page**, edit form: "Domain" list (labels; a legacy value such as
   `@ordi` stays selectable so saving keeps it), "Size" list with the meaning
-  of each size ([task size guide](../guides/task-size.md)), "AI mode" list
+  of each size and a "Size guide" link to `/sizes`, "AI mode" list
   (blank clears it). The details panel shows Domain (label, or the raw
   legacy value), Size and AI mode.
 - **Inbox / clarify form**: same Domain and Size lists.
@@ -47,8 +47,16 @@ can override the default nature of any domain.
 - **Project page**, "AI usage" section: one row per nature, the share of
   each mode (✋ 📚 ✅ ⚠️ 🔴), the target, and the result (✅ met / ❌
   missed, with the ✋ + 📚 share; "—" without target or counted tasks).
-  Below: counts of done tasks without mode, with an unknown domain, and
-  without size.
+  The section's hint links to `/sizes`. Then "Weight by size": one row
+  per size plus "No size" (weighed as M), with the weight each, the
+  number of counted tasks, their weight and their share of the total
+  weight ("—" when zero). Counted tasks are done, with a mode and a known
+  domain. Below: counts of done tasks without mode, with an unknown
+  domain, and without size.
+- **Task sizes** (`/sizes`): table Size | Weight | When | Example and the
+  rules ([task size guide](../guides/task-size.md)). Linked under the
+  Size list of the task and clarify forms (not the version page's compact
+  add form) and from the project's AI usage section.
 - **Project page**, "AI settings" (collapsed): targets per nature (min
   ✋ + 📚 %, max 🔴 %, blank = no bound) and the nature of each domain
   (default marked). One "Save AI settings" button

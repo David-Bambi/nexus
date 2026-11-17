@@ -79,8 +79,13 @@ counted tasks):
               "own_pct": 66.7, "dependent_pct": 0.0,
               "target": {"min_own_pct": 80, "max_dependent_pct": null},
               "own_gap": -13.3, "dependent_gap": null, "met": false}, "..."],
- "without_mode": 2, "unknown_domain": 1, "without_size": 0}
+ "without_mode": 2, "unknown_domain": 1, "without_size": 0,
+ "by_size": [{"size": "XS", "count": 3, "weight": 3, "share": 15.0}, "...",
+             {"size": null, "count": 0, "weight": 0, "share": 0.0}]}
 ```
+
+`by_size` lists XS, S, M, L then `null` (no size, weighed as M): counted
+done tasks, their weight, and their share (%) of the total counted weight.
 
 Rules: [0013](../architecture/adr/0013-ai-usage-metric.md).
 
