@@ -120,8 +120,9 @@
     <form class="form-stacked" method="post" action="{{ url_for('pages.task_update', task_id=task.id, next=next) }}">
         {{ ui.field("Title", "title", task.title, required=true) }}
         {{ ui.field("Body", "body", task.body, kind="textarea") }}
-        {{ ui.field("Context", "context", task.context) }}
-        {{ ui.field("Size", "size", task.size) }}
+        {{ ui.context_select(task.context) }}
+        {{ ui.size_select(task.size) }}
+        {{ ui.mode_select(task.ai_mode) }}
         <div class="form-actions"><button class="button-primary" type="submit">Save</button></div>
     </form>
 
@@ -146,10 +147,12 @@
         <dd>{% if task.project %}<a href="{{ url_for('pages.project_detail', key=task.project.key) }}">{{ task.project.name }}</a>{% else %}—{% endif %}</dd>
         <dt>Version</dt>
         <dd data-field="version">{% if task.version %}<a href="{{ url_for('pages.version_detail', key=task.version.project.key, number=task.version.number) }}">{{ task.version.number }}</a>{% else %}—{% endif %}</dd>
-        <dt>Context</dt>
-        <dd>{{ task.context or "—" }}</dd>
+        <dt>Domain</dt>
+        <dd>{{ ui.domain_label(task.context) }}</dd>
         <dt>Size</dt>
         <dd>{% if task.size %}<span class="size">{{ task.size }}</span>{% else %}—{% endif %}</dd>
+        <dt>AI mode</dt>
+        <dd data-field="ai-mode">{% if task.ai_mode %}{{ ai_modes[task.ai_mode] | join(" ") }}{% else %}—{% endif %}</dd>
     </dl>
 </aside>
 </div>

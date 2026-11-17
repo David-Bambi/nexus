@@ -77,12 +77,17 @@
 <form class="form-inline" method="post" action="{{ url_for('pages.version_task_add', key=key, number=version.number) }}">
     <input type="text" name="title" placeholder="New task" aria-label="New task" required>
     <input type="text" name="body" placeholder="Body" aria-label="Body">
-    <input type="text" name="context" placeholder="Context" aria-label="Context">
-    <select name="size" aria-label="Size">
-        <option value="XS">XS</option>
-        <option value="S">S</option>
-        <option value="M">M</option>
-        <option value="L">L</option>
+    <select name="context" aria-label="Domain">
+        <option value="">Domain</option>
+        {% for slug, (text, _) in ai_domains.items() %}
+        <option value="{{ slug }}">{{ text }}</option>
+        {% endfor %}
+    </select>
+    <select name="size" aria-label="Size" title="In doubt, take the bigger size; split anything bigger than L.">
+        <option value="XS" title="Trivial change in one place, no decision">XS</option>
+        <option value="S" title="Small change you understand, one layer, with its test">S</option>
+        <option value="M" title="Several layers, or a small design decision; clear path">M</option>
+        <option value="L" title="New concept or open questions; several sessions">L</option>
     </select>
     <button type="submit">Add task</button>
 </form>

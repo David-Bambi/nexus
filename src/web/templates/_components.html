@@ -24,6 +24,64 @@
 </label>
 {% endmacro %}
 
+{# A task's domain, chosen from the AI domain list. A value outside the list
+   (set before the list existed) stays selectable so saving keeps it. #}
+{% macro context_select(value, label="Domain") %}
+<label class="field">
+    <span class="field-label">{{ label }}</span>
+    <select name="context">
+        <option value="">—</option>
+        {% if value and value not in ai_domains %}
+        <option value="{{ value }}" selected>{{ value }}</option>
+        {% endif %}
+        {% for slug, (text, _) in ai_domains.items() %}
+        <option value="{{ slug }}"{% if slug == value %} selected{% endif %}>{{ text }}</option>
+        {% endfor %}
+    </select>
+</label>
+{% endmacro %}
+
+{# What each task size means, from the task-size guide. #}
+{% set size_help = {
+    "XS": "XS — trivial change in one place, no decision",
+    "S": "S — small change you understand, one layer, with its test",
+    "M": "M — several layers, or a small design decision; clear path",
+    "L": "L — new concept or open questions; several sessions",
+} %}
+
+{# A task's size, with what each size means. A value outside the list stays selectable. #}
+{% macro size_select(value) %}
+<label class="field">
+    <span class="field-label">Size</span>
+    <select name="size">
+        <option value="">—</option>
+        {% if value and value not in size_help %}
+        <option value="{{ value }}" selected>{{ value }}</option>
+        {% endif %}
+        {% for size, text in size_help.items() %}
+        <option value="{{ size }}"{% if size == value %} selected{% endif %}>{{ text }}</option>
+        {% endfor %}
+    </select>
+    <span class="hint">In doubt, take the bigger size; split anything bigger than L.</span>
+</label>
+{% endmacro %}
+
+{# A task's AI mode, or none. #}
+{% macro mode_select(value) %}
+<label class="field">
+    <span class="field-label">AI mode</span>
+    <select name="ai_mode">
+        <option value="">—</option>
+        {% for mode, (symbol, text) in ai_modes.items() %}
+        <option value="{{ mode.name }}"{% if mode == value %} selected{% endif %}>{{ symbol }} {{ text }}</option>
+        {% endfor %}
+    </select>
+</label>
+{% endmacro %}
+
+{# A task's domain as text: its label, or the raw value if it isn't a domain. #}
+{% macro domain_label(value) %}{{ ai_domains[value][0] if value in ai_domains else (value or "—") }}{% endmacro %}
+
 {# An error message, shown only when there is one. #}
 {% macro error_message(error) %}
 {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}

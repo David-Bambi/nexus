@@ -20,6 +20,95 @@
 </ul>
 <p><a href="{{ url_for('pages.versions_list', key=project.key) }}">Manage versions →</a></p>
 
+<section class="ai-usage" aria-labelledby="ai-usage-title">
+    <h2 id="ai-usage-title">AI usage</h2>
+    <p class="hint">Done tasks, weighted by size (XS=1, S=2, M=4, L=8; no size counts as M).</p>
+    {{ ui.error_message(error) }}
+    <div class="table-scroll">
+    <table class="ai-profile">
+        <thead>
+            <tr>
+                <th scope="col">Nature</th>
+                {% for mode, (symbol, text) in ai_modes.items() %}
+                <th scope="col" title="{{ text }}">{{ symbol }}</th>
+                {% endfor %}
+                <th scope="col">Target</th>
+                <th scope="col">Result</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for entry in profile.natures %}
+            <tr data-nature="{{ entry.nature.name }}">
+                <th scope="row">{{ ai_natures[entry.nature] }}</th>
+                {% for mode in ai_modes %}
+                <td>{% if entry.weight %}{{ entry.shares[mode] | round | int }} %{% else %}—{% endif %}</td>
+                {% endfor %}
+                <td>
+                    {% if entry.min_own_pct is not none %}✋+📚 ≥ {{ entry.min_own_pct }} %{% endif %}
+                    {% if entry.max_dependent_pct is not none %}🔴 ≤ {{ entry.max_dependent_pct }} %{% endif %}
+                    {% if not entry.has_target %}—{% endif %}
+                </td>
+                <td class="ai-result">
+                    {% if entry.met is none %}—
+                    {% elif entry.met %}<span class="ai-met">✅ {{ entry.own_pct | round | int }} %</span>
+                    {% else %}<span class="ai-missed">❌ {{ entry.own_pct | round | int }} %</span>{% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    <p class="meta" data-field="ai-left-out">
+        Done tasks without mode: {{ profile.without_mode }} ·
+        unknown domain: {{ profile.unknown_domain }} ·
+        without size: {{ profile.without_size }}
+    </p>
+
+    <details class="ai-settings">
+        <summary>AI settings</summary>
+        <form class="form-stacked" method="post" action="{{ url_for('pages.project_ai_settings', key=project.key) }}">
+            <h3>Targets</h3>
+            <div class="table-scroll">
+            <table class="ai-profile">
+                <thead>
+                    <tr><th scope="col">Nature</th><th scope="col">Min ✋+📚 %</th><th scope="col">Max 🔴 %</th></tr>
+                </thead>
+                <tbody>
+                    {% for nature, (low, high) in targets.items() %}
+                    <tr>
+                        <th scope="row">{{ ai_natures[nature] }}</th>
+                        <td><input type="number" min="0" max="100" name="min_own_{{ nature.name }}" value="{{ low if low is not none }}" aria-label="{{ ai_natures[nature] }} minimum own %"></td>
+                        <td><input type="number" min="0" max="100" name="max_dependent_{{ nature.name }}" value="{{ high if high is not none }}" aria-label="{{ ai_natures[nature] }} maximum dependent %"></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            </div>
+            <h3>Domain natures</h3>
+            <div class="table-scroll">
+            <table class="ai-profile">
+                <thead><tr><th scope="col">Domain</th><th scope="col">Nature</th></tr></thead>
+                <tbody>
+                    {% for slug, nature in natures.items() %}
+                    <tr>
+                        <th scope="row">{{ ai_domains[slug][0] }} <span class="hint">{{ slug }}</span></th>
+                        <td>
+                            <select name="nature_{{ slug }}" aria-label="Nature of {{ ai_domains[slug][0] }}">
+                                {% for option, text in ai_natures.items() %}
+                                <option value="{{ option.name }}"{% if option == nature %} selected{% endif %}>{{ text }}{% if option == ai_domains[slug][1] %} (default){% endif %}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            </div>
+            <div class="form-actions"><button class="button-primary" type="submit">Save AI settings</button></div>
+        </form>
+    </details>
+</section>
+
 <section class="danger-zone">
     <h2>Delete this project</h2>
     <form method="post" action="{{ url_for('pages.project_delete', key=project.key) }}">

@@ -1,5 +1,6 @@
 from flask import abort, redirect, render_template, request, url_for
 
+from src.models.ai import AiMode
 from src.models.task import TaskState
 from src.services import events, tasks, versions
 from src.services.errors import InvalidTransitionError, NotFoundError, ValidationError
@@ -122,17 +123,34 @@ def _apply_transition(task_id, fn):
 @bp.route("/tasks/<int:task_id>/update", methods=["POST"])
 def task_update(task_id):
     """Update a task's descriptive fields."""
-    return _apply_transition(
-        task_id,
-        lambda s: tasks.update(
-            s,
+    def save(session):
+        """Check the mode first, then save the fields and the mode."""
+        mode = _form_mode()
+        tasks.update(
+            session,
             task_id,
             title=request.form["title"],
             body=request.form.get("body") or None,
             context=request.form.get("context") or None,
             size=request.form.get("size") or None,
-        ),
-    )
+        )
+        return tasks.set_ai_mode(session, task_id, mode)
+
+    return _apply_transition(task_id, save)
+
+
+def _form_mode():
+    """The AI mode chosen in the current request's form, or None.
+
+    Raises:
+        ValidationError: If the value isn't an AI mode.
+    """
+    name = request.form.get("ai_mode") or None
+    if name is None:
+        return None
+    if name not in AiMode.__members__:
+        raise ValidationError(f"AI mode '{name}' doesn't exist.")
+    return AiMode[name]
 
 
 @bp.route("/tasks/<int:task_id>/clarify", methods=["POST"])
