@@ -371,11 +371,11 @@ def test_inbox_action_advances_to_next_item(client, action, data):
 def test_refine_filters_by_context(client):
     """The refine queue filtered by context only shows the matching task."""
     client.post("/tasks", data={"title": "At the computer"})
-    client.post("/tasks/1/clarify", data={"title": "At the computer", "context": "@ordi"})
+    client.post("/tasks/1/clarify", data={"title": "At the computer", "context": "code-core"})
     client.post("/tasks", data={"title": "At the store"})
-    client.post("/tasks/2/clarify", data={"title": "At the store", "context": "@achat"})
+    client.post("/tasks/2/clarify", data={"title": "At the store", "context": "docs"})
 
-    response = client.get("/refine?context=@ordi")
+    response = client.get("/refine?context=code-core")
     assert response.status_code == 200
     assert b"At the computer" in response.data
     assert b"At the store" not in response.data
@@ -741,10 +741,10 @@ def test_version_task_add_keeps_optional_fields(client):
     _create_version(client)
     client.post(
         "/projects/nexus/versions/0.1.0/tasks/",
-        data={"title": "Write the docs", "context": "@ordi", "size": "S", "body": "Details"},
+        data={"title": "Write the docs", "context": "code-core", "size": "S", "body": "Details"},
     )
     response = client.get("/tasks/1")
-    assert b"@ordi" in response.data
+    assert b"code-core" in response.data
     assert b"Details" in response.data
 
 

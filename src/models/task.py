@@ -6,6 +6,7 @@ from sqlalchemy import DateTime, Enum as SAEnum, ForeignKey, Integer, String, Te
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.db import Base
+from src.models.ai import AiMode
 from src.models.tag import task_tag_table
 
 
@@ -42,7 +43,7 @@ class Task(Base):
         nullable=False,
         default=TaskState.INBOX,
     )
-    # Free string, e.g. "@ordi", "@achat" — suggested set only.
+    # Domain slug from services/ai.DOMAINS; older free tags (e.g. "@ordi") are kept as is.
     context: Mapped[Optional[str]] = mapped_column(String)
     # XS / S / M / L — ordinal effort estimate, never converted to hours.
     size: Mapped[Optional[str]] = mapped_column(String)
@@ -56,6 +57,10 @@ class Task(Base):
     )
     # Set on completion, cleared on reopen.
     closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    # How the AI took part in the task; None = not recorded yet.
+    ai_mode: Mapped[Optional[AiMode]] = mapped_column(
+        SAEnum(AiMode, name="task_ai_mode", create_constraint=True)
+    )
 
     project: Mapped[Optional["Project"]] = relationship(back_populates="tasks")
     version: Mapped[Optional["Version"]] = relationship(back_populates="tasks")

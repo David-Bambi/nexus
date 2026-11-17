@@ -1,10 +1,12 @@
 from datetime import date, datetime
 
+from src.models.ai import Nature
 from src.models.definition_of_done import DefinitionOfDoneCriterion
 from src.models.event import Event
 from src.models.project import Project
 from src.models.task import Task
 from src.models.version import Version
+from src.services.ai import DOMAINS, NatureProfile, Profile
 from src.services.views import DashboardView
 
 
@@ -54,7 +56,8 @@ def task_brief(item : Task) -> dict:
             "version": item.version.number if item.version else None,
             "version_ref": item.version.ref if item.version else None,
             "size": item.size,
-            "context": item.context}
+            "context": item.context,
+            "ai_mode": item.ai_mode.name if item.ai_mode else None}
 
 
 def task(item : Task) -> dict:
@@ -85,3 +88,41 @@ def dashboard(view : DashboardView) -> dict:
             "waiting": [task_brief(t) for t in view.waiting],
             "inbox_count": view.inbox_count,
             "refine_count": view.refine_count}
+
+
+def _pct(value : float | None) -> float | None:
+    """Round a percentage to one decimal, keeping None."""
+    return None if value is None else round(value, 1)
+
+
+def ai_settings(key : str, natures : dict[str, Nature],
+                targets : dict[Nature, tuple[int | None, int | None]]) -> dict:
+    """A project's AI settings: the nature of each domain and the target per nature."""
+    return {"project": key,
+            "domains": [{"domain": slug, "label": DOMAINS[slug][0], "nature": nature.name,
+                         "default": DOMAINS[slug][1].name}
+                        for slug, nature in natures.items()],
+            "targets": [{"nature": nature.name, "min_own_pct": low, "max_dependent_pct": high}
+                        for nature, (low, high) in targets.items()]}
+
+
+def _nature_profile(item : NatureProfile) -> dict:
+    """One nature of an AI usage profile."""
+    return {"nature": item.nature.name,
+            "weight": item.weight,
+            "shares": {mode.name: _pct(share) for mode, share in item.shares.items()},
+            "own_pct": _pct(item.own_pct),
+            "dependent_pct": _pct(item.dependent_pct),
+            "target": {"min_own_pct": item.min_own_pct, "max_dependent_pct": item.max_dependent_pct},
+            "own_gap": _pct(item.own_gap),
+            "dependent_gap": _pct(item.dependent_gap),
+            "met": item.met}
+
+
+def ai_profile(item : Profile) -> dict:
+    """A project's AI usage profile, with its targets, gaps and left-out tasks."""
+    return {"project": item.project_key,
+            "natures": [_nature_profile(n) for n in item.natures],
+            "without_mode": item.without_mode,
+            "unknown_domain": item.unknown_domain,
+            "without_size": item.without_size}

@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from src.models.project import Project
 from src.models.version import VersionStatus
-from src.services import projects, tasks, versions
+from src.services import ai, projects, tasks, versions
 from src.services.errors import NotFoundError, ValidationError
 
 # Sizes a task may take.
@@ -149,7 +149,9 @@ def _check_task(entry : dict, where : str, errors : list, loose : bool = False) 
     _unknown_fields(entry, _LOOSE_TASK_FIELDS if loose else _TASK_FIELDS, where, errors)
     _text(entry, "title", where, errors, required=True)
     _text(entry, "body", where, errors)
-    _text(entry, "context", where, errors)
+    context = _text(entry, "context", where, errors)
+    if context is not None and context not in ai.DOMAINS:
+        errors.append(f"{where}: 'context' must be one of {', '.join(ai.DOMAINS)}")
     size = _text(entry, "size", where, errors)
     if size is not None and size not in _SIZES:
         errors.append(f"{where}: 'size' must be one of {', '.join(_SIZES)}")

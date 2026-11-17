@@ -5,8 +5,9 @@ from typing import Callable
 from sqlalchemy.orm import Session
 
 from src.mcp_server import serialize
+from src.models.ai import AiMode, Nature
 from src.models.task import TaskState
-from src.services import events, importer, projects, refs, tasks, versions, views
+from src.services import ai, events, importer, projects, refs, tasks, versions, views
 from src.services.errors import DomainError, ValidationError
 from src.services.resolve import resolve_version
 
@@ -15,6 +16,18 @@ ACTOR = events.ACTOR_MCP
 
 # Task sizes a tool accepts.
 SIZES = ["XS", "S", "M", "L"]
+
+# AI modes a tool accepts, and what each one means.
+AI_MODES = [mode.name for mode in AiMode]
+_AI_MODE_HELP = ("AUTONOMOUS = David defined and did it; LEARNED = David did it with AI explanations; "
+                 "DELEGATED = David defined, the AI did it; GUIDED = the AI defined, David did it; "
+                 "DEPENDENT = the AI defined and did it.")
+
+# Domain natures a tool accepts.
+NATURES = [nature.name for nature in Nature]
+
+# Domain slugs a task context may take.
+DOMAIN_SLUGS = list(ai.DOMAINS)
 
 # Rows a list tool returns when no limit is given, and the most it will return.
 DEFAULT_LIMIT = 100
@@ -151,6 +164,7 @@ def tool(name : str, description : str, properties : dict | None = None, require
 _REF = _string("Task ref, e.g. t-4k2.")
 _VERSION = _string("Version ref (v-9xa), or its number (e.g. 1.2.0) together with 'project'.")
 _PROJECT = _string("Project key.")
+_CONTEXT = _string("Domain of the task (see get_ai_settings for labels and natures).", DOMAIN_SLUGS)
 
 
 def _limit(args : dict) -> int:
@@ -266,9 +280,51 @@ def dashboard(session : Session, args : dict) -> dict:
     return serialize.dashboard(views.dashboard(session))
 
 
+@tool("get_ai_settings", "Show a project's AI settings: the nature (FOUNDING, REPETITIVE, PERIPHERAL) "
+      "of each domain, and the target per nature (min % of AUTONOMOUS+LEARNED, max % of DEPENDENT).",
+      {"project": _PROJECT}, ["project"], read_only=True)
+def get_ai_settings(session : Session, args : dict) -> dict:
+    """Show a project's AI settings."""
+    key = args["project"]
+    return serialize.ai_settings(key, ai.natures(session, key), ai.targets(session, key))
+
+
+@tool("ai_profile", "Show a project's AI usage profile: for each nature, the share of each AI mode among done "
+      "tasks, weighted by size (XS=1, S=2, M=4, L=8, none=4), compared with the target (gaps are negative when "
+      "missed), plus how many done tasks have no mode, an unknown domain, or no size.",
+      {"project": _PROJECT}, ["project"], read_only=True)
+def ai_profile(session : Session, args : dict) -> dict:
+    """Show a project's AI usage profile."""
+    return serialize.ai_profile(ai.profile(session, args["project"]))
+
+
 # -----------------------------------------------------------------------------
 # Write tools
 # -----------------------------------------------------------------------------
+
+@tool("set_domain_nature", "Set the nature of one domain in a project; setting its default nature removes the override.",
+      {"project": _PROJECT, "domain": _string("Domain slug.", DOMAIN_SLUGS),
+       "nature": _string("The domain's nature in this project.", NATURES)},
+      ["project", "domain", "nature"], idempotent=True)
+def set_domain_nature(session : Session, args : dict) -> dict:
+    """Set a domain's nature in a project."""
+    key = args["project"]
+    ai.set_domain_nature(session, key, args["domain"], Nature[args["nature"]], actor=ACTOR)
+    return serialize.ai_settings(key, ai.natures(session, key), ai.targets(session, key))
+
+
+@tool("set_ai_target", "Set a project's target for one nature. An omitted bound means no bound; omit both to "
+      "remove the target.",
+      {"project": _PROJECT, "nature": _string("The nature the target applies to.", NATURES),
+       "min_own_pct": _integer("Minimum % (0-100) of AUTONOMOUS + LEARNED work."),
+       "max_dependent_pct": _integer("Maximum % (0-100) of DEPENDENT work.")},
+      ["project", "nature"], idempotent=True)
+def set_ai_target(session : Session, args : dict) -> dict:
+    """Set a project's target for one nature."""
+    key = args["project"]
+    ai.set_target(session, key, Nature[args["nature"]], args.get("min_own_pct"), args.get("max_dependent_pct"),
+                  actor=ACTOR)
+    return serialize.ai_settings(key, ai.natures(session, key), ai.targets(session, key))
 
 @tool("capture_task", "Capture a task into the inbox, with just a title.", {"title": _string("Task title.")}, ["title"])
 def capture_task(session : Session, args : dict) -> dict:
@@ -278,7 +334,7 @@ def capture_task(session : Session, args : dict) -> dict:
 
 @tool("add_task", "Create a task in a project: in the inbox, or planned straight into a version when 'version' is given.",
       {"project": _PROJECT, "title": _string("Task title."), "version": _VERSION,
-       "body": _string("Free-text detail."), "context": _string("Context tag, e.g. @ordi."),
+       "body": _string("Free-text detail."), "context": _CONTEXT,
        "size": _string("Effort size.", SIZES)},
       ["project", "title"])
 def add_task(session : Session, args : dict) -> dict:
@@ -313,19 +369,26 @@ def import_data(session : Session, args : dict) -> dict:
             "created": [{"kind": kind, "ref": ref, "title": title} for kind, ref, title in result.created]}
 
 
-@tool("update_task", "Change a task's title, body, context or size. A blank body, context or size clears it.",
+@tool("update_task", "Change a task's title, body, context (its domain), size or AI mode. "
+      "A blank body, context, size or ai_mode clears it.",
       {"ref": _REF, "title": _string("New title."), "body": _string("New detail."),
-       "context": _string("New context tag."), "size": _string("New size.", SIZES)},
+       "context": _CONTEXT, "size": _string("New size.", SIZES),
+       "ai_mode": _string("How the AI took part: " + _AI_MODE_HELP, AI_MODES)},
       ["ref"], idempotent=True)
 def update_task(session : Session, args : dict) -> dict:
     """Update a task's fields."""
     task = _task_of(session, args)
     fields = {name: args[name] for name in ("title", "body", "context", "size") if name in args}
-    if not fields:
+    if not fields and "ai_mode" not in args:
         raise ValidationError("give at least one field to change")
     if "title" in fields and fields["title"] is None:
         raise ValidationError("'title' must not be blank")
-    return serialize.task(tasks.update(session, task.id, actor=ACTOR, **fields))
+    if fields:
+        tasks.update(session, task.id, actor=ACTOR, **fields)
+    if "ai_mode" in args:
+        mode = AiMode[args["ai_mode"]] if args["ai_mode"] else None
+        tasks.set_ai_mode(session, task.id, mode, actor=ACTOR)
+    return serialize.task(task)
 
 
 @tool("plan_task", "Plan a refined task into a version.", {"ref": _REF, "version": _VERSION, "project": _PROJECT},

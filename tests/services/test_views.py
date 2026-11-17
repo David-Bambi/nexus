@@ -70,12 +70,12 @@ def test_to_refine_filters_by_context(session):
     Then only the matching task is returned
     """
     matching = tasks.capture(session, "At the computer")
-    tasks.clarify(session, matching.id, "At the computer", None, None, "@ordi", None)
+    tasks.clarify(session, matching.id, "At the computer", None, None, "code-core", None)
 
     other = tasks.capture(session, "At the store")
-    tasks.clarify(session, other.id, "At the store", None, None, "@achat", None)
+    tasks.clarify(session, other.id, "At the store", None, None, "docs", None)
 
-    result = views.to_refine(session, context="@ordi")
+    result = views.to_refine(session, context="code-core")
     assert [t.id for t in result] == [matching.id]
 
 def test_to_refine_filters_by_project_key(session):

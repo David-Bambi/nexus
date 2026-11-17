@@ -41,3 +41,11 @@ class Project(Base):
     )
     # Not cascaded: a task can outlive its project (e.g. unassigned later).
     tasks: Mapped[list["Task"]] = relationship(back_populates="project")
+    # The project's own nature per domain; deleted with the project.
+    ai_domains: Mapped[list["ProjectAiDomain"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan"
+    )
+    # The project's targets on its AI usage profile; deleted with the project.
+    ai_targets: Mapped[list["ProjectAiTarget"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan"
+    )

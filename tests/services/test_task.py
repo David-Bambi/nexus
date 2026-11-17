@@ -27,11 +27,11 @@ def test_create_returns_inbox_task(session):
     Then the task is created in the inbox state with that detail
     """
     projects.create(session, "nexus", "Nexus", "")
-    task = tasks.create(session, "Write the docs", "nexus", "Body", "@ordi", "S")
+    task = tasks.create(session, "Write the docs", "nexus", "Body", "code-core", "S")
     assert task.state is TaskState.INBOX
     assert task.project_id is not None
     assert task.body == "Body"
-    assert task.context == "@ordi"
+    assert task.context == "code-core"
     assert task.size == "S"
 
 def test_create_project_not_found(session):
@@ -63,11 +63,11 @@ def test_create_in_version_returns_planned_task(session):
     """
     projects.create(session, "nexus", "Nexus", "")
     version = versions.create(session, "nexus", "0.1.0", "First version", ["Ships"])
-    task = tasks.create_in_version(session, version.id, "Write the docs", "@ordi", "S", "Body")
+    task = tasks.create_in_version(session, version.id, "Write the docs", "code-core", "S", "Body")
     assert task.state is TaskState.PLANNED
     assert task.project_id == version.project_id
     assert task.version_id == version.id
-    assert task.context == "@ordi"
+    assert task.context == "code-core"
     assert task.size == "S"
     assert task.body == "Body"
     assert [t.id for t in versions.list_tasks(session, version.id)] == [task.id]
@@ -206,10 +206,10 @@ def test_clarify_inbox_task(session):
     """
     projects.create(session, "nexus", "Nexus", "")
     task = tasks.capture(session, "Write the docs")
-    clarified = tasks.clarify(session, task.id, "Write the docs", "Body", "nexus", "@ordi", "S")
+    clarified = tasks.clarify(session, task.id, "Write the docs", "Body", "nexus", "code-core", "S")
     assert clarified.state is TaskState.REFINED
     assert clarified.project_id is not None
-    assert clarified.context == "@ordi"
+    assert clarified.context == "code-core"
 
 def test_clarify_someday_task(session):
     """Clarify a someday task reactivates it to refined

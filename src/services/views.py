@@ -66,7 +66,7 @@ def to_refine(session : Session, context : str | None = None, project_key : str 
 
     Args:
         session: Database session to use.
-        context: Optional context tag (e.g. "@ordi") to filter on.
+        context: Optional domain slug (e.g. "code-core") to filter on.
         project_key: Optional project key to filter on. A key matching no
             project simply yields no results, rather than raising.
         limit: Optional maximum number of tasks to return.

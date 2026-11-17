@@ -5,7 +5,7 @@ import pytest
 
 from src.mcp_server import tools
 from src.models.event import Event
-from src.models.task import Task
+from src.models.task import Task, TaskState
 from src.services import events, projects, tasks, versions
 
 
@@ -68,7 +68,7 @@ def test_every_tool_is_described_with_a_strict_schema_and_annotations():
     (only delete_criterion removes data)
     """
     listed = tools.list_tools()
-    assert len(listed) == len(tools.TOOLS) == 25
+    assert len(listed) == len(tools.TOOLS) == 29
     for item in listed:
         assert item["description"]
         assert item["inputSchema"]["type"] == "object" and item["inputSchema"]["additionalProperties"] is False
@@ -87,12 +87,13 @@ def test_read_only_tools_are_exactly_the_read_ones():
     """
     assert {n for n, t in tools.TOOLS.items() if t.read_only} == {
         "list_projects", "list_versions", "list_tasks", "get_project", "get_version", "get_task",
-        "inbox", "search", "dashboard"}
+        "inbox", "search", "dashboard", "get_ai_settings", "ai_profile"}
 
 
 READ_CALLS = [("list_projects", {}), ("list_versions", {}), ("list_versions", {"project": "nx"}),
               ("list_tasks", {}), ("get_project", {"project": "nx"}), ("get_version", {"version": "1.0", "project": "nx"}),
-              ("inbox", {}), ("search", {"term": "task"}), ("dashboard", {})]
+              ("inbox", {}), ("search", {"term": "task"}), ("dashboard", {}),
+              ("get_ai_settings", {"project": "nx"}), ("ai_profile", {"project": "nx"})]
 
 
 @pytest.mark.parametrize("name,arguments", READ_CALLS)
@@ -257,9 +258,9 @@ def test_add_task_to_project_or_version(session, world):
     When adding tasks with and without a version
     Then one lands in the inbox and one is planned in the version
     """
-    inbox = ok(session, "add_task", project="nx", title="A", context="@ordi", size="M", body="Detail")
+    inbox = ok(session, "add_task", project="nx", title="A", context="code-core", size="M", body="Detail")
     assert (inbox["state"], inbox["project"], inbox["version"]) == ("INBOX", "nx", None)
-    assert (inbox["context"], inbox["size"], inbox["body"]) == ("@ordi", "M", "Detail")
+    assert (inbox["context"], inbox["size"], inbox["body"]) == ("code-core", "M", "Detail")
     planned = ok(session, "add_task", project="nx", version="1.0", title="B")
     assert (planned["state"], planned["version"]) == ("PLANNED", "1.0")
     assert "doesn't exist" in refused(session, "add_task", project="ghost", title="C")
@@ -539,6 +540,8 @@ WRITE_CALLS = [
     ("delete_criterion", lambda w: {"version": w.version.ref, "index": 1}),
     ("start_version", lambda w: {"version": w.version.ref}),
     ("release_version", lambda w: {"version": w.ready.ref}),
+    ("set_domain_nature", lambda w: {"project": "nx", "domain": "assets", "nature": "FOUNDING"}),
+    ("set_ai_target", lambda w: {"project": "nx", "nature": "FOUNDING", "min_own_pct": 80}),
 ]
 
 
@@ -573,3 +576,57 @@ def test_the_write_calls_above_cover_every_write_tool():
     Then none is left out, so a new write tool can't skip the actor check
     """
     assert {t.name for t in tools.TOOLS.values() if not t.read_only} == {name for name, _ in WRITE_CALLS}
+
+
+# AI usage metric -----------------------------------------------------------------------------------
+
+def test_update_task_sets_and_clears_the_ai_mode(session, world):
+    """
+    Given a planned task
+    When setting its domain and AI mode, then clearing the mode
+    Then the task shows them, and an unknown mode is refused
+    """
+    _, planned, _, _ = world
+    updated = ok(session, "update_task", ref=planned.ref, context="code-core", ai_mode="LEARNED")
+    assert (updated["context"], updated["ai_mode"]) == ("code-core", "LEARNED")
+    assert ok(session, "update_task", ref=planned.ref, ai_mode=" ")["ai_mode"] is None
+    assert "must be one of" in refused(session, "update_task", ref=planned.ref, ai_mode="LAZY")
+    assert "must be one of" in refused(session, "update_task", ref=planned.ref, context="@ordi")
+
+
+def test_ai_settings_round_trip(session, world):
+    """
+    Given a project
+    When making 'assets' founding and setting a founding target
+    Then get_ai_settings shows both
+    """
+    ok(session, "set_domain_nature", project="nx", domain="assets", nature="FOUNDING")
+    ok(session, "set_ai_target", project="nx", nature="FOUNDING", min_own_pct=80, max_dependent_pct=0)
+    settings = ok(session, "get_ai_settings", project="nx")
+    assets = next(d for d in settings["domains"] if d["domain"] == "assets")
+    assert (assets["nature"], assets["default"]) == ("FOUNDING", "PERIPHERAL")
+    assert settings["targets"][0] == {"nature": "FOUNDING", "min_own_pct": 80, "max_dependent_pct": 0}
+    assert "between 0 and 100" in refused(session, "set_ai_target", project="nx", nature="FOUNDING",
+                                          min_own_pct=120)
+
+
+def test_ai_profile_reports_shares_gaps_and_left_out_tasks(session, world):
+    """
+    Given a founding target of 80 % own, one done L autonomous and one done S delegated founding task,
+    and one done task without mode
+    When reading the profile
+    Then founding is 80 % own, the target is met, and one task has no mode
+    """
+    _, planned, _, _ = world
+    ok(session, "set_ai_target", project="nx", nature="FOUNDING", min_own_pct=80)
+    for size, mode in (("L", "AUTONOMOUS"), ("S", "DELEGATED"), ("M", None)):
+        task = tasks.create(session, "Done", "nx", None, "code-core", size)
+        task.state = TaskState.DONE
+        session.commit()
+        if mode:
+            ok(session, "update_task", ref=task.ref, ai_mode=mode)
+    profile = ok(session, "ai_profile", project="nx")
+    founding = profile["natures"][0]
+    assert (founding["nature"], founding["weight"], founding["own_pct"]) == ("FOUNDING", 10, 80.0)
+    assert (founding["own_gap"], founding["met"]) == (0.0, True)
+    assert profile["without_mode"] == 1
