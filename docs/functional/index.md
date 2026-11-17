@@ -20,4 +20,3 @@ introduces the first screens (see spec §9/§12 in
 
 - [Command line](cli.md): the `nexus` CLI, refs and the import format.
 - [MCP server](mcp.md): the tools an AI assistant can call, and how to register them.
-- [AI usage](ai-usage.md): task domains and AI modes, the project's AI usage profile and settings.

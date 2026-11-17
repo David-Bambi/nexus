@@ -36,11 +36,11 @@ def test_add_task_to_project_lands_in_inbox(run, session, version):
     When running `nexus add task nx --title ...` with detail options
     Then an inbox task is created in the project, by the cli actor
     """
-    code, out, _ = run("add", "task", "nx", "-t", "Write docs", "-c", "code-core", "-s", "S", "-b", "More")
+    code, out, _ = run("add", "task", "nx", "-t", "Write docs", "-c", "@ordi", "-s", "S", "-b", "More")
     task = _only_task(session)
     assert code == EXIT_OK and task.ref in out and "(inbox)" in out
     assert (task.title, task.state, task.project.key) == ("Write docs", TaskState.INBOX, "nx")
-    assert (task.context, task.size, task.body) == ("code-core", "S", "More")
+    assert (task.context, task.size, task.body) == ("@ordi", "S", "More")
     assert events.history(session, "task", task.id)[0].actor == events.ACTOR_CLI
 
 

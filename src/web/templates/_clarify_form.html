@@ -3,7 +3,7 @@
     {{ ui.field("Title", "title", task.title, required=true) }}
     {{ ui.field("Body", "body", task.body, kind="textarea") }}
     {{ ui.field("Project key", "project_key", task.project.key if task.project else "") }}
-    {{ ui.context_select(task.context) }}
+    {{ ui.field("Context", "context", task.context) }}
     {{ ui.size_select(task.size) }}
     <div class="form-actions"><button class="button-primary" type="submit">{{ clarify_label }}</button></div>
 </form>

@@ -77,12 +77,7 @@
 <form class="form-inline" method="post" action="{{ url_for('pages.version_task_add', key=key, number=version.number) }}">
     <input type="text" name="title" placeholder="New task" aria-label="New task" required>
     <input type="text" name="body" placeholder="Body" aria-label="Body">
-    <select name="context" aria-label="Domain">
-        <option value="">Domain</option>
-        {% for slug, (text, _) in ai_domains.items() %}
-        <option value="{{ slug }}">{{ text }}</option>
-        {% endfor %}
-    </select>
+    <input type="text" name="context" placeholder="Context" aria-label="Context">
     <select name="size" aria-label="Size" title="In doubt, take the bigger size; split anything bigger than L.">
         {% for size, guide in size_guide.items() %}
         <option value="{{ size }}" title="{{ guide.short }}">{{ size }}</option>

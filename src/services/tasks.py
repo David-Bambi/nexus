@@ -2,10 +2,9 @@ from datetime import datetime
 
 from sqlalchemy.orm import Session
 
-from src.models.ai import AiMode
 from src.models.task import Task, TaskState
 from src.models.version import Version, VersionStatus
-from src.services import ai, events, projects, refs
+from src.services import events, projects, refs
 from src.services.errors import InvalidTransitionError, NotFoundError, ValidationError
 
 # Fields update() is allowed to touch; state, project/version linkage and
@@ -53,23 +52,6 @@ def _require_valid_title(title : str) -> None:
     """
     if not title.strip() :
         raise ValidationError("The title must be specified.")
-
-
-def _require_domain_context(context : str | None, current : str | None = None) -> None:
-    """Check a task context against the domain list, unless it is unchanged.
-
-    Contexts set before the domain list existed stay accepted as long as they
-    aren't changed.
-
-    Args:
-        context: The context about to be stored.
-        current: The task's current context, None for a new task.
-
-    Raises:
-        ValidationError: If a new or changed context isn't a known domain.
-    """
-    if context != current:
-        ai.require_domain(context)
 
 
 def _log_transition(session : Session, task : Task, action : str, previous : TaskState,
@@ -182,7 +164,7 @@ def create(session : Session,
         title: Short title for the task.
         project_key: Optional key of the owning project.
         body: Optional free-text detail.
-        context: Optional domain slug (e.g. "code-core"), see services/ai.DOMAINS.
+        context: Optional context tag (e.g. "@ordi").
         size: Optional effort size ("XS", "S", "M", "L").
         actor: Who made the change, recorded in the event log.
 
@@ -192,7 +174,6 @@ def create(session : Session,
     Raises:
         NotFoundError: If project_key is given but no project has this key.
     """
-    _require_domain_context(context)
     project = projects.get(session, project_key) if project_key else None
 
     task = Task(ref=refs.generate(session, Task),
@@ -224,7 +205,7 @@ def create_in_version(session : Session,
         session: Database session to use.
         version_id: Id of the version to create the task in.
         title: Short title for the task.
-        context: Optional domain slug (e.g. "code-core"), see services/ai.DOMAINS.
+        context: Optional context tag (e.g. "@ordi").
         size: Optional effort size ("XS", "S", "M", "L").
         body: Optional free-text detail.
         actor: Who made the change, recorded in the event log.
@@ -240,7 +221,7 @@ def create_in_version(session : Session,
     _require_existing_version(version, version_id)
     _require_unreleased(version)
     _require_valid_title(title)
-    _require_domain_context(context)
+
 
     task = Task(ref=refs.generate(session, Task),
                 project_id=version.project_id,
@@ -287,8 +268,6 @@ def update(session : Session, task_id : int, actor : str = events.ACTOR_WEB, **f
     for name in fields:
         if name not in _UPDATABLE_FIELDS:
             raise ValidationError(f"field '{name}' cannot be updated this way.")
-    if "context" in fields:
-        _require_domain_context(fields["context"], task.context)
 
     changes = {}
     for name, value in fields.items():
@@ -300,31 +279,6 @@ def update(session : Session, task_id : int, actor : str = events.ACTOR_WEB, **f
     if changes:
         events.log(session, actor, "task", task.id, "updated", changes)
 
-    session.commit()
-    return task
-
-def set_ai_mode(session : Session, task_id : int, mode : AiMode | None,
-                actor : str = events.ACTOR_WEB) -> Task:
-    """Record how the AI took part in a task.
-
-    Args:
-        session: Database session to use.
-        task_id: Id of the task.
-        mode: The task's AI mode, or None to clear it.
-        actor: Who made the change, recorded in the event log.
-
-    Returns:
-        The updated Task.
-
-    Raises:
-        NotFoundError: If no task has this id.
-    """
-    task = get(session, task_id)
-    if task.ai_mode != mode:
-        events.log(session, actor, "task", task.id, "updated",
-                   {"ai_mode": {"from": task.ai_mode.name if task.ai_mode else None,
-                                "to": mode.name if mode else None}})
-        task.ai_mode = mode
     session.commit()
     return task
 
@@ -346,7 +300,7 @@ def clarify(session : Session,
         title: Short title for the task.
         body: Optional free-text detail.
         project_key: Optional key of the owning project.
-        context: Optional domain slug (e.g. "code-core"), see services/ai.DOMAINS.
+        context: Optional context tag (e.g. "@ordi").
         size: Optional effort size ("XS", "S", "M", "L").
         actor: Who made the change, recorded in the event log.
 
@@ -363,7 +317,6 @@ def clarify(session : Session,
     if task.state not in (TaskState.INBOX, TaskState.SOMEDAY):
         raise InvalidTransitionError(f"task '{task_id}' isn't inbox or someday.")
 
-    _require_domain_context(context, task.context)
     project = projects.get(session, project_key) if project_key else None
 
     previous = task.state

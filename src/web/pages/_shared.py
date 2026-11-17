@@ -1,6 +1,6 @@
 from flask import Blueprint, current_app
 
-from src.services import ai
+from src.services import sizes
 
 # Full-page (non-fragment) routes. Adapters only: no business logic here —
 # validate input, call a service, render a template (ADR-0001). Every module
@@ -13,15 +13,13 @@ PAGE_LIMIT = 100
 
 
 @bp.record_once
-def _ai_labels(state):
-    """Give every template, imported macros included, the AI domains, modes and natures.
+def _size_guide(state):
+    """Give every template, imported macros included, the task-size guide.
 
-    Jinja globals are used rather than a context processor because macros
+    A Jinja global is used rather than a context processor because macros
     imported without context can't see context-processor values.
     """
-    state.app.jinja_env.globals.update(ai_domains=ai.DOMAINS, ai_modes=ai.MODE_LABELS,
-                                       ai_natures=ai.NATURE_LABELS, size_guide=ai.SIZE_GUIDE,
-                                       size_weights=ai.SIZE_WEIGHTS)
+    state.app.jinja_env.globals.update(size_guide=sizes.SIZE_GUIDE)
 
 
 def _session():

@@ -38,8 +38,7 @@ Usage: [MCP server](../../functional/mcp.md).
   Starting and releasing versions were later exposed by
   [0009](0009-version-lifecycle-in-cli-and-mcp.md) (13 write tools, 22 in all),
   DoD add/edit/delete by [0010](0010-dod-editing-in-cli-and-mcp.md)
-  (16 write tools, 25 in all), AI usage tools by
-  [0013](0013-ai-usage-metric.md) (11 read and 18 write tools, 29 in all).
+  (16 write tools, 25 in all).
 - **Write safety**: rely on the client's permissions (Claude Code prompts for
   write tools; read-only tools carry `readOnlyHint`). No server-side
   read-only mode.

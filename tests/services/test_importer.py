@@ -11,7 +11,7 @@ DOCUMENT = {
         "key": "nx", "name": "Nexus", "description": "The manager",
         "versions": [{
             "number": "1.0", "title": "First", "goal": "Ship", "dod": ["Ships", "Documented"],
-            "tasks": [{"title": "Planned", "size": "S", "context": "code-core", "body": "Detail"}],
+            "tasks": [{"title": "Planned", "size": "S", "context": "@ordi", "body": "Detail"}],
         }],
     }],
     "tasks": [
@@ -45,7 +45,7 @@ def test_import_creates_everything(session):
     assert [c.description for c in version.definition_of_done] == ["Ships", "Documented"]
     by_title = {t.title: t for t in tasks.list(session)}
     assert by_title["Planned"].state == TaskState.PLANNED and by_title["Planned"].size == "S"
-    assert (by_title["Planned"].context, by_title["Planned"].body) == ("code-core", "Detail")
+    assert (by_title["Planned"].context, by_title["Planned"].body) == ("@ordi", "Detail")
     assert by_title["Loose"].project_id is None and by_title["Loose"].state == TaskState.INBOX
     assert by_title["In project"].project.key == "nx" and by_title["In project"].version_id is None
     assert by_title["In version"].version_id == version.id
