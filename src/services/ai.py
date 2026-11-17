@@ -50,6 +50,42 @@ SIZE_WEIGHTS = {"XS": 1, "S": 2, "M": 4, "L": 8}
 # Weight of a task without a size (counted as M).
 DEFAULT_WEIGHT = SIZE_WEIGHTS["M"]
 
+@dataclass(frozen=True)
+class SizeGuide:
+    """What a task size means, from the task-size guide."""
+
+    # One-line summary, shown in size lists.
+    short: str
+    # When to choose this size.
+    when: str
+    # A typical Nexus task of this size.
+    example: str
+
+
+# Meaning of each task size, in the order of SIZE_WEIGHTS.
+SIZE_GUIDE: dict[str, SizeGuide] = {
+    "XS": SizeGuide("trivial change in one place, no decision",
+                    "Trivial change in one place, no decision.",
+                    "Fix a typo or a label, change a config value."),
+    "S": SizeGuide("small change you understand, one layer, with its test",
+                   "Small change you already understand, in one layer, with its test.",
+                   "Add a field to a form; an MCP tool wrapping an existing service."),
+    "M": SizeGuide("several layers, or a small design decision; clear path",
+                   "Feature across several layers (model, service, page, tests), or with a small "
+                   "design decision. Clear path.",
+                   "Add a project setting and its form."),
+    "L": SizeGuide("new concept or open questions; several sessions",
+                   "New concept or open questions: needs design and several work sessions.",
+                   "A new entity with its migration, service, pages and docs."),
+}
+
+# Rules for choosing a size, from the task-size guide.
+SIZE_RULES = (
+    "When you hesitate between two sizes, take the bigger one.",
+    "A task bigger than L is split.",
+    "A task mixing defining and doing is split too.",
+)
+
 # Modes where David executed the work himself.
 OWN_MODES = (AiMode.AUTONOMOUS, AiMode.LEARNED)
 
@@ -261,6 +297,18 @@ class NatureProfile:
 
 
 @dataclass
+class SizeShare:
+    """How much one task size weighs in a project's profile."""
+
+    # Counted done tasks of this size.
+    count: int = 0
+    # Their total weight.
+    weight: int = 0
+    # Their share (0-100) of the weight of all counted tasks.
+    share: float = 0.0
+
+
+@dataclass
 class Profile:
     """AI usage profile of a project, from its done tasks."""
 
@@ -273,6 +321,10 @@ class Profile:
     unknown_domain: int = 0
     # Counted done tasks without a size (weighed as M).
     without_size: int = 0
+    # Weight of each size among counted tasks, in the order of SIZE_WEIGHTS;
+    # the key None groups tasks without a size.
+    by_size: dict[str | None, SizeShare] = field(
+        default_factory=lambda: {size: SizeShare() for size in [*SIZE_WEIGHTS, None]})
 
 
 def profile(session : Session, key : str) -> Profile:
@@ -308,12 +360,20 @@ def profile(session : Session, key : str) -> Profile:
         if task.context not in domain_natures:
             result.unknown_domain += 1
             continue
-        if task.size not in SIZE_WEIGHTS:
+        size = task.size if task.size in SIZE_WEIGHTS else None
+        if size is None:
             result.without_size += 1
-        weights[domain_natures[task.context]][task.ai_mode] += SIZE_WEIGHTS.get(task.size, DEFAULT_WEIGHT)
+        weight = SIZE_WEIGHTS.get(size, DEFAULT_WEIGHT)
+        weights[domain_natures[task.context]][task.ai_mode] += weight
+        result.by_size[size].count += 1
+        result.by_size[size].weight += weight
 
     for nature, entry in by_nature.items():
         entry.weight = sum(weights[nature].values())
         if entry.weight:
             entry.shares = {mode: 100 * w / entry.weight for mode, w in weights[nature].items()}
+    total = sum(entry.weight for entry in by_nature.values())
+    if total:
+        for entry in result.by_size.values():
+            entry.share = 100 * entry.weight / total
     return result

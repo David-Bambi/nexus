@@ -20,7 +20,8 @@ def _ai_labels(state):
     imported without context can't see context-processor values.
     """
     state.app.jinja_env.globals.update(ai_domains=ai.DOMAINS, ai_modes=ai.MODE_LABELS,
-                                       ai_natures=ai.NATURE_LABELS)
+                                       ai_natures=ai.NATURE_LABELS, size_guide=ai.SIZE_GUIDE,
+                                       size_weights=ai.SIZE_WEIGHTS)
 
 
 def _session():

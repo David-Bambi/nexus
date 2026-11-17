@@ -22,7 +22,7 @@
 
 <section class="ai-usage" aria-labelledby="ai-usage-title">
     <h2 id="ai-usage-title">AI usage</h2>
-    <p class="hint">Done tasks, weighted by size (XS=1, S=2, M=4, L=8; no size counts as M).</p>
+    <p class="hint">Done tasks, weighted by size (XS=1, S=2, M=4, L=8; no size counts as M). <a href="{{ url_for('pages.sizes') }}">Size guide</a></p>
     {{ ui.error_message(error) }}
     <div class="table-scroll">
     <table class="ai-profile">
@@ -53,6 +53,25 @@
                     {% elif entry.met %}<span class="ai-met">✅ {{ entry.own_pct | round | int }} %</span>
                     {% else %}<span class="ai-missed">❌ {{ entry.own_pct | round | int }} %</span>{% endif %}
                 </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    <h3>Weight by size</h3>
+    <div class="table-scroll">
+    <table class="ai-profile" data-field="ai-by-size">
+        <thead>
+            <tr><th scope="col">Size</th><th scope="col">Weight each</th><th scope="col">Tasks</th><th scope="col">Weight</th><th scope="col">Share</th></tr>
+        </thead>
+        <tbody>
+            {% for size, entry in profile.by_size.items() %}
+            <tr data-size="{{ size or 'none' }}">
+                <th scope="row">{% if size %}<span class="size">{{ size }}</span>{% else %}No size{% endif %}</th>
+                <td>{{ size_weights[size or "M"] }}</td>
+                <td>{{ entry.count }}</td>
+                <td>{{ entry.weight }}</td>
+                <td>{% if entry.weight %}{{ entry.share | round | int }} %{% else %}—{% endif %}</td>
             </tr>
             {% endfor %}
         </tbody>

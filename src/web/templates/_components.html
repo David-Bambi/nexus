@@ -41,28 +41,20 @@
 </label>
 {% endmacro %}
 
-{# What each task size means, from the task-size guide. #}
-{% set size_help = {
-    "XS": "XS — trivial change in one place, no decision",
-    "S": "S — small change you understand, one layer, with its test",
-    "M": "M — several layers, or a small design decision; clear path",
-    "L": "L — new concept or open questions; several sessions",
-} %}
-
 {# A task's size, with what each size means. A value outside the list stays selectable. #}
 {% macro size_select(value) %}
 <label class="field">
     <span class="field-label">Size</span>
     <select name="size">
         <option value="">—</option>
-        {% if value and value not in size_help %}
+        {% if value and value not in size_guide %}
         <option value="{{ value }}" selected>{{ value }}</option>
         {% endif %}
-        {% for size, text in size_help.items() %}
-        <option value="{{ size }}"{% if size == value %} selected{% endif %}>{{ text }}</option>
+        {% for size, guide in size_guide.items() %}
+        <option value="{{ size }}"{% if size == value %} selected{% endif %}>{{ size }} — {{ guide.short }}</option>
         {% endfor %}
     </select>
-    <span class="hint">In doubt, take the bigger size; split anything bigger than L.</span>
+    <span class="hint">In doubt, take the bigger size; split anything bigger than L. <a href="{{ url_for('pages.sizes') }}">Size guide</a></span>
 </label>
 {% endmacro %}
 

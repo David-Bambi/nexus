@@ -125,4 +125,6 @@ def ai_profile(item : Profile) -> dict:
             "natures": [_nature_profile(n) for n in item.natures],
             "without_mode": item.without_mode,
             "unknown_domain": item.unknown_domain,
-            "without_size": item.without_size}
+            "without_size": item.without_size,
+            "by_size": [{"size": size, "count": entry.count, "weight": entry.weight, "share": _pct(entry.share)}
+                        for size, entry in item.by_size.items()]}

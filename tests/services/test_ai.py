@@ -245,3 +245,33 @@ def test_profile_target_met_or_unknown(session, project):
     natures = {entry.nature: entry for entry in ai.profile(session, "nx").natures}
     assert natures[Nature.FOUNDING].met is True
     assert natures[Nature.REPETITIVE].met is None
+
+
+# Size guide ----------------------------------------------------------------------------------------
+
+def test_size_guide_covers_every_weighted_size_in_order():
+    """
+    Given the size weights and the size guide
+    When comparing their sizes
+    Then both list XS, S, M, L in the same order
+    """
+    assert list(ai.SIZE_GUIDE) == list(ai.SIZE_WEIGHTS) == ["XS", "S", "M", "L"]
+
+
+def test_profile_weight_by_size(session, project):
+    """
+    Given counted done tasks: one L, two S, one without size, and a done task without mode
+    When computing the profile
+    Then each size reports its tasks, weight and share of the total (16), the unsized one as M
+    """
+    _done(session, "code-core", AiMode.AUTONOMOUS, "L")
+    _done(session, "docs", AiMode.DELEGATED, "S")
+    _done(session, "tests-variants", AiMode.DELEGATED, "S")
+    _done(session, "debug", AiMode.LEARNED, None)
+    _done(session, "docs", None, "L")
+    by_size = ai.profile(session, "nx").by_size
+    assert list(by_size) == ["XS", "S", "M", "L", None]
+    assert (by_size["L"].count, by_size["L"].weight, by_size["L"].share) == (1, 8, 50)
+    assert (by_size["S"].count, by_size["S"].weight, by_size["S"].share) == (2, 4, 25)
+    assert (by_size[None].count, by_size[None].weight, by_size[None].share) == (1, 4, 25)
+    assert (by_size["XS"].count, by_size["M"].count) == (0, 0)

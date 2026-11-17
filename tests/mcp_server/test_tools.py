@@ -630,3 +630,4 @@ def test_ai_profile_reports_shares_gaps_and_left_out_tasks(session, world):
     assert (founding["nature"], founding["weight"], founding["own_pct"]) == ("FOUNDING", 10, 80.0)
     assert (founding["own_gap"], founding["met"]) == (0.0, True)
     assert profile["without_mode"] == 1
+    assert {entry["size"]: entry["share"] for entry in profile["by_size"]}["L"] == 80.0

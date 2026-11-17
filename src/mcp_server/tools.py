@@ -291,7 +291,8 @@ def get_ai_settings(session : Session, args : dict) -> dict:
 
 @tool("ai_profile", "Show a project's AI usage profile: for each nature, the share of each AI mode among done "
       "tasks, weighted by size (XS=1, S=2, M=4, L=8, none=4), compared with the target (gaps are negative when "
-      "missed), plus how many done tasks have no mode, an unknown domain, or no size.",
+      "missed), plus how many done tasks have no mode, an unknown domain, or no size, and the weight of each size "
+      "among counted tasks (size null = no size).",
       {"project": _PROJECT}, ["project"], read_only=True)
 def ai_profile(session : Session, args : dict) -> dict:
     """Show a project's AI usage profile."""

@@ -2,9 +2,15 @@ from flask import abort, redirect, render_template, request, url_for
 
 from src.models.ai import AiMode
 from src.models.task import TaskState
-from src.services import events, tasks, versions
+from src.services import ai, events, tasks, versions
 from src.services.errors import InvalidTransitionError, NotFoundError, ValidationError
 from src.web.pages._shared import PAGE_LIMIT, _session, bp
+
+
+@bp.route("/sizes")
+def sizes():
+    """Show the task-size guide: each size's weight, when to choose it, an example, and the rules."""
+    return render_template("sizes.html", size_rules=ai.SIZE_RULES)
 
 
 @bp.route("/tasks", methods=["GET", "POST"])

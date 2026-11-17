@@ -84,10 +84,9 @@
         {% endfor %}
     </select>
     <select name="size" aria-label="Size" title="In doubt, take the bigger size; split anything bigger than L.">
-        <option value="XS" title="Trivial change in one place, no decision">XS</option>
-        <option value="S" title="Small change you understand, one layer, with its test">S</option>
-        <option value="M" title="Several layers, or a small design decision; clear path">M</option>
-        <option value="L" title="New concept or open questions; several sessions">L</option>
+        {% for size, guide in size_guide.items() %}
+        <option value="{{ size }}" title="{{ guide.short }}">{{ size }}</option>
+        {% endfor %}
     </select>
     <button type="submit">Add task</button>
 </form>

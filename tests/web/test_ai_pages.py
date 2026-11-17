@@ -132,3 +132,41 @@ def test_task_size_select_explains_each_size(client, session, project):
     html = client.get(f"/tasks/{task.id}").get_data(as_text=True)
     assert '<option value="S" selected>S — small change you understand' in html
     assert "L — new concept or open questions" in html and "split anything bigger than L" in html
+
+
+def test_sizes_page_shows_weights_guide_and_rules(client):
+    """
+    Given the app
+    When opening the sizes page
+    Then each size row shows its weight, when to use it and an example, followed by the rules
+    """
+    html = client.get("/sizes").get_data(as_text=True)
+    row = re.search(r'<tr data-size="L">(.*?)</tr>', html, re.S).group(1)
+    assert "<td>8</td>" in row and "New concept or open questions" in row and "A new entity" in row
+    assert "A task bigger than L is split." in html
+
+
+def test_size_lists_and_project_link_to_the_sizes_page(client, session, project):
+    """
+    Given a task and its project
+    When opening the task page and the project page
+    Then both link to the sizes page
+    """
+    task = tasks.create(session, "Task", "nx")
+    assert 'href="/sizes"' in client.get(f"/tasks/{task.id}").get_data(as_text=True)
+    assert 'href="/sizes"' in client.get("/projects/nx").get_data(as_text=True)
+
+
+def test_project_page_shows_weight_by_size(client, session, project):
+    """
+    Given done counted tasks of size L and S
+    When opening the project page
+    Then the weight-by-size table shows L at 80 % and S at 20 %
+    """
+    _done(session, "code-core", AiMode.AUTONOMOUS, "L")
+    _done(session, "docs", AiMode.DELEGATED, "S")
+    html = client.get("/projects/nx").get_data(as_text=True)
+    row_l = re.search(r'<tr data-size="L">(.*?)</tr>', html, re.S).group(1)
+    row_s = re.search(r'<tr data-size="S">(.*?)</tr>', html, re.S).group(1)
+    assert "<td>8</td>" in row_l and "80 %" in row_l and "20 %" in row_s
+    assert '<tr data-size="none">' in html

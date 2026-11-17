@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% import "_components.html" as ui %}
+
+{% block title %}Task sizes — Nexus{% endblock %}
+
+{% block content %}
+{{ ui.page_header("Task sizes") }}
+<p class="lead">Sizes are effort levels, never hours. Each size is about twice the previous one.</p>
+<p class="hint">In a project's AI usage profile, each done task weighs its size's weight; a task without a size counts as M.</p>
+
+<div class="table-scroll">
+<table class="ai-profile size-guide">
+    <thead>
+        <tr><th scope="col">Size</th><th scope="col">Weight</th><th scope="col">When</th><th scope="col">Example</th></tr>
+    </thead>
+    <tbody>
+        {% for size, guide in size_guide.items() %}
+        <tr data-size="{{ size }}">
+            <th scope="row"><span class="size">{{ size }}</span></th>
+            <td>{{ size_weights[size] }}</td>
+            <td>{{ guide.when }}</td>
+            <td>{{ guide.example }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+
+<h2>Rules</h2>
+<ul>
+    {% for rule in size_rules %}
+    <li>{{ rule }}</li>
+    {% endfor %}
+</ul>
+{% endblock %}
