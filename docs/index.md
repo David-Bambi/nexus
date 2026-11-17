@@ -22,6 +22,12 @@ code but not architecture decisions themselves.
 
 [Browse Python →](python/index.md)
 
+## Guides
+
+Short how-to pages for using Nexus day to day.
+
+[Browse Guides →](guides/index.md)
+
 ## AI tools
 
 How Claude Code is configured to work in this repository — CLAUDE.md

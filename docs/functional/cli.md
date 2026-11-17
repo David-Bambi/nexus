@@ -48,8 +48,9 @@ command line. Errors go to stderr.
 | `nexus import <file\|->` | Bulk import, see below |
 
 `add task` without a version creates an inbox task attached to the project;
-with a version it creates a task already planned. `--size` is `XS`, `S`,
-`M` or `L`. Without `--title`, it prompts on a terminal and fails otherwise.
+with a version it creates a task already planned. `--context` must be a
+[domain slug](ai-usage.md#domains) (e.g. `code-core`). `--size` is `XS`,
+`S`, `M` or `L` ([task size guide](../guides/task-size.md)). Without `--title`, it prompts on a terminal and fails otherwise.
 A lone argument that is blank or contains whitespace is a capture.
 
 Version actions also work after a `v-` ref (`nexus v-9xa start`) and print
@@ -80,7 +81,7 @@ Design: [0007](../architecture/adr/0007-importer-mcp-entry-point.md).
    "versions": [{"number": "1.0", "title": "First", "goal": "...",
                  "dod": ["Docs written"],
                  "tasks": [{"title": "Write docs", "body": "...",
-                            "context": "@ordi", "size": "S"}]}]}],
+                            "context": "docs", "size": "S"}]}]}],
  "tasks": [{"title": "Loose idea"},
            {"title": "Attached", "project": "NX"},
            {"title": "Planned", "project": "NX", "version": "1.0"}]}
@@ -96,6 +97,7 @@ Design: [0007](../architecture/adr/0007-importer-mcp-entry-point.md).
   `version` plans them. `version` alone is an error. New tasks in a released
   version are refused.
 - Unknown fields are errors. Refs and ids are not part of the format.
+- A task `context` must be a [domain slug](ai-usage.md#domains).
 - **All-or-nothing**: all problems are listed at once (each names its
   entry), and nothing is written if there is any.
 - `--dry-run` runs everything, rolls back and prints what would be created

@@ -1,5 +1,7 @@
 # Nexus
 
+*[Version française](README.fr.md)*
+
 A single-user, GTD-inspired project manager served as a local web app.
 
 ## Requirements
@@ -94,8 +96,9 @@ redeployed. Import format and details: `docs/functional/cli.md`.
 ## MCP server
 
 The running service also speaks the Model Context Protocol, so an AI
-assistant can read and update your projects (25 tools: list, get, search,
-capture, add, update, plan, start, complete, block, release, DoD editing, import...). Register it
+assistant can read and update your projects (29 tools: list, get, search,
+capture, add, update, plan, start, complete, block, release, DoD editing, import,
+AI usage settings and profile...). Register it
 once in Claude Code:
 
 ```bash
@@ -162,3 +165,23 @@ reference). Build/serve it locally:
 ```bash
 uv run mkdocs serve
 ```
+
+## Use of AI
+
+This project was made with the help of an AI assistant, Claude (Anthropic), through Claude Code,
+from September to November 2026. The table below shows how much each part relies on it.
+
+- 🤖 **AI-generated**: the AI produced the content; I directed it and reviewed it.
+- 🤝 **AI-assisted**: I did the work; the AI proposed, explained, reviewed or fixed.
+- ✋ **No AI**: done entirely by me.
+
+| Area | Level | In practice |
+|---|---|---|
+| Project management | 🤖 AI-generated | Specs, plans, versions and tasks |
+| Design and architecture | 🤖 AI-generated | Layering, data model and ADRs |
+| Code | 🤖 AI-generated | Web app, services, CLI and MCP server |
+| Code comments | 🤖 AI-generated | Docstrings and comments |
+| Tests | 🤖 AI-generated | The pytest suite |
+| Documentation and README | 🤖 AI-generated | `docs/` site and this README |
+| Graphic assets | 🤖 AI-generated | Stylesheet and page layout |
+| Tools | 🤖 AI-generated | Service, CLI and deploy scripts |

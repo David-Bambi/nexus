@@ -44,9 +44,11 @@ leaves no event. The session runs with `autoflush=False`, so services
 |---|---|
 | task | `created`, `updated`, `clarified`, `planned`, `unplanned`, `started`, `blocked`, `unblocked`, `completed`, `reopened`, `deferred`, `cancelled`, `restored`, `moved`, `deleted` |
 | version | `created`, `started`, `released`, `deleted`, `dod_added`, `dod_updated`, `dod_deleted`, `dod_checked`, `dod_unchecked` |
-| project | `created`, `archived`, `deleted`, `versions_reordered` |
+| project | `created`, `archived`, `deleted`, `versions_reordered`, `ai_settings_updated` |
 
 `versions_reordered` is logged on the project, with payload `ordered_ids`.
+`ai_settings_updated` payloads and the task `updated` `{ai_mode}` event:
+[0013](0013-ai-usage-metric.md).
 
 `dod_*` events are logged on the version (Definition of Done criteria have no
 entity of their own in the log). `dod_checked` / `dod_unchecked` are skipped
