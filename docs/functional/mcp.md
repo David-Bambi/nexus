@@ -21,41 +21,76 @@ Only requests from the machine itself are accepted (no authentication).
 
 ## Tools
 
+30 tools. The server's `instructions` (sent on `initialize`) summarize the
+2.0 model: the tree, keys vs refs, capture vs add vs clarify, the computed
+version. A test checks that every tool they name exists.
+
 Read tools (`readOnlyHint`):
 
 | Tool | Purpose |
 |---|---|
-| `list_projects` | Projects (`include_archived`) |
+| `list_projects` | Projects and subprojects, each with its `version` (`include_archived`) |
 | `list_tasks` | Features and tasks, filtered by `state`, `project`; `limit` |
-| `get_project` | A project or subproject and its subprojects |
-| `get_task` | All fields plus event history |
+| `get_project` | `version`, `criteria`, `subprojects` (with `version`) and `tree`; closed items only with `include_closed` |
+| `get_task` | All fields plus event history; a feature adds its direct `children` (closed included) |
 | `inbox` | Captured tasks to triage |
 | `search` | Substring of title or body; `limit` |
 | `dashboard` | Doing/waiting items, inbox and refine counts |
 
-Write tools (`destructiveHint: false`; `idempotentHint` on `update_task`):
+Item write tools:
 
 | Tool | Purpose |
 |---|---|
 | `capture_task` | Title into the inbox |
-| `add_task` | Create in a project's inbox; `body`, `context`, `size` |
-| `import_data` | Bulk import a `document` or a `text` list; `dry_run` (same rules as the [CLI import](cli.md#import)) |
+| `add_task` | Into a project's tree, refined: `project` and/or `parent` (only a parent: its project), `title`, `kind` (`task` default, `feature`), `body`, `context`, `size` |
+| `clarify_task` | Inbox or someday item to refined: `title`, `project`, `parent`, `kind`, `body`, `context`, `size`; omitted fields keep their value |
 | `update_task` | Change title, body, context, size; blank body/context/size clears it, blank title refused |
+| `move_task` | To a project's top level and/or under a feature (`project`, `parent`); keeps its state, a feature takes its subtree |
+| `change_kind` | Task to feature, or empty feature to task; the ref letter follows (`t-` / `f-`) |
+| `reorder_task` | `direction` `up` or `down` among siblings; an open item skips closed ones |
 | `start_task` | Refined to doing |
 | `complete_task` | Doing to done; a feature only once its children are done or cancelled |
 | `block_task` | Doing to waiting, `reason` required |
 | `unblock_task` | Waiting to doing |
+| `reopen_task` | Done to doing; a feature keeps its `released_in` |
+| `cancel_task` | Open item to cancelled; a feature only once its children are closed |
+| `restore_task` | Cancelled to refined |
+| `defer_task` | Inbox or refined to someday |
+| `import_data` | Bulk import a `document` or a `text` list; `dry_run` (same rules as the [CLI import](cli.md#import)) |
 
-Not exposed, use the web UI: deleting, archiving, and arbitrary state
-changes. No clarify, move or change-kind tool yet (planned for a later
-increment).
+Project and version write tools:
+
+| Tool | Purpose |
+|---|---|
+| `create_project` | `key`, `name`, `description`; `parent` (a root key) makes a subproject |
+| `update_project` | `name` and/or `description`; blank description clears it |
+| `add_criterion` | Append a criterion for the next major version (`text`) |
+| `update_criterion` | Change criterion `number`'s `text` |
+| `set_criterion_done` | Check or uncheck criterion `number` (`done`) |
+| `delete_criterion` | Remove criterion `number`; later numbers shift down |
+| `release_major` | MAJOR + 1, MINOR 0, list emptied; refused unless it has criteria, all checked |
+
+Criterion tools and `release_major` return `{project, version, criteria}`.
+MINOR is never set by a tool: it rises when a feature is completed
+([0016](../architecture/adr/0016-computed-version.md)).
+
+Hints: write tools have `destructiveHint: false` except `delete_criterion`
+(`true`). `idempotentHint` on `update_task`, `update_project`,
+`update_criterion`, `set_criterion_done`.
+
+Not exposed, use the web UI: deleting items or projects, archiving and
+restoring projects, arbitrary state changes.
 
 ## Identification
 
 - Project or subproject: its key.
   Feature or task: its ref (`f-4k2`, `t-4k2`); a task turned into a
   feature answers to both.
-- Serialized items carry `kind` and `parent`.
+- Serialized items carry `kind`, `parent` and `released_in` (the
+  version a feature shipped in, else null). In `tree`, each item also has
+  nested `children`.
+- Criteria are identified by `number`, counted from 1 in list order
+  (`criteria`: `{number, text, done}`).
 - Results never contain integer ids.
 - Each tool has a strict JSON Schema; unknown arguments are refused and
   strings are stripped.

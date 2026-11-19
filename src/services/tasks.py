@@ -284,6 +284,48 @@ def create(session : Session,
     session.commit()
     return task
 
+def add_to_tree(session : Session,
+                title : str,
+                project_key : str | None = None,
+                parent_ref : str | None = None,
+                kind : TaskKind = TaskKind.TASK,
+                body : str | None = None,
+                context : str | None = None,
+                size : str | None = None,
+                actor : str = events.ACTOR_WEB) -> Task:
+    """Add a feature or task straight into a project's tree, already refined.
+
+    Unlike a capture, the item is already triaged: it is created, then
+    clarified in place, so its history shows both steps.
+
+    Args:
+        session: Database session to use.
+        title: Short title.
+        project_key: Key of the project or subproject it goes in.
+        parent_ref: Ref of the feature it goes under; its project is used
+            when project_key is None.
+        kind: TaskKind.TASK (default) or TaskKind.FEATURE.
+        body: Optional free-text detail.
+        context: Optional context tag (e.g. "@ordi").
+        size: Optional effort size ("XS", "S", "M", "L").
+        actor: Who made the change, recorded in the event log.
+
+    Returns:
+        The new item, refined, last among its siblings.
+
+    Raises:
+        NotFoundError: If the project or the parent doesn't exist.
+        ValidationError: If neither a project nor a parent is given, the
+            title is empty, or the parent can't hold it (e.g. a feature of
+            another project). Nothing is written then.
+    """
+    if project_key is None and parent_ref is None:
+        raise ValidationError("give a project or a parent feature to add the item to.")
+    item = create(session, title, project_key=project_key, body=body, context=context, size=size,
+                  parent_ref=parent_ref, kind=kind, actor=actor)
+    return clarify(session, item.id, item.title, body, item.project.key, context, size,
+                   parent_ref=parent_ref, actor=actor)
+
 # -----------------------------------------------------------------------------
 # Editing
 # -----------------------------------------------------------------------------

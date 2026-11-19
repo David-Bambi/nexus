@@ -244,11 +244,9 @@ def task_add_child(task_id):
         feature = tasks.get(session, task_id)
         if feature.project is None:
             raise ValidationError(f"'{feature.ref}' has no project yet.")
-        key = feature.project.key
-        child = tasks.create(session, request.form.get("title", ""), project_key=key,
-                             parent_ref=feature.ref,
-                             kind=_KINDS.get(request.form.get("kind", "task"), TaskKind.TASK))
-        tasks.clarify(session, child.id, child.title, None, key, None, None, parent_ref=feature.ref)
+        tasks.add_to_tree(session, request.form.get("title", ""), project_key=feature.project.key,
+                          parent_ref=feature.ref,
+                          kind=_KINDS.get(request.form.get("kind", "task"), TaskKind.TASK))
         return tasks.get(session, task_id)
 
     return _apply_transition(task_id, add)

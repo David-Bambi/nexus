@@ -423,10 +423,8 @@ def _create_item(session : _DeferredCommit, entry : dict, project_key : str, par
     kind = _KINDS[entry.get("kind", "task")]
     title = entry["title"].strip()
     fields = _fields(entry)
-    item = tasks.create(session, title, project_key=None if parent_ref else project_key,
-                        parent_ref=parent_ref, kind=kind, actor=actor, **fields)
-    tasks.clarify(session, item.id, title, fields["body"], project_key, fields["context"], fields["size"],
-                  parent_ref=parent_ref, actor=actor)
+    item = tasks.add_to_tree(session, title, project_key=project_key, parent_ref=parent_ref,
+                             kind=kind, actor=actor, **fields)
     result.tasks_created += 1
     result.created.append((kind.name.lower(), item.ref, title))
     for child in entry.get("children", []):

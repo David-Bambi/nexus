@@ -9,19 +9,19 @@ from src.models.task import Task, TaskKind
 from src.services import events, projects, tasks
 
 
-def call(session, name, **arguments):
-    """Call a tool and return its raw MCP result."""
+def call(session, name, /, **arguments):
+    """Call a tool and return its raw MCP result (positional-only, so a tool may take a 'name' argument)."""
     return tools.call_tool(session, name, arguments)
 
 
-def ok(session, name, **arguments):
+def ok(session, name, /, **arguments):
     """Call a tool that must succeed; return its structured data."""
     result = call(session, name, **arguments)
     assert result["isError"] is False, result["content"][0]["text"]
     return result["structuredContent"]
 
 
-def refused(session, name, **arguments):
+def refused(session, name, /, **arguments):
     """Call a tool that must be refused; return the message."""
     result = call(session, name, **arguments)
     assert result["isError"] is True and "structuredContent" not in result
@@ -67,10 +67,10 @@ def test_every_tool_is_described_with_a_strict_schema_and_annotations():
     Given the tool registry
     When listing the tools
     Then each has a description, an object schema with no extra properties, and hints matching its kind
-    (none removes data)
+    (only delete_criterion removes data)
     """
     listed = tools.list_tools()
-    assert len(listed) == len(tools.TOOLS) == 15
+    assert len(listed) == len(tools.TOOLS) == 30
     for item in listed:
         assert item["description"]
         assert item["inputSchema"]["type"] == "object" and item["inputSchema"]["additionalProperties"] is False
@@ -78,7 +78,7 @@ def test_every_tool_is_described_with_a_strict_schema_and_annotations():
         hints = item["annotations"]
         assert hints["readOnlyHint"] == tools.TOOLS[item["name"]].read_only
         assert ("destructiveHint" in hints) == (not hints["readOnlyHint"])
-        assert hints.get("destructiveHint", False) is False
+        assert hints.get("destructiveHint", False) is (item["name"] == "delete_criterion")
 
 
 def test_read_only_tools_are_exactly_the_read_ones():
@@ -194,7 +194,7 @@ def test_list_and_show_tools_return_refs_and_no_integer_ids(session, world):
     assert by_ref[planned.parent.ref]["kind"] == "FEATURE"
     shown = ok(session, "get_project", project="nx")
     assert shown["subprojects"] == [{"key": "v2", "ref": sub.ref, "parent": "nx", "name": "Nexus 2",
-                                     "description": None, "status": "ACTIVE"}]
+                                     "description": None, "status": "ACTIVE", "version": "0.0"}]
     assert not _id_keys(shown) and not _id_keys(listed)
 
 
@@ -254,13 +254,22 @@ def test_add_task_to_a_project(session, world):
     """
     Given a project
     When adding a task to it, then to a missing one
-    Then the first lands in the project's inbox and the second is refused
+    Then the first is refined at the top of the project and the second is refused
     """
-    inbox = ok(session, "add_task", project="nx", title="A", context="@ordi", size="M", body="Detail")
-    assert (inbox["state"], inbox["project"], inbox["parent"]) == ("INBOX", "nx", None)
-    assert (inbox["context"], inbox["size"], inbox["body"]) == ("@ordi", "M", "Detail")
+    added = ok(session, "add_task", project="nx", title="A", context="@ordi", size="M", body="Detail")
+    assert (added["state"], added["project"], added["parent"], added["kind"]) == ("REFINED", "nx", None, "TASK")
+    assert (added["context"], added["size"], added["body"]) == ("@ordi", "M", "Detail")
     assert "doesn't exist" in refused(session, "add_task", project="ghost", title="C")
     assert "unknown argument(s): version" in refused(session, "add_task", project="nx", title="B", version="1.0")
+
+
+def test_add_task_as_a_feature_or_under_a_parent(session, world):
+    """A feature is added at the top; a task under it by parent alone takes its project."""
+    feature = ok(session, "add_task", project="nx", title="Auth", kind="feature")
+    child = ok(session, "add_task", parent=feature["ref"], title="Login")
+    assert feature["kind"] == "FEATURE" and feature["ref"].startswith("f-")
+    assert (child["parent"], child["project"], child["state"]) == (feature["ref"], "nx", "REFINED")
+    assert "give a project" in refused(session, "add_task", title="Nowhere")
 
 
 def test_import_data_dry_run_then_real(session):
@@ -425,6 +434,21 @@ def test_dashboard_lists_working_tasks(session, world):
 WRITE_CALLS = [
     ("capture_task", lambda w: {"title": "T"}),
     ("add_task", lambda w: {"project": "nx", "title": "T"}),
+    ("clarify_task", lambda w: {"ref": w.inbox.ref, "project": "nx"}),
+    ("move_task", lambda w: {"ref": w.refined.ref, "parent": w.planned.parent.ref}),
+    ("change_kind", lambda w: {"ref": w.refined.ref, "kind": "feature"}),
+    ("reorder_task", lambda w: {"ref": w.refined.ref, "direction": "up"}),
+    ("reopen_task", lambda w: {"ref": w.done.ref}),
+    ("cancel_task", lambda w: {"ref": w.refined.ref}),
+    ("restore_task", lambda w: {"ref": w.cancelled.ref}),
+    ("defer_task", lambda w: {"ref": w.refined.ref}),
+    ("create_project", lambda w: {"key": "new", "name": "New"}),
+    ("update_project", lambda w: {"project": "nx", "name": "Renamed"}),
+    ("add_criterion", lambda w: {"project": "nx", "text": "Tests green"}),
+    ("update_criterion", lambda w: {"project": "nx", "number": 1, "text": "Docs built"}),
+    ("set_criterion_done", lambda w: {"project": "nx", "number": 1, "done": True}),
+    ("delete_criterion", lambda w: {"project": "nx", "number": 1}),
+    ("release_major", lambda w: {"project": "nx"}),
     ("import_data", lambda w: {"text": "T"}),
     ("update_task", lambda w: {"ref": w.planned.ref, "title": "New"}),
     ("start_task", lambda w: {"ref": w.planned.ref}),
@@ -441,7 +465,7 @@ def test_every_write_tool_logs_the_mcp_actor(session, world, name, arguments):
     When it runs
     Then every event it logged is attributed to mcp
     """
-    _, planned, refined, _ = world
+    _, planned, refined, inbox = world
     doing = tasks.create(session, "Doing", "nx")
     tasks.clarify(session, doing.id, "Doing", None, "nx", None, None)
     tasks.start(session, doing.id)
@@ -449,7 +473,16 @@ def test_every_write_tool_logs_the_mcp_actor(session, world, name, arguments):
     tasks.clarify(session, waiting.id, "Waiting", None, "nx", None, None)
     tasks.start(session, waiting.id)
     tasks.block(session, waiting.id, "why")
-    known = SimpleNamespace(planned=planned, refined=refined, doing=doing, waiting=waiting)
+    done = tasks.add_to_tree(session, "Done", project_key="nx")
+    tasks.start(session, done.id)
+    tasks.complete(session, done.id)
+    cancelled = tasks.add_to_tree(session, "Cancelled", project_key="nx")
+    tasks.cancel(session, cancelled.id)
+    from src.services import versioning
+    criterion = versioning.add_criterion(session, "nx", "Ready")
+    versioning.set_criterion_done(session, criterion.id, True)
+    known = SimpleNamespace(planned=planned, refined=refined, doing=doing, waiting=waiting,
+                            inbox=inbox, done=done, cancelled=cancelled)
     before = session.query(Event).count()
     ok(session, name, **arguments(known))
     fresh = session.query(Event).order_by(Event.id).offset(before).all()
@@ -463,3 +496,138 @@ def test_the_write_calls_above_cover_every_write_tool():
     Then none is left out, so a new write tool can't skip the actor check
     """
     assert {t.name for t in tools.TOOLS.values() if not t.read_only} == {name for name, _ in WRITE_CALLS}
+
+
+# Project tree, version and children ----------------------------------------------------------------
+
+def test_get_project_gives_version_criteria_and_tree(session, world):
+    """
+    Given the world project with a criterion and a cancelled top task
+    When getting it, then with include_closed
+    Then it shows its version, numbered criteria and nested tree, closed items only on request
+    """
+    from src.services import versioning
+
+    sub, planned, refined, inbox = world
+    versioning.add_criterion(session, "nx", "Tests green")
+    tasks.cancel(session, refined.id)
+
+    shown = ok(session, "get_project", project="nx")
+    assert shown["version"] == "0.0"
+    assert shown["criteria"] == [{"number": 1, "text": "Tests green", "done": False}]
+    assert [s["key"] for s in shown["subprojects"]] == ["v2"]
+    (feature,) = shown["tree"]
+    assert feature["kind"] == "FEATURE" and [c["ref"] for c in feature["children"]] == [planned.ref]
+    assert not _id_keys(shown)
+
+    with_closed = ok(session, "get_project", project="nx", include_closed=True)
+    assert [node["title"] for node in with_closed["tree"]] == ["Tree", "Refined task"]
+
+
+def test_get_task_lists_a_feature_children_only_for_features(session, world):
+    """A feature shows its direct children; a task has no children field."""
+    sub, planned, refined, inbox = world
+    feature = ok(session, "get_task", ref=planned.parent.ref)
+    assert [c["ref"] for c in feature["children"]] == [planned.ref]
+    assert "children" not in ok(session, "get_task", ref=planned.ref)
+
+
+def test_list_projects_gives_versions(session, world):
+    """Every listed project carries its version."""
+    listed = ok(session, "list_projects")
+    assert {p["key"]: p["version"] for p in listed["projects"]} == {"nx": "0.0", "v2": "0.0"}
+
+
+
+# Tree and state write tools ------------------------------------------------------------------------
+
+def test_clarify_task_turns_a_capture_into_a_feature_under_a_parent(session, world):
+    """
+    Given an inbox capture
+    When it is clarified as a feature under the world's feature, with a size
+    Then it is a refined feature there, its title kept
+    """
+    sub, planned, refined, inbox = world
+    clarified = ok(session, "clarify_task", ref=inbox.ref, parent=planned.parent.ref, kind="feature", size="L")
+    assert (clarified["kind"], clarified["state"], clarified["parent"]) == ("FEATURE", "REFINED", planned.parent.ref)
+    assert (clarified["title"], clarified["size"], clarified["project"]) == ("Inbox task", "L", "nx")
+
+
+def test_clarify_task_refuses_a_refined_item(session, world):
+    """Only inbox and someday items can be clarified."""
+    _, _, refined, _ = world
+    assert "isn't inbox or someday" in refused(session, "clarify_task", ref=refined.ref, project="nx")
+
+
+def test_move_and_change_kind_and_reorder(session, world):
+    """An item moves under a feature, becomes a feature, and goes up among its siblings."""
+    sub, planned, refined, inbox = world
+    feature_ref = planned.parent.ref
+    moved = ok(session, "move_task", ref=refined.ref, parent=feature_ref)
+    assert moved["parent"] == feature_ref
+
+    changed = ok(session, "change_kind", ref=moved["ref"], kind="feature")
+    assert changed["kind"] == "FEATURE" and changed["ref"].startswith("f-")
+
+    ok(session, "reorder_task", ref=changed["ref"], direction="up")
+    shown = ok(session, "get_task", ref=feature_ref)
+    assert [c["title"] for c in shown["children"]] == ["Refined task", "Planned task"]
+    assert "already first" in refused(session, "reorder_task", ref=changed["ref"], direction="up")
+
+
+def test_cancel_restore_defer_reopen(session, world):
+    """The state tools move an item through cancelled, refined, someday, and done back to doing."""
+    _, planned, refined, _ = world
+    assert ok(session, "cancel_task", ref=refined.ref)["state"] == "CANCELLED"
+    assert ok(session, "restore_task", ref=refined.ref)["state"] == "REFINED"
+    assert ok(session, "defer_task", ref=refined.ref)["state"] == "SOMEDAY"
+
+    ok(session, "start_task", ref=planned.ref)
+    ok(session, "complete_task", ref=planned.ref)
+    assert ok(session, "reopen_task", ref=planned.ref)["state"] == "DOING"
+    assert "isn't done" in refused(session, "reopen_task", ref=planned.ref)
+
+
+
+# Project and version tools -------------------------------------------------------------------------
+
+def test_create_project_and_subproject_then_update(session):
+    """A root project and its subproject are created; the root's name and description change."""
+    root = ok(session, "create_project", key="nx", name="Nexus", description="Manager")
+    sub = ok(session, "create_project", key="web", name="Web", parent="nx")
+    assert (root["version"], root["parent"]) == ("0.0", None)
+    assert (sub["parent"], sub["ref"][:2]) == ("nx", "s-")
+    assert "already exists" in refused(session, "create_project", key="nx", name="Again")
+
+    renamed = ok(session, "update_project", project="nx", name="Nexus 2")
+    assert (renamed["name"], renamed["description"]) == ("Nexus 2", "Manager")
+    cleared = ok(session, "update_project", project="nx", description="")
+    assert (cleared["name"], cleared["description"]) == ("Nexus 2", None)
+    assert "at least one field" in refused(session, "update_project", project="nx")
+
+
+def test_criteria_by_number_then_major_release(session):
+    """
+    Given a project at 0.1 with two criteria
+    When the second is checked, the first deleted, and the major released
+    Then numbers shift, the release is refused until all are checked, and the project ends at 1.0
+    """
+    ok(session, "create_project", key="nx", name="Nexus")
+    feature = ok(session, "add_task", project="nx", title="Auth", kind="feature")
+    ok(session, "start_task", ref=feature["ref"])
+    ok(session, "complete_task", ref=feature["ref"])
+
+    ok(session, "add_criterion", project="nx", text="Tests green")
+    result = ok(session, "add_criterion", project="nx", text="Docs built")
+    assert result == {"project": "nx", "version": "0.1", "criteria": [
+        {"number": 1, "text": "Tests green", "done": False},
+        {"number": 2, "text": "Docs built", "done": False}]}
+
+    ok(session, "set_criterion_done", project="nx", number=2, done=True)
+    assert "unchecked criteria" in refused(session, "release_major", project="nx")
+    result = ok(session, "delete_criterion", project="nx", number=1)
+    assert result["criteria"] == [{"number": 1, "text": "Docs built", "done": True}]
+    assert "no criterion 3" in refused(session, "update_criterion", project="nx", number=3, text="X")
+
+    released = ok(session, "release_major", project="nx")
+    assert (released["version"], released["criteria"]) == ("1.0", [])

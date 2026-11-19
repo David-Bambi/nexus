@@ -1,9 +1,11 @@
 from datetime import date, datetime
 
+from src.models.criterion import MajorCriterion
 from src.models.event import Event
 from src.models.project import Project
 from src.models.task import Task
-from src.services.views import DashboardView
+from src.services import versioning
+from src.services.views import DashboardView, TreeNode
 
 
 def _iso(value : date | datetime | None) -> str | None:
@@ -18,7 +20,22 @@ def project(item : Project) -> dict:
             "parent": item.parent.key if item.parent else None,
             "name": item.name,
             "description": item.description,
-            "status": item.status.name}
+            "status": item.status.name,
+            "version": versioning.label(item)}
+
+
+def criteria(items : list[MajorCriterion]) -> list[dict]:
+    """A project's criteria for the next major version, in list order.
+
+    Each is identified by its "number", counted from 1, never by a raw id.
+    """
+    return [{"number": number, "text": item.text, "done": item.done}
+            for number, item in enumerate(items, start=1)]
+
+
+def tree(nodes : list[TreeNode]) -> list[dict]:
+    """A work tree as nested dicts: each item's brief plus its "children"."""
+    return [{**task_brief(node.item), "children": tree(node.children)} for node in nodes]
 
 
 def task_brief(item : Task) -> dict:
@@ -30,7 +47,8 @@ def task_brief(item : Task) -> dict:
             "project": item.project.key if item.project else None,
             "parent": item.parent.ref if item.parent else None,
             "size": item.size,
-            "context": item.context}
+            "context": item.context,
+            "released_in": item.released_in}
 
 
 def task(item : Task) -> dict:

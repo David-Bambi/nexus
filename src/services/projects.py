@@ -6,7 +6,7 @@ from src.services.errors import ConflictError, NotFoundError, ValidationError
 
 # Keys a project may not take: the command line reads them as commands, not
 # as project keys.
-RESERVED_KEYS = frozenset({"add", "help", "import", "projects", "tasks", "version", "versions"})
+RESERVED_KEYS = frozenset({"add", "help", "import", "projects", "tasks", "version"})
 
 def is_reserved_key(key : str) -> bool:
     """Tell whether a project key is refused as a command word or ref lookalike.

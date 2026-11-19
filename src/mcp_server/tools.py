@@ -5,8 +5,8 @@ from typing import Callable
 from sqlalchemy.orm import Session
 
 from src.mcp_server import serialize
-from src.models.task import TaskState
-from src.services import events, importer, projects, tasks, views
+from src.models.task import TaskKind, TaskState
+from src.services import events, importer, projects, tasks, versioning, views
 from src.services.errors import DomainError, ValidationError
 
 # Who is recorded in the event log for changes made through a tool.
@@ -170,7 +170,7 @@ def _listing(name : str, items : list, limit : int | None = None) -> dict:
 # Read tools
 # -----------------------------------------------------------------------------
 
-@tool("list_projects", "List projects.",
+@tool("list_projects", "List projects and subprojects, each with its version.",
       {"include_archived": _boolean("Also list archived projects (default false).")}, read_only=True)
 def list_projects(session : Session, args : dict) -> dict:
     """List projects."""
@@ -191,20 +191,35 @@ def list_tasks(session : Session, args : dict) -> dict:
     return _listing("tasks", [serialize.task_brief(t) for t in items], limit)
 
 
-@tool("get_project", "Show a project or subproject and its subprojects.", {"project": _PROJECT}, ["project"], read_only=True)
+@tool("get_project",
+      "Show a project or subproject: its version, its criteria for the next major version, its subprojects and its "
+      "work tree (features with nested 'children', and tasks). Done and cancelled items are left out unless "
+      "include_closed is true.",
+      {"project": _PROJECT,
+       "include_closed": _boolean("Also show done and cancelled items (default false).")},
+      ["project"], read_only=True)
 def get_project(session : Session, args : dict) -> dict:
-    """Show a project."""
+    """Show a project with its version, criteria, subprojects and tree."""
     project = projects.get(session, args["project"])
+    nodes = views.project_tree(project, include_closed=bool(args.get("include_closed")))
     return {**serialize.project(project),
-            "subprojects": [serialize.project(sub) for sub in project.subprojects]}
+            "criteria": serialize.criteria(project.criteria),
+            "subprojects": [serialize.project(sub) for sub in project.subprojects],
+            "tree": serialize.tree(nodes)}
 
 
-@tool("get_task", "Show a task with all its fields and its event history.", {"ref": _REF}, ["ref"], read_only=True)
+@tool("get_task",
+      "Show a feature or task with all its fields and its event history; a feature also lists its direct children "
+      "(done and cancelled included).",
+      {"ref": _REF}, ["ref"], read_only=True)
 def get_task(session : Session, args : dict) -> dict:
-    """Show a task."""
+    """Show a task, and a feature's direct children."""
     task = _task_of(session, args)
-    return {**serialize.task(task),
-            "history": [serialize.event(e) for e in events.history(session, "task", task.id)]}
+    result = {**serialize.task(task),
+              "history": [serialize.event(e) for e in events.history(session, "task", task.id)]}
+    if task.kind is TaskKind.FEATURE:
+        result["children"] = [serialize.task_brief(child) for child in task.children]
+    return result
 
 
 @tool("inbox", "List captured tasks still to triage, oldest first.", read_only=True)
@@ -240,15 +255,80 @@ def capture_task(session : Session, args : dict) -> dict:
     return serialize.task(tasks.capture(session, args["title"], actor=ACTOR))
 
 
-@tool("add_task", "Create a task in a project's inbox.",
-      {"project": _PROJECT, "title": _string("Task title."),
+# Item kinds as the tools take them, mapped to the model's.
+_KINDS = {"task": TaskKind.TASK, "feature": TaskKind.FEATURE}
+_KIND = _string("Item kind.", list(_KINDS))
+_PARENT = _string("Ref of the feature it goes under, e.g. f-4k2.")
+
+
+@tool("add_task",
+      "Add a feature or task to a project's tree, already refined (not into the inbox: use capture_task for that). "
+      "Give the project, the parent feature, or both; with only a parent, its project is used.",
+      {"project": _PROJECT, "parent": _PARENT, "title": _string("Item title."),
+       "kind": _string("Item kind (default task).", list(_KINDS)),
        "body": _string("Free-text detail."), "context": _string("Context tag, e.g. @ordi."),
        "size": _string("Effort size.", SIZES)},
-      ["project", "title"])
+      ["title"])
 def add_task(session : Session, args : dict) -> dict:
-    """Create a task."""
+    """Add an item to a project's tree."""
     detail = {name: args.get(name) for name in ("body", "context", "size")}
-    return serialize.task(tasks.create(session, args["title"], project_key=args["project"], actor=ACTOR, **detail))
+    return serialize.task(tasks.add_to_tree(
+        session, args["title"], project_key=args.get("project"), parent_ref=args.get("parent"),
+        kind=_KINDS[args.get("kind") or "task"], actor=ACTOR, **detail))
+
+
+@tool("clarify_task",
+      "Triage a captured (inbox) or someday item into a refined one, placed in a project's tree. Fields left out keep "
+      "their current value; give project and/or parent to place it, kind to turn it into a feature.",
+      {"ref": _REF, "title": _string("New title."), "project": _PROJECT, "parent": _PARENT, "kind": _KIND,
+       "body": _string("Free-text detail."), "context": _string("Context tag, e.g. @ordi."),
+       "size": _string("Effort size.", SIZES)},
+      ["ref"])
+def clarify_task(session : Session, args : dict) -> dict:
+    """Clarify an inbox or someday item."""
+    task = _task_of(session, args)
+    project = args.get("project")
+    if project is None and args.get("parent") is None and task.project is not None:
+        project = task.project.key
+    return serialize.task(tasks.clarify(
+        session, task.id,
+        args.get("title") or task.title,
+        args["body"] if "body" in args else task.body,
+        project,
+        args["context"] if "context" in args else task.context,
+        args["size"] if "size" in args else task.size,
+        parent_ref=args.get("parent"),
+        kind=_KINDS[args["kind"]] if args.get("kind") else None,
+        actor=ACTOR))
+
+
+@tool("move_task",
+      "Move a feature (with its whole subtree) or a task: to the top of a project, or under a feature. It keeps its "
+      "state.",
+      {"ref": _REF, "project": _PROJECT, "parent": _PARENT}, ["ref"])
+def move_task(session : Session, args : dict) -> dict:
+    """Move an item in the tree."""
+    task = _task_of(session, args)
+    return serialize.task(tasks.move(session, task.id, project_key=args.get("project"),
+                                     parent_ref=args.get("parent"), actor=ACTOR))
+
+
+@tool("change_kind",
+      "Turn a task into a feature, or an empty feature into a task. The ref's letter follows (t-4k2 <-> f-4k2).",
+      {"ref": _REF, "kind": _KIND}, ["ref", "kind"])
+def change_kind(session : Session, args : dict) -> dict:
+    """Change an item's kind."""
+    task = _task_of(session, args)
+    return serialize.task(tasks.change_kind(session, task.id, _KINDS[args["kind"]], actor=ACTOR))
+
+
+@tool("reorder_task",
+      "Move an item one place up or down among its siblings. An open item skips done and cancelled siblings.",
+      {"ref": _REF, "direction": _string("Where to move it.", ["up", "down"])}, ["ref", "direction"])
+def reorder_task(session : Session, args : dict) -> dict:
+    """Move an item among its siblings."""
+    task = _task_of(session, args)
+    return serialize.task(tasks.reorder(session, task.id, args["direction"], actor=ACTOR))
 
 
 @tool("import_data",
@@ -310,6 +390,112 @@ _transition("complete_task", "Mark a task in progress as done. A feature closes 
 _transition("block_task", "Mark a task in progress as waiting on something.", tasks.block,
             {"reason": _string("What the task is waiting for.")}, ["reason"])
 _transition("unblock_task", "Resume a waiting task (waiting to doing).", tasks.unblock)
+_transition("reopen_task", "Reopen a done item (done to doing). A reopened feature keeps the version it shipped in.",
+            tasks.reopen)
+_transition("cancel_task", "Cancel an open item that won't be done. A feature only once its children are closed.",
+            tasks.cancel)
+_transition("restore_task", "Bring a cancelled item back to refined.", tasks.restore)
+_transition("defer_task", "Defer an inbox or refined item to someday.", tasks.defer)
+
+
+# -----------------------------------------------------------------------------
+# Project and version tools
+# -----------------------------------------------------------------------------
+
+@tool("create_project",
+      "Create a root project, or a subproject when 'parent' (a root project's key) is given. The key is short, "
+      "unique and can't change later.",
+      {"key": _string("Unique short key, e.g. nexus."), "name": _string("Display name."),
+       "description": _string("Free-text description."),
+       "parent": _string("Key of the root project to create a subproject under.")},
+      ["key", "name"])
+def create_project(session : Session, args : dict) -> dict:
+    """Create a project or subproject."""
+    return serialize.project(projects.create(session, args["key"], args["name"], args.get("description"),
+                                             parent_key=args.get("parent"), actor=ACTOR))
+
+
+@tool("update_project", "Change a project's name and/or description. A blank description clears it.",
+      {"project": _PROJECT, "name": _string("New display name."), "description": _string("New description.")},
+      ["project"], idempotent=True)
+def update_project(session : Session, args : dict) -> dict:
+    """Change a project's name or description."""
+    project = projects.get(session, args["project"])
+    if "name" not in args and "description" not in args:
+        raise ValidationError("give at least one field to change")
+    if "name" in args and args["name"] is None:
+        raise ValidationError("'name' must not be blank")
+    name = args.get("name") or project.name
+    description = args["description"] if "description" in args else project.description
+    return serialize.project(projects.update(session, project.key, name, description, actor=ACTOR))
+
+
+# Schema of the argument numbering a criterion.
+_NUMBER = _integer("Criterion number, from 1, as listed by get_project.")
+
+
+def _criterion_at(session : Session, args : dict):
+    """The criterion of the 'project' argument at position 'number', counted from 1."""
+    project = projects.get(session, args["project"])
+    number = args["number"]
+    if not 1 <= number <= len(project.criteria):
+        raise ValidationError(
+            f"project '{project.key}' has no criterion {number} (it has {len(project.criteria)}).")
+    return project.criteria[number - 1]
+
+
+def _criteria_result(session : Session, key : str) -> dict:
+    """A project's version and criteria, the result of every criterion tool."""
+    project = projects.get(session, key)
+    return {"project": project.key, "version": versioning.label(project),
+            "criteria": serialize.criteria(project.criteria)}
+
+
+@tool("add_criterion", "Append a criterion for a project's next major version.",
+      {"project": _PROJECT, "text": _string("What must be true before the next major version.")},
+      ["project", "text"])
+def add_criterion(session : Session, args : dict) -> dict:
+    """Append a criterion."""
+    versioning.add_criterion(session, args["project"], args["text"], actor=ACTOR)
+    return _criteria_result(session, args["project"])
+
+
+@tool("update_criterion", "Change the text of one criterion for a project's next major version.",
+      {"project": _PROJECT, "number": _NUMBER, "text": _string("New text.")},
+      ["project", "number", "text"], idempotent=True)
+def update_criterion(session : Session, args : dict) -> dict:
+    """Change a criterion's text."""
+    versioning.update_criterion(session, _criterion_at(session, args).id, args["text"], actor=ACTOR)
+    return _criteria_result(session, args["project"])
+
+
+@tool("set_criterion_done", "Check or uncheck one criterion for a project's next major version.",
+      {"project": _PROJECT, "number": _NUMBER, "done": _boolean("True to check it, false to uncheck it.")},
+      ["project", "number", "done"], idempotent=True)
+def set_criterion_done(session : Session, args : dict) -> dict:
+    """Check or uncheck a criterion."""
+    versioning.set_criterion_done(session, _criterion_at(session, args).id, args["done"], actor=ACTOR)
+    return _criteria_result(session, args["project"])
+
+
+@tool("delete_criterion",
+      "Remove one criterion for a project's next major version. The numbers of the following criteria shift down "
+      "by one.",
+      {"project": _PROJECT, "number": _NUMBER}, ["project", "number"], destructive=True)
+def delete_criterion(session : Session, args : dict) -> dict:
+    """Remove a criterion."""
+    versioning.delete_criterion(session, _criterion_at(session, args).id, actor=ACTOR)
+    return _criteria_result(session, args["project"])
+
+
+@tool("release_major",
+      "Move a project to its next major version: MAJOR + 1, MINOR back to 0, criteria list emptied. Refused unless "
+      "it has criteria and every one is checked. MINOR goes up by itself each time a feature is completed.",
+      {"project": _PROJECT}, ["project"])
+def release_major(session : Session, args : dict) -> dict:
+    """Release the next major version."""
+    versioning.release_major(session, args["project"], actor=ACTOR)
+    return _criteria_result(session, args["project"])
 
 
 def list_tools() -> list[dict]:

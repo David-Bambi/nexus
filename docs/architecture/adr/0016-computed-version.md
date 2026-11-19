@@ -65,7 +65,7 @@ every change.
 
 ## Known limits
 
-Not exposed yet in the web UI, the CLI or the MCP server.
+Exposed in the web UI and the MCP server; the CLI only shows the version and criteria (no write).
 
 ## Alternative rejected
 

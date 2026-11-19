@@ -14,11 +14,12 @@ USAGE = """usage: nexus <command> | <reference>
 
   nexus version            app version
   nexus tasks              all features and tasks
-  nexus projects           all projects
-  nexus <project>          project detail and its subprojects
-  nexus <subproject>       subproject detail
-  nexus <feature|task>     feature or task detail
-  nexus add task <project> [--title T] [--body B] [--context C] [--size S]
+  nexus projects           all projects, subprojects indented, with versions
+  nexus <project> [--all]  project: version, criteria, subprojects, work tree
+  nexus <subproject> [--all]
+  nexus <feature|task>     feature or task detail (a feature: its children)
+  nexus add task|feature <project> [--parent f-ref] [--title T] [--body B]
+                           [--context C] [--size S]   add to the tree, refined
   nexus "<description>"     capture a task into the inbox
   nexus import <file|->
 

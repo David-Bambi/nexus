@@ -73,6 +73,9 @@ enforced in the services layer, implemented in `services/tasks.py` — see
 
 - `tasks.clarify` (inbox or someday → refined) can also set the project,
   the parent feature and the kind.
+- `tasks.add_to_tree` (CLI `add`, MCP `add_task`): creates an item in a
+  project's tree and clarifies it in place, so it starts refined; logs
+  `created` then `clarified`.
 - Completing or cancelling a feature raises `ConflictError` while a child
   is neither done nor cancelled.
 - `tasks.change_state(session, task_id, target, reason="")` is a single
@@ -127,7 +130,7 @@ an `actor` argument (default `web`, also `mcp`).
 
 `src/mcp_server/` is a third adapter over `services/`
 ([0008](adr/0008-mcp-over-http-on-the-service.md)), serving AI assistants
-through `POST /mcp` on the running service. Modules: `tools.py` (15 tools,
+through `POST /mcp` on the running service. Modules: `tools.py` (30 tools,
 each a schema plus a handler calling services) and `serialize.py` (rows to
 JSON, no integer ids), both transport-agnostic and Flask-free (enforced by
 `tests/test_architecture.py`); `http.py` (the Flask blueprint: origin/host

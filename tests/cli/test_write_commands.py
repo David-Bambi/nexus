@@ -29,18 +29,39 @@ def _only_task(session):
     return task
 
 
-def test_add_task_to_project_lands_in_inbox(run, session, project):
+def test_add_task_to_project_is_refined_in_its_tree(run, session, project):
     """
     Given a project
     When running `nexus add task nx --title ...` with detail options
-    Then an inbox task is created in the project, by the cli actor
+    Then a refined task is created at the top of the project, by the cli actor
     """
     code, out, _ = run("add", "task", "nx", "-t", "Write docs", "-c", "@ordi", "-s", "S", "-b", "More")
     task = _only_task(session)
-    assert code == EXIT_OK and task.ref in out and "(inbox)" in out
-    assert (task.title, task.state, task.project.key) == ("Write docs", TaskState.INBOX, "nx")
+    assert code == EXIT_OK and f"Created task {task.ref} (refined, nx): Write docs" in out
+    assert (task.title, task.state, task.project.key, task.parent) == ("Write docs", TaskState.REFINED, "nx", None)
     assert (task.context, task.size, task.body) == ("@ordi", "S", "More")
-    assert events.history(session, "task", task.id)[0].actor == events.ACTOR_CLI
+    assert {e.actor for e in events.history(session, "task", task.id)} == {events.ACTOR_CLI}
+
+
+def test_add_feature_then_task_under_it(run, session, project):
+    """A feature is added, then a task under it with --parent."""
+    run("add", "feature", "nx", "-t", "Auth")
+    feature_ref = tasks.list(session)[0].ref
+    code, out, _ = run("add", "task", "nx", "--parent", feature_ref, "-t", "Login")
+    assert code == EXIT_OK and f"(refined, nx > {feature_ref}): Login" in out
+    # The cli closes its session after each run: read the feature afresh.
+    feature = tasks.get_by_ref(session, feature_ref)
+    assert feature.kind.name == "FEATURE" and [c.title for c in feature.children] == ["Login"]
+
+
+def test_add_under_a_feature_of_another_project_is_refused(run, session, project):
+    """A parent from another project is refused, and nothing is created."""
+    projects.create(session, "other", "Other")
+    run("add", "feature", "nx", "-t", "Auth")
+    feature_ref = tasks.list(session)[0].ref
+    code, _, err = run("add", "task", "other", "--parent", feature_ref, "-t", "Stray")
+    assert code == EXIT_ERROR and "isn't in project" in err
+    assert [t.title for t in tasks.list(session)] == ["Auth"]
 
 
 def test_add_task_prompts_for_missing_title_on_a_terminal(run, session, project, monkeypatch):
@@ -98,7 +119,7 @@ def test_sentence_is_captured_into_the_inbox(run, session):
     """
     code, out, _ = run("  Buy some milk ")
     task = _only_task(session)
-    assert code == EXIT_OK and "(inbox)" in out
+    assert code == EXIT_OK and "(inbox):" in out
     assert (task.title, task.state, task.project_id) == ("Buy some milk", TaskState.INBOX, None)
     assert events.history(session, "task", task.id)[0].actor == events.ACTOR_CLI
 

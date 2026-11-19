@@ -58,7 +58,7 @@ def test_ping_and_tools_list(client):
     """
     assert rpc(client, "ping").get_json() == {"jsonrpc": "2.0", "id": 1, "result": {}}
     listed = rpc(client, "tools/list").get_json()["result"]["tools"]
-    assert len(listed) == 15 and {"name", "description", "inputSchema", "annotations"} <= set(listed[0])
+    assert len(listed) == 30 and {"name", "description", "inputSchema", "annotations"} <= set(listed[0])
 
 
 def test_notifications_and_client_replies_get_202_and_no_body(client):
@@ -298,3 +298,14 @@ def test_unexpected_tool_failure_is_a_readable_error_result_and_is_logged(client
     assert response.status_code == 200 and result["isError"] is True
     assert "internal error" in result["content"][0]["text"] and "secret detail" not in json.dumps(result)
     assert "secret detail" in caplog.text
+
+
+def test_instructions_only_name_tools_that_exist():
+    """Every tool the instructions mention is a registered tool, so they can't drift from the registry."""
+    import re
+
+    from src.mcp_server import http, tools
+
+    # dry_run is an argument of import_data, not a tool.
+    named = set(re.findall(r"\b[a-z]+_[a-z_]+\b", http.INSTRUCTIONS)) - {"dry_run"}
+    assert named and named <= set(tools.TOOLS)

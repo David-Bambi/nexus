@@ -589,3 +589,37 @@ def test_reorder_refuses_a_capture_or_a_bad_direction(session, nexus):
     (item,) = _top_items(session, "A")
     with pytest.raises(ValidationError, match="unknown direction"):
         tasks.reorder(session, item.id, "sideways")
+
+
+# Add to tree -------------------------------------------------------------------------------------
+
+def test_add_to_tree_creates_a_refined_item_with_its_detail(session, nexus):
+    """
+    Given a project
+    When a feature is added to its tree, then a task under it by parent only
+    Then both are refined, in place, with their detail, and history shows created then clarified
+    """
+    feature = tasks.add_to_tree(session, "Auth", project_key="nexus", kind=TaskKind.FEATURE)
+    task = tasks.add_to_tree(session, "Login", parent_ref=feature.ref, body="Form",
+                             context="@ordi", size="S")
+
+    assert (feature.kind, feature.state, feature.project.key) == (TaskKind.FEATURE, TaskState.REFINED, "nexus")
+    assert (task.parent, task.project.key, task.state) == (feature, "nexus", TaskState.REFINED)
+    assert (task.body, task.context, task.size) == ("Form", "@ordi", "S")
+    assert [action for action, _ in _history(session, task.id)] == ["created", "clarified"]
+
+
+def test_add_to_tree_needs_a_place(session, nexus):
+    """Neither project nor parent: refused, nothing written."""
+    with pytest.raises(ValidationError, match="give a project"):
+        tasks.add_to_tree(session, "Loose")
+    assert tasks.list(session) == []
+
+
+def test_add_to_tree_refuses_a_parent_of_another_project_before_writing(session, nexus):
+    """A feature of another project is refused, and no item is left behind."""
+    projects.create(session, "other", "Other")
+    feature = tasks.add_to_tree(session, "Auth", project_key="nexus", kind=TaskKind.FEATURE)
+    with pytest.raises(ValidationError):
+        tasks.add_to_tree(session, "Stray", project_key="other", parent_ref=feature.ref)
+    assert [t.title for t in tasks.list(session)] == ["Auth"]

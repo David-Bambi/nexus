@@ -6,7 +6,8 @@ from sqlalchemy.orm import Session
 from src.cli import commands, format as fmt
 from src.cli.errors import UsageError
 from src.services.resolve import Target
-from src.services import projects, tasks
+from src.models.task import TaskKind
+from src.services import projects, tasks, versioning, views
 
 
 def _date(value : object) -> str | None:
@@ -48,10 +49,21 @@ def list_tasks(session : Session, args : list[str], out : TextIO) -> None:
 
 
 def list_projects(session : Session, args : list[str], out : TextIO) -> None:
-    """`nexus projects`: every active project."""
+    """`nexus projects`: every active project, each followed by its active
+    subprojects, indented."""
     _no_arguments(args, "projects")
-    rows = [[p.key, p.status.name, p.name] for p in projects.list(session)]
-    print(fmt.table(["KEY", "STATUS", "NAME"], rows), file=out)
+    listed = projects.list(session)
+    shown = {p.id for p in listed}
+
+    def row(project, indent=""):
+        return [indent + project.key, project.ref or "-", versioning.label(project),
+                project.status.name, project.name]
+
+    rows = []
+    for root in (p for p in listed if p.parent_id is None):
+        rows.append(row(root))
+        rows.extend(row(sub, "  ") for sub in root.subprojects if sub.id in shown)
+    print(fmt.table(["KEY", "REF", "VERSION", "STATUS", "NAME"], rows), file=out)
 
 
 # -----------------------------------------------------------------------------
@@ -59,18 +71,30 @@ def list_projects(session : Session, args : list[str], out : TextIO) -> None:
 # -----------------------------------------------------------------------------
 
 def _view_project(session : Session, target : Target, args : list[str], out : TextIO) -> None:
-    """`nexus <project>` or `nexus <subproject ref>`: project detail and its subprojects."""
+    """`nexus <project> [--all]` or `nexus <subproject ref> [--all]`: project
+    detail, its criteria for the next major version, its subprojects and its
+    work tree. Done and cancelled items are shown only with --all."""
     project = target.entity
-    _no_arguments(args, project.ref or project.key)
+    name = project.ref or project.key
+    include_closed = args == ["--all"]
+    if not include_closed:
+        _no_arguments(args, name)
     print(fmt.detail([("Key", project.key),
                       ("Ref", project.ref),
                       ("Name", project.name),
                       ("Parent", project.parent.key if project.parent else None),
                       ("Status", project.status.name),
+                      ("Version", versioning.label(project)),
                       ("Description", project.description)]), file=out)
+    if project.criteria:
+        lines = [f"[{'x' if c.done else ' '}] {number}. {c.text}"
+                 for number, c in enumerate(project.criteria, start=1)]
+        print(fmt.section(f"Criteria for {project.version_major + 1}.0", "\n".join(lines)), file=out)
     if project.subprojects:
-        rows = [[sub.ref, sub.key, sub.status.name, sub.name] for sub in project.subprojects]
-        print(fmt.section("Subprojects", fmt.table(["REF", "KEY", "STATUS", "NAME"], rows)), file=out)
+        rows = [[sub.ref, sub.key, versioning.label(sub), sub.status.name, sub.name] for sub in project.subprojects]
+        print(fmt.section("Subprojects", fmt.table(["REF", "KEY", "VERSION", "STATUS", "NAME"], rows)), file=out)
+    title = "Work" if include_closed else "Work (open items; --all shows done and cancelled)"
+    print(fmt.section(title, fmt.tree(views.project_tree(project, include_closed=include_closed))), file=out)
 
 
 def _view_task(session : Session, target : Target, args : list[str], out : TextIO) -> None:
@@ -85,11 +109,14 @@ def _view_task(session : Session, target : Target, args : list[str], out : TextI
                       ("Parent", task.parent.ref if task.parent else None),
                       ("Context", task.context),
                       ("Size", task.size),
+                      ("Released", f"v{task.released_in}" if task.released_in else None),
                       ("Blocked", task.blocked_reason),
                       ("Created", _date(task.created_at)),
                       ("Closed", _date(task.closed_at))]), file=out)
     if task.body:
         print(fmt.section("Description", task.body), file=out)
+    if task.kind is TaskKind.FEATURE:
+        print(fmt.section("Children", fmt.tree(views.item_tree(task, include_closed=True))), file=out)
 
 
 commands.COMMANDS.update({

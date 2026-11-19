@@ -25,31 +25,46 @@ command line. Errors go to stderr.
   its code: `t-4k2` and `f-4k2` both find it. Refs are shown in the web UI
   and in every CLI table.
 - Projects are named by their **key**. Keys that look like a ref, or equal a
-  command word (`add`, `help`, `import`, `projects`, `tasks`, `version`,
-  `versions`), are refused when creating a project.
+  command word (`add`, `help`, `import`, `projects`, `tasks`, `version`),
+  are refused when creating a project.
 
 ## Commands
 
 | Command | Result |
 |---|---|
 | `nexus version` | App version |
-| `nexus tasks` / `projects` | Table of all rows, `(none)` if empty |
-| `nexus <project>` | Project detail and its subprojects |
-| `nexus <s-ref>` | Subproject detail |
-| `nexus <f-ref>` / `<t-ref>` | Feature or task detail |
-| `nexus add task <project> [-t T] [-b B] [-c C] [-s SIZE]` | Create a task in the project's inbox |
+| `nexus tasks` | Table of all features and tasks, `(none)` if empty |
+| `nexus projects` | `KEY REF VERSION STATUS NAME`; each active subproject follows its root, key indented |
+| `nexus <project> [--all]` / `<s-ref> [--all]` | Project detail, see below |
+| `nexus <f-ref>` / `<t-ref>` | Feature or task detail, see below |
+| `nexus add task\|feature <project> [-p f-ref] [-t T] [-b B] [-c C] [-s SIZE]` | Add to the project's tree, refined |
 | `nexus "<description>"` | Capture into the inbox |
 | `nexus import <file\|->` | Bulk import, see below |
 
-`--size` is `XS`, `S`, `M` or `L`. Without `--title`, `add task` prompts on
-a terminal and fails otherwise. A lone argument that is blank or contains
-whitespace is a capture.
+Project detail: fields (with `Version`), "Criteria for N+1.0" (`[x] 1.
+text`, if any), a Subprojects table (with `VERSION`), then "Work": the
+tree, two spaces of indent per level, one line per item `ref  STATE
+title`, plus `(vX.Y)` for a shipped feature; `(none)` if empty. Done and
+cancelled items only with `--all`.
+
+Feature or task detail: fields (with `Released`, `vX.Y`, for a shipped
+feature); a feature adds "Children", its whole subtree, closed items
+included.
+
+`add` puts the item at the end of the project's top level, or under
+`--parent` (`-p`), already refined. The parent must belong to the project:
+otherwise exit `1` and nothing is created. `--size` is `XS`, `S`, `M` or
+`L`. Without `--title`, `add` prompts on a terminal and fails otherwise. A
+lone argument that is blank or contains whitespace is a capture.
 
 ```bash
-nexus add task NX -t "Write the CLI page" -s S
+nexus add feature NX -t "CLI page"
+nexus add task NX -p f-9ab -t "Write the CLI page" -s S
+# Created task t-4k2 (refined, NX > f-9ab): Write the CLI page
 nexus "buy a USB-C cable"
-nexus NX
-nexus f-4k2
+# Created task t-7xq (inbox): buy a USB-C cable
+nexus NX --all
+nexus f-9ab
 ```
 
 Everything the CLI creates or changes is logged with actor `cli`
@@ -91,5 +106,6 @@ The JSON export (`/export.json`) is a backup format and can't be imported.
 
 ## Not in scope
 
-The CLI cannot edit or change a task's state. Those are available to an AI
+The CLI cannot edit, clarify, move or reorder an item, change its kind or
+state, edit criteria or release a major version. Use the web UI, or an AI
 assistant through the [MCP server](mcp.md).

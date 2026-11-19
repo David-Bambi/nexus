@@ -25,9 +25,16 @@ MAX_BODY = 1_000_000
 
 # What the assistant is told about the server when it connects.
 INSTRUCTIONS = (
-    "Nexus is a GTD-style project manager: a project holds subprojects (one level), features and tasks; "
-    "a feature holds features and tasks. Identify projects by key, subprojects by ref (s-…), features by "
-    "ref (f-…) and tasks by ref (t-…). Items move inbox -> refined -> doing -> waiting/done. "
+    "Nexus is a GTD-style project manager. A project holds subprojects (one level), features and tasks; "
+    "a feature holds features and tasks, at any depth; a task holds nothing. "
+    "In tool arguments, name projects and subprojects by key, features and tasks by ref (f-… or t-…); "
+    "a subproject also shows a ref (s-…). "
+    "Items move inbox -> refined -> doing -> waiting/done (or someday, cancelled). capture_task puts a bare "
+    "title in the inbox; add_task puts an item straight into a project's tree, refined; clarify_task triages "
+    "an inbox item into the tree. "
+    "Each project and subproject has a computed version MAJOR.MINOR: completing a feature raises MINOR by "
+    "itself; MAJOR goes up with release_major once every criterion (numbered from 1 in get_project) is "
+    "checked. There are no planned versions. "
     "Use dry_run with import_data before importing for real."
 )
 

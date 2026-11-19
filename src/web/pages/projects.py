@@ -97,9 +97,7 @@ def project_add_item(key):
     try:
         # Both the project and the parent are given, so a feature of another
         # project is refused before anything is written.
-        item = tasks.create(session, title, project_key=key,
-                            parent_ref=parent_ref, kind=kind)
-        tasks.clarify(session, item.id, item.title, None, key, None, None, parent_ref=parent_ref)
+        tasks.add_to_tree(session, title, project_key=key, parent_ref=parent_ref, kind=kind)
     except (NotFoundError, ValidationError, ConflictError) as e:
         session.rollback()
         return _render_project(project, str(e), 400)

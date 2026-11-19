@@ -7,7 +7,7 @@ date: 2026-09-21
 
 ## Status
 
-Accepted. Since 2.0, refs are `s-` / `f-` / `t-` (no `v-`) and the version commands are gone: see [0013](0013-project-feature-task-tree.md).
+Accepted. Since 2.0, refs are `s-` / `f-` / `t-` (no `v-`) and the version commands are gone: see [0013](0013-project-feature-task-tree.md). `versions` is no longer a reserved key; `nexus add task|feature` adds to the tree, refined (see [Command line](../../functional/cli.md)).
 
 ## Decision
 

@@ -89,8 +89,8 @@ finished" guard the version release gave, without a separate checklist.
 
 ## Known limits
 
-- The MCP server has no clarify, move or change-kind tool yet (planned for
-  a later increment).
+- Lifted in increment 4: the MCP server now has clarify, move and
+  change-kind tools ([MCP server](../../functional/mcp.md)).
 - No migration from 1.x data: [0014](0014-restart-migrations-refuse-1x.md).
 
 ## Alternative rejected
