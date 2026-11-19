@@ -21,10 +21,3 @@ document.addEventListener("input", function (event) {
         button.disabled = input.value !== input.dataset.confirm;
     }
 });
-
-// A control marked data-autosubmit submits its form as soon as it changes (e.g. a checklist checkbox).
-document.addEventListener("change", function (event) {
-    if (event.target.dataset && event.target.dataset.autosubmit !== undefined) {
-        event.target.form.submit();
-    }
-});

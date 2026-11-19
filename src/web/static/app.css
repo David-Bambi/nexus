@@ -331,7 +331,7 @@ form {
 
 /* Lists, badges and ref chips ----------------------------------------------------------------- */
 
-/* A list of rows (tasks, versions, projects...) on a surface, one bordered row per item. */
+/* A list of rows (tasks, projects...) on a surface, one bordered row per item. */
 .list {
     padding: 0;
     list-style: none;
@@ -358,37 +358,9 @@ form {
     border-top: 1px solid var(--color-border);
 }
 
-/* A list inside a row (e.g. a project's subprojects): full width, lighter frame. */
-.list-nested {
-    flex-basis: 100%;
-    margin-block: 0;
-    background: var(--color-surface-muted);
-}
-
-.list-nested > li {
-    padding-block: var(--space-2);
-}
-
 .empty {
     color: var(--color-text-muted);
     font-style: italic;
-}
-
-/* Progress figures; pushed to the right end of their row. */
-.progress {
-    display: inline-flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-2);
-    margin-left: auto;
-    font-size: var(--text-sm);
-    color: var(--color-text-muted);
-}
-
-progress {
-    width: 6rem;
-    height: 0.5rem;
-    accent-color: var(--color-accent);
 }
 
 /* Event history: compact rows, no frame (drawn as a timeline further down). */
@@ -417,8 +389,7 @@ progress {
     background: color-mix(in srgb, var(--badge-color) 12%, var(--color-surface));
 }
 
-.badge-doing,
-.badge-in_progress {
+.badge-doing {
     --badge-color: var(--color-accent);
 }
 
@@ -427,7 +398,6 @@ progress {
 }
 
 .badge-done,
-.badge-released,
 .badge-active {
     --badge-color: var(--color-success);
 }
@@ -436,7 +406,7 @@ progress {
     --badge-color: var(--color-danger);
 }
 
-/* A t-/v- reference or a project key. */
+/* A s-/f-/t- reference or a project key. */
 .ref {
     padding: 0 var(--space-1);
     border-radius: var(--radius-sm);
@@ -480,13 +450,6 @@ progress {
     color: var(--color-text-muted);
 }
 
-/* Cards laid out in as many columns as fit. */
-.cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
-    gap: var(--space-4);
-}
-
 .card {
     display: grid;
     align-content: start;
@@ -507,31 +470,6 @@ progress {
 .card-title {
     margin: 0;
     font-size: var(--text-base);
-}
-
-/* Labelled progress bars, one per line. */
-.meter-list {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: var(--space-1) var(--space-3);
-    margin: 0;
-    font-size: var(--text-sm);
-}
-
-.meter-list dt {
-    color: var(--color-text-muted);
-}
-
-.meter-list dd {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    margin: 0;
-}
-
-.meter-list progress {
-    flex: 1;
-    width: auto;
 }
 
 .task-place {
@@ -572,113 +510,12 @@ progress {
     gap: var(--space-2);
 }
 
-/* Task board: one column per state, as many side by side as fit. */
-.board {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-    gap: var(--space-3);
-    align-items: start;
-}
-
-.board-column {
-    display: grid;
-    gap: var(--space-2);
-    padding: var(--space-3);
-    border-radius: var(--radius);
-    background: var(--color-surface-muted);
-}
-
-.board-column h3 {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    margin: 0;
-    font-size: var(--text-base);
-}
-
-.count {
-    font-size: var(--text-sm);
-    color: var(--color-text-muted);
-}
-
-.board-card {
-    display: grid;
-    gap: var(--space-2);
-    padding: var(--space-3);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    background: var(--color-surface);
-    box-shadow: var(--shadow);
-}
-
-.board-card-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-/* Grid children may shrink below their content width, so long titles and inputs stay inside the column. */
-.board-column,
-.board-card {
-    min-width: 0;
-}
-
-.board-card a {
-    overflow-wrap: anywhere;
-}
-
-.board-card input,
-.board-card select {
-    width: 100%;
-    min-width: 0;
-}
-
-/* The state form inside a card: select and button on one line, the reason on its own line below. */
-.board-card .state-form {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: var(--space-1);
-    margin: 0;
-}
-
-.board-card .state-form input[name="reason"] {
-    grid-column: 1 / -1;
-}
-
-.board-card .state-form select,
-.board-card .state-form input,
-.board-card .state-form button {
-    padding-block: var(--space-1);
-    font-size: var(--text-sm);
-}
-
-.board-card .blocked-reason {
-    margin: 0;
-}
-
 .size {
     padding: 0 var(--space-2);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
     font-size: var(--text-sm);
     color: var(--color-text-muted);
-}
-
-/* Definition-of-done checklist. */
-.checklist .grow {
-    flex: 1;
-}
-
-.checklist .grow input[type="text"] {
-    flex: 1;
-}
-
-.checklist .checked {
-    color: var(--color-text-muted);
-}
-
-.checklist .checked input[type="text"] {
-    text-decoration: line-through;
 }
 
 /* Irreversible actions, set apart at the bottom of a page. */
@@ -805,20 +642,6 @@ progress {
 
 .row-title {
     font-weight: 600;
-}
-
-.dod-rows {
-    display: grid;
-    gap: var(--space-2);
-    margin-bottom: var(--space-2);
-}
-
-.dod-row {
-    display: flex;
-}
-
-.dod-row input {
-    flex: 1;
 }
 
 /* Buttons inside a stacked field keep their own width instead of stretching. */

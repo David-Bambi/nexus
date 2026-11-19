@@ -53,8 +53,6 @@ templates (enforced by `tests/web/test_pages.py`). `app.js` handles:
 - `data-confirm="<value>"` on an input: its form's submit button (rendered
   `disabled`) is enabled only once that exact value is typed (delete
   project).
-- `data-autosubmit` on a control: submits its form on change (no
-  template uses it since 2.0).
 
 Pure presentation stays in CSS, e.g. the waiting reason field of the state
 form is shown only when `WAITING` is selected, via `:has()`.
