@@ -516,3 +516,76 @@ def test_delete_a_feature_with_children_is_refused(session, nexus):
     session.refresh(feature)
     tasks.delete(session, feature.id)
     assert tasks.list(session) == []
+
+
+# Reorder -----------------------------------------------------------------------------------------
+
+def _siblings(session, project_key="nexus"):
+    """Titles of a project's top items, in sibling order."""
+    from src.services import views
+    return [node.item.title for node in views.project_tree(projects.get(session, project_key), include_closed=True)]
+
+
+def _top_items(session, *titles):
+    """Create refined top items of project 'nexus'; return them."""
+    items = []
+    for title in titles:
+        item = tasks.create(session, title, project_key="nexus")
+        items.append(tasks.clarify(session, item.id, title, None, "nexus", None, None))
+    return items
+
+
+def test_reorder_up_and_down_logs_the_move(session, nexus):
+    """
+    Given three sibling items A, B, C
+    When C goes up, then A goes down
+    Then the order is B, A, C… step by step, and each move is logged
+    """
+    a, b, c = _top_items(session, "A", "B", "C")
+    tasks.reorder(session, c.id, "up")
+    assert _siblings(session) == ["A", "C", "B"]
+
+    tasks.reorder(session, a.id, "down")
+    assert _siblings(session) == ["C", "A", "B"]
+    assert _history(session, a.id)[-1] == ("reordered", {"from": 0, "to": 1, "direction": "down"})
+
+
+def test_reorder_first_up_or_last_down_is_refused(session, nexus):
+    """The first item can't go up, the last can't go down."""
+    a, b = _top_items(session, "A", "B")
+    with pytest.raises(ValidationError, match="already first"):
+        tasks.reorder(session, a.id, "up")
+    with pytest.raises(ValidationError, match="already last"):
+        tasks.reorder(session, b.id, "down")
+
+
+def test_reorder_open_item_skips_closed_siblings(session, nexus):
+    """An open item moves past a cancelled sibling hidden from the tree."""
+    a, b, c = _top_items(session, "A", "B", "C")
+    tasks.cancel(session, b.id)
+    tasks.reorder(session, c.id, "up")
+    assert _siblings(session) == ["C", "A", "B"]
+
+
+def test_reorder_stays_among_siblings_under_a_feature(session, nexus):
+    """Reordering under a feature leaves the top level as it was."""
+    feature, top = _top_items(session, "Auth", "Readme")
+    tasks.change_kind(session, feature.id, TaskKind.FEATURE)
+    children = []
+    for title in ("Login", "Logout"):
+        child = tasks.create(session, title, project_key="nexus", parent_ref=feature.ref)
+        children.append(tasks.clarify(session, child.id, title, None, "nexus", None, None, parent_ref=feature.ref))
+    tasks.reorder(session, children[1].id, "up")
+
+    assert [child.title for child in feature.children] == ["Logout", "Login"]
+    assert _siblings(session) == ["Auth", "Readme"]
+
+
+def test_reorder_refuses_a_capture_or_a_bad_direction(session, nexus):
+    """An inbox capture has no tree order; a direction must be up or down."""
+    capture = tasks.capture(session, "Loose")
+    with pytest.raises(ValidationError, match="no project"):
+        tasks.reorder(session, capture.id, "up")
+    (item,) = _top_items(session, "A")
+    with pytest.raises(ValidationError, match="unknown direction"):
+        tasks.reorder(session, item.id, "sideways")

@@ -42,12 +42,14 @@ leaves no event. The session runs with `autoflush=False`, so services
 
 | Entity | Actions |
 |---|---|
-| task | `created`, `updated`, `clarified`, `planned`, `unplanned`, `started`, `blocked`, `unblocked`, `completed`, `reopened`, `deferred`, `cancelled`, `restored`, `moved`, `deleted` |
+| task | `created`, `updated`, `clarified`, `planned`, `unplanned`, `started`, `blocked`, `unblocked`, `completed`, `reopened`, `deferred`, `cancelled`, `restored`, `moved`, `reordered`, `deleted` |
 | version | `created`, `started`, `released`, `deleted`, `dod_added`, `dod_updated`, `dod_deleted`, `dod_checked`, `dod_unchecked` |
 | project | `created`, `updated`, `archived`, `restored`, `deleted`, `versions_reordered`, `minor_bumped`, `major_released`, `version_set` |
 | criterion | `criterion_added`, `criterion_updated`, `criterion_checked`, `criterion_deleted` |
 
 `versions_reordered` is logged on the project, with payload `ordered_ids`.
+`reordered` is logged on the task, with payload `{from, to, direction}`
+(old and new sibling positions).
 
 `dod_*` events are logged on the version (Definition of Done criteria have no
 entity of their own in the log). `dod_checked` / `dod_unchecked` are skipped

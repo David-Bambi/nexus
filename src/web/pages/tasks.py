@@ -263,6 +263,22 @@ def task_move(task_id):
         parent_ref=(request.form.get("parent_ref") or "").strip() or None))
 
 
+@bp.route("/tasks/<int:task_id>/reorder", methods=["POST"])
+def task_reorder(task_id):
+    """Move an item up or down among its siblings ("direction" = up or down).
+
+    On success, goes back to the safe "next" page (the tree it was moved
+    in), else to the item's project; a refusal shows the item page.
+    """
+    session = _session()
+    task, error = _run_transition(
+        session, task_id, lambda s: tasks.reorder(s, task_id, request.form.get("direction", "")))
+    if error:
+        return _render_task(task, error)
+    target = _local_path(request.values.get("next"))
+    return redirect(target or url_for("pages.project_detail", key=task.project.key))
+
+
 @bp.route("/tasks/<int:task_id>/kind", methods=["POST"])
 def task_change_kind(task_id):
     """Turn a task into a feature, or an empty feature into a task."""

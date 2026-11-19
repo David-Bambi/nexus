@@ -601,6 +601,60 @@ def move(session : Session, task_id : int, project_key : str | None = None,
     session.commit()
     return task
 
+# Directions reorder() accepts, mapped to the step taken among the siblings.
+_REORDER_STEPS = {"up": -1, "down": 1}
+
+def reorder(session : Session, task_id : int, direction : str, actor : str = events.ACTOR_WEB) -> Task:
+    """Move a work item one place up or down among its siblings.
+
+    An open item swaps with its nearest open sibling, so it never seems to
+    stay still behind a done or cancelled one hidden from the tree; a closed
+    item swaps with its nearest sibling. Sibling positions are renumbered
+    0, 1, 2… in the new order.
+
+    Args:
+        session: Database session to use.
+        task_id: Id of the task.
+        direction: "up" or "down".
+        actor: Who made the change, recorded in the event log.
+
+    Returns:
+        The moved Task.
+
+    Raises:
+        NotFoundError: If no task has this id.
+        ValidationError: If the direction is unknown, the item has no
+            project (inbox order is capture order), or it is already first
+            (up) or last (down).
+    """
+    if direction not in _REORDER_STEPS:
+        raise ValidationError(f"unknown direction '{direction}': use up or down.")
+    task = get(session, task_id)
+    if task.project is None:
+        raise ValidationError(f"'{task.ref}' has no project yet; only items in a tree can be reordered.")
+
+    siblings = sorted(
+        session.query(Task).filter_by(project_id=task.project_id, parent_id=task.parent_id),
+        key=lambda sibling: (sibling.position, sibling.id))
+    index = siblings.index(task)
+    step = _REORDER_STEPS[direction]
+    neighbour = index + step
+    if task.state not in _CLOSED_STATES:
+        while 0 <= neighbour < len(siblings) and siblings[neighbour].state in _CLOSED_STATES:
+            neighbour += step
+    if not 0 <= neighbour < len(siblings):
+        raise ValidationError(f"'{task.ref}' is already {'first' if step < 0 else 'last'}.")
+
+    previous = task.position
+    siblings.insert(neighbour, siblings.pop(index))
+    for position, sibling in enumerate(siblings):
+        sibling.position = position
+
+    events.log(session, actor, "task", task.id, "reordered",
+               {"from": previous, "to": task.position, "direction": direction})
+    session.commit()
+    return task
+
 def _change_kind(session : Session, task : Task, kind : TaskKind, actor : str) -> None:
     """Turn a task into a feature or back, respelling its ref; no commit.
 

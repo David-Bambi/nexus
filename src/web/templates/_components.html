@@ -100,9 +100,25 @@
 </form>
 {% endmacro %}
 
+{# Up / down buttons moving an item among its siblings, then back to this page. #}
+{% macro reorder_buttons(item) %}
+{% set back = request.full_path.rstrip("?") %}
+<span class="reorder">
+    <form method="post" action="{{ url_for('pages.task_reorder', task_id=item.id, next=back) }}">
+        <input type="hidden" name="direction" value="up">
+        <button type="submit" aria-label="Move {{ item.title }} up" title="Move up">↑</button>
+    </form>
+    <form method="post" action="{{ url_for('pages.task_reorder', task_id=item.id, next=back) }}">
+        <input type="hidden" name="direction" value="down">
+        <button type="submit" aria-label="Move {{ item.title }} down" title="Move down">↓</button>
+    </form>
+</span>
+{% endmacro %}
+
 {#
   A work tree: nested lists of features (collapsible, with an add form) and
-  tasks. `nodes` come from views.project_tree() or views.item_tree().
+  tasks, each with up / down buttons. `nodes` come from
+  views.project_tree() or views.item_tree().
 #}
 {% macro work_tree(nodes, project_key, closed=none) %}
 <ul class="tree">
@@ -114,12 +130,14 @@
             <summary>
                 {{ task_link(item) }} {{ ref_chip(item.ref) }} {{ badge(item.state.name) }}
                 {% if item.released_in %}<span class="hint">v{{ item.released_in }}</span>{% endif %}
+                {{ reorder_buttons(item) }}
             </summary>
             {% if node.children %}{{ work_tree(node.children, project_key, closed) }}{% endif %}
             {{ add_item_form(project_key, item.ref, closed) }}
         </details>
         {% else %}
         {{ task_link(item) }} {{ ref_chip(item.ref) }} {{ badge(item.state.name) }}
+        {{ reorder_buttons(item) }}
         {% endif %}
     </li>
     {% endfor %}

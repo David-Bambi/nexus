@@ -982,3 +982,43 @@ def test_item_page_links_back_to_its_project(client):
 
     assert '<a href="/projects/nexus">← Nexus</a>' in client.get("/tasks/1").get_data(as_text=True)
     assert '<a href="/tasks">← Tasks</a>' in client.get("/tasks/2").get_data(as_text=True)
+
+
+# Reorder ------------------------------------------------------------------------------------------------
+
+def test_reorder_buttons_move_an_item_and_come_back(client):
+    """
+    Given a project with items A then B
+    When B's up button is sent from the project page showing closed items
+    Then it comes back to that page, with B before A
+    """
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    client.post("/projects/nexus/items", data={"title": "Item A"})
+    client.post("/projects/nexus/items", data={"title": "Item B"})
+    page = client.get("/projects/nexus?closed=1").get_data(as_text=True)
+    assert 'aria-label="Move Item B up"' in page
+
+    response = client.post("/tasks/2/reorder?next=/projects/nexus?closed%3D1", data={"direction": "up"})
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/projects/nexus?closed=1"
+
+    html = client.get("/projects/nexus").get_data(as_text=True)
+    assert html.index("Item B") < html.index("Item A")
+
+
+def test_reorder_refused_shows_the_item_page(client):
+    """Moving the first item up shows the reason on its page."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    client.post("/projects/nexus/items", data={"title": "Item A"})
+    response = client.post("/tasks/1/reorder", data={"direction": "up"})
+    assert response.status_code == 200
+    assert "already first" in response.get_data(as_text=True)
+
+
+def test_reorder_without_next_goes_back_to_the_project(client):
+    """Without a next page, a reorder goes back to the item's project."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    client.post("/projects/nexus/items", data={"title": "Item A"})
+    client.post("/projects/nexus/items", data={"title": "Item B"})
+    response = client.post("/tasks/2/reorder", data={"direction": "up"})
+    assert response.headers["Location"] == "/projects/nexus"

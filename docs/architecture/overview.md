@@ -176,6 +176,14 @@ inline style or script ([0012](adr/0012-plain-static-css-and-js.md),
   child created refined) and its released version; for every item, "Move
   to" (`/move`, project key and/or parent feature ref) and the kind switch
   (`/kind`; a feature with children stays a feature).
+- Each work-tree item (project page and a feature's Children) has ↑ / ↓
+  buttons posting to `POST /tasks/<id>/reorder` (field `direction`: `up` /
+  `down`), which calls `tasks.reorder`: one place among the siblings (same
+  project, same parent feature); an open item skips closed siblings, which
+  the tree hides. Sibling positions are renumbered 0..n-1. On success it
+  redirects to the safe `next` (keeping `?closed=1`), else to the item's
+  project; a refusal (unknown direction, no project, already first / last)
+  re-renders the item page with the message.
 - The task page shows its History (`ui.event_list`, drawn as a timeline).
   It has two columns: actions, edit form and history, beside a sticky
   details panel (state, ref, kind, project, parent...); the panel goes on

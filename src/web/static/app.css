@@ -517,6 +517,23 @@ form {
     cursor: pointer;
 }
 
+/* Up / down buttons of a tree item, small and on the item's line. */
+.reorder {
+    display: inline-flex;
+    gap: var(--space-1);
+    margin-left: var(--space-2);
+}
+
+.reorder form {
+    display: inline;
+    margin: 0;
+}
+
+.reorder button {
+    padding: 0 var(--space-2);
+    font-size: var(--text-sm);
+}
+
 /* The add form under a feature sits indented like its children. */
 .tree .add-item {
     padding-left: var(--space-5);

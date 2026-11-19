@@ -29,7 +29,8 @@ Routes and templates: [Architecture overview](../architecture/overview.md#web-pa
       order, with ref, state and, for a shipped feature, its released
       version. Done and cancelled items are hidden unless "Show closed".
       "Add" (title, task or feature) at the top level and under each
-      feature; the item is created refined.
+      feature; the item is created refined. ↑ / ↓ on each item move it
+      one place among its open siblings (closed siblings are skipped).
     - *Next major version*: the major criteria (check / uncheck, edit,
       delete, add) and "Release N+1.0", enabled once every criterion is
       checked.
@@ -38,14 +39,14 @@ Routes and templates: [Architecture overview](../architecture/overview.md#web-pa
     - *Status*: Archive / Restore.
     - *Danger zone*: delete, once the key is typed.
 - **Item** (`/tasks/<id>`): for a feature, its *Children* (whole subtree,
-  closed items included) with an Add form, and "Released in" in the side
+  closed items included, with ↑ / ↓) and an Add form, and "Released in" in the side
   panel. For every item, *Place*: "Move to" (project key and/or parent
   feature ref) and "Change to feature / task" (a feature with children
   can't become a task).
 - **Inbox** and the clarify form: *Kind* (task / feature) and *Parent
   feature ref*; with no project key, the parent's project is used.
 
-Sibling reordering isn't available in the web app yet.
+A refused move (already first / last) shows the item page with the reason.
 
 ## Pages
 
