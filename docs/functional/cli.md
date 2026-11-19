@@ -20,51 +20,36 @@ command line. Errors go to stderr.
 
 ## References
 
-- Tasks and versions have a short immutable **ref**: `t-4k2`, `v-9xa`
-  (case-insensitive). It is shown in the web UI and in every CLI table.
+- Subprojects, features and tasks have a short immutable **ref**: `s-4k2`,
+  `f-4k2`, `t-4k2` (case-insensitive). A task turned into a feature keeps
+  its code: `t-4k2` and `f-4k2` both find it. Refs are shown in the web UI
+  and in every CLI table.
 - Projects are named by their **key**. Keys that look like a ref, or equal a
   command word (`add`, `help`, `import`, `projects`, `tasks`, `version`,
   `versions`), are refused when creating a project.
-- A version is named by its number or its `v-` ref.
 
 ## Commands
 
 | Command | Result |
 |---|---|
 | `nexus version` | App version |
-| `nexus tasks` / `versions` / `projects` | Table of all rows, `(none)` if empty |
-| `nexus <project>` | Project detail and its versions |
-| `nexus <project> <version>` | Version detail, its tasks, definition of done as `[x]` / `[ ]` with a count |
-| `nexus <t-ref>` | Task detail |
-| `nexus <v-ref>` | Version detail |
-| `nexus <project> <version> check\|uncheck <n>` | Check or uncheck DoD criterion `n` (from 1) |
-| `nexus <project> <version> add-criterion <text…>` | Append a DoD criterion |
-| `nexus <project> <version> edit-criterion <n> <text…>` | Reword criterion `n` |
-| `nexus <project> <version> remove-criterion <n>` | Delete criterion `n`; later numbers shift down |
-| `nexus <project> <version> start` | Planned to in progress |
-| `nexus <project> <version> release` | In progress to released |
-| `nexus add task <project> [<version>] [-t T] [-b B] [-c C] [-s SIZE]` | Create a task |
+| `nexus tasks` / `projects` | Table of all rows, `(none)` if empty |
+| `nexus <project>` | Project detail and its subprojects |
+| `nexus <s-ref>` | Subproject detail |
+| `nexus <f-ref>` / `<t-ref>` | Feature or task detail |
+| `nexus add task <project> [-t T] [-b B] [-c C] [-s SIZE]` | Create a task in the project's inbox |
 | `nexus "<description>"` | Capture into the inbox |
 | `nexus import <file\|->` | Bulk import, see below |
 
-`add task` without a version creates an inbox task attached to the project;
-with a version it creates a task already planned. `--size` is `XS`, `S`,
-`M` or `L`. Without `--title`, it prompts on a terminal and fails otherwise.
-A lone argument that is blank or contains whitespace is a capture.
-
-Version actions also work after a `v-` ref (`nexus v-9xa start`) and print
-the version detail afterwards. A criterion number out of range is a usage
-error (exit 2). `release` is refused (exit 1) while a task is unfinished
-(cancelled tasks don't count) or a criterion is unchecked. Criterion text is
-the remaining words joined by spaces; editing a released version's DoD or
-removing its last criterion is refused (exit 1).
+`--size` is `XS`, `S`, `M` or `L`. Without `--title`, `add task` prompts on
+a terminal and fails otherwise. A lone argument that is blank or contains
+whitespace is a capture.
 
 ```bash
-nexus add task NX 1.0 -t "Write the CLI page" -s S
+nexus add task NX -t "Write the CLI page" -s S
 nexus "buy a USB-C cable"
-nexus NX 1.0
-nexus NX 1.0 check 2
-nexus v-9xa release
+nexus NX
+nexus f-4k2
 ```
 
 Everything the CLI creates or changes is logged with actor `cli`
@@ -73,28 +58,28 @@ Everything the CLI creates or changes is logged with actor `cli`
 ## Import
 
 `nexus import <file|-> [--dry-run] [--text]`; `-` reads stdin.
-Design: [0007](../architecture/adr/0007-importer-mcp-entry-point.md).
+Design: [0007](../architecture/adr/0007-importer-mcp-entry-point.md), format
+[0015](../architecture/adr/0015-tree-import-format.md).
 
 ```json
 {"projects": [{"key": "NX", "name": "Nexus", "description": "...",
-   "versions": [{"number": "1.0", "title": "First", "goal": "...",
-                 "dod": ["Docs written"],
-                 "tasks": [{"title": "Write docs", "body": "...",
-                            "context": "@ordi", "size": "S"}]}]}],
+   "items": [{"kind": "feature", "title": "Docs",
+              "children": [{"title": "Write docs", "body": "...",
+                            "context": "@ordi", "size": "S"}]}],
+   "subprojects": [{"key": "NX-WEB", "name": "Web UI",
+                    "items": [{"title": "Fix the header"}]}]}],
  "tasks": [{"title": "Loose idea"},
-           {"title": "Attached", "project": "NX"},
-           {"title": "Planned", "project": "NX", "version": "1.0"}]}
+           {"title": "Attached", "project": "NX"}]}
 ```
 
-- Projects match by `key`, versions by `number` within the project. An
-  existing one is **reused, never overwritten** (its `title`, `goal`, `dod`
-  are ignored) but its nested tasks are still created.
-- A new project needs `name`; a new version needs `title` and a non-empty
-  `dod`.
+- Projects and subprojects match by `key`. An existing one is **reused,
+  never overwritten** (its `name`, `description` are ignored) but its items
+  are still created. It can't change place (root vs subproject, or parent).
+- A new project needs `name`.
+- An item's `kind` is `feature` or `task` (default); only a feature takes
+  `children`, at any depth. Items in a project tree are created refined.
+- Top-level `tasks` go to the inbox; `project` attaches them.
 - Tasks are always created: importing the same file twice duplicates them.
-- Top-level tasks go to the inbox; `project` attaches them; `project` +
-  `version` plans them. `version` alone is an error. New tasks in a released
-  version are refused.
 - Unknown fields are errors. Refs and ids are not part of the format.
 - **All-or-nothing**: all problems are listed at once (each names its
   entry), and nothing is written if there is any.

@@ -7,7 +7,7 @@ date: 2026-09-21
 
 ## Status
 
-Accepted
+Accepted. Since 2.0, the document format (no versions) is [0015](0015-tree-import-format.md); the rest still holds.
 
 ## Decision
 

@@ -1,11 +1,13 @@
 ---
-status: accepted
+status: superseded
 date: 2026-10-13
 ---
 
 # 0011 — Deleting a version
 
 ## Status
+
+Superseded by [0013](0013-project-feature-task-tree.md): versions and their DoD were removed in 2.0.
 
 Accepted.
 

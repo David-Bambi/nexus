@@ -1,5 +1,12 @@
 # Cascade behavior: what happens to children on delete
 
+!!! note "1.x examples"
+    The examples below use the 1.x `Version` and `DefinitionOfDoneCriterion`
+    models, removed in 2.0
+    ([0013](../architecture/adr/0013-project-feature-task-tree.md)). The
+    concept still applies; the current model is in the
+    [overview](../architecture/overview.md#domain-model).
+
 `session.delete(parent)` doesn't have one universal effect on the parent's
 children — SQLAlchemy does exactly what each `relationship()` declares,
 and `src/models/` deliberately declares two different things.

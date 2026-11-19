@@ -1,5 +1,12 @@
 # Database relationships: FK column vs. junction table
 
+!!! note "1.x examples"
+    The examples below use the 1.x `Version` and `DefinitionOfDoneCriterion`
+    models, removed in 2.0
+    ([0013](../architecture/adr/0013-project-feature-task-tree.md)). The
+    concept still applies; the current model is in the
+    [overview](../architecture/overview.md#domain-model).
+
 Two ways to link two tables show up in `src/models/`: a plain foreign-key
 column, and a separate junction table. Which one to use isn't a style
 choice — it follows directly from the cardinality of the relationship.

@@ -1,11 +1,13 @@
 ---
-status: accepted
+status: superseded
 date: 2026-10-11
 ---
 
 # 0010 — DoD editing in the CLI and the MCP server
 
 ## Status
+
+Superseded by [0013](0013-project-feature-task-tree.md): versions and their DoD were removed in 2.0.
 
 Accepted. Narrows [0009](0009-version-lifecycle-in-cli-and-mcp.md)
 ("DoD editing stays web-only"), and with it the scope limits of

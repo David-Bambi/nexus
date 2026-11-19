@@ -13,7 +13,7 @@ How the web UI is built and how to extend it. Decision:
   `{% import "_components.html" as ui %}`.
 - `src/web/static/app.css`: the only stylesheet. Sections in order: design
   tokens, dark theme, reset, base typography, then components (app shell,
-  forms and buttons, lists/badges/ref chips, dashboard, version page,
+  forms and buttons, lists/badges/ref chips, dashboard,
   detail pages and timeline, remaining pages, accessibility).
 - `src/web/static/app.js`: the only script.
 
@@ -37,9 +37,9 @@ blocks, never hard-code a color, size or spacing: use a token.
 ## Badges
 
 `ui.badge(name)` renders `<span class="badge badge-<name lower>">` for a
-task state, version status or project status. A state picks its color by
-setting `--badge-color` (doing/in progress: accent; waiting: warning;
-done/released/active: success; cancelled: danger; others: muted text). The
+task state or project status. A state picks its color by
+setting `--badge-color` (doing: accent; waiting: warning;
+done/active: success; cancelled: danger; others: muted text). The
 background is `color-mix` of that color at 12% with `--color-surface`, not
 transparency, so contrast is the same on any background.
 
@@ -52,11 +52,9 @@ templates (enforced by `tests/web/test_pages.py`). `app.js` handles:
   left alone (Ctrl+C copies).
 - `data-confirm="<value>"` on an input: its form's submit button (rendered
   `disabled`) is enabled only once that exact value is typed (delete
-  project, delete version).
-- `data-autosubmit` on a control: submits its form on change (DoD
-  checkbox).
-- `#dod-rows` in the new-version form: add/remove criterion rows (one is
-  kept), Enter adds a row.
+  project).
+- `data-autosubmit` on a control: submits its form on change (no
+  template uses it since 2.0).
 
 Pure presentation stays in CSS, e.g. the waiting reason field of the state
 form is shown only when `WAITING` is selected, via `:has()`.

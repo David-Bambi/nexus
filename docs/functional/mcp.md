@@ -26,48 +26,36 @@ Read tools (`readOnlyHint`):
 | Tool | Purpose |
 |---|---|
 | `list_projects` | Projects (`include_archived`) |
-| `list_versions` | Versions of one project (`project`) or of all |
-| `list_tasks` | Tasks, filtered by `state`, `project`, `version`; `limit` |
-| `get_project` | A project and its versions |
-| `get_version` | Tasks and definition of done, criteria numbered from 1 |
+| `list_tasks` | Features and tasks, filtered by `state`, `project`; `limit` |
+| `get_project` | A project or subproject and its subprojects |
 | `get_task` | All fields plus event history |
 | `inbox` | Captured tasks to triage |
 | `search` | Substring of title or body; `limit` |
-| `dashboard` | In-progress versions, doing/waiting tasks, inbox and refine counts |
+| `dashboard` | Doing/waiting items, inbox and refine counts |
 
-Write tools (`destructiveHint: false` except `delete_criterion`;
-`idempotentHint` on `update_task` and `set_criterion_done`):
+Write tools (`destructiveHint: false`; `idempotentHint` on `update_task`):
 
 | Tool | Purpose |
 |---|---|
 | `capture_task` | Title into the inbox |
-| `add_task` | Create in a project, in the inbox or planned into a `version`; `body`, `context`, `size` |
+| `add_task` | Create in a project's inbox; `body`, `context`, `size` |
 | `import_data` | Bulk import a `document` or a `text` list; `dry_run` (same rules as the [CLI import](cli.md#import)) |
 | `update_task` | Change title, body, context, size; blank body/context/size clears it, blank title refused |
-| `plan_task` | Refined task into a version |
-| `unplan_task` | Planned task back to refined |
-| `start_task` | Planned to doing |
-| `complete_task` | Doing to done |
+| `start_task` | Refined to doing |
+| `complete_task` | Doing to done; a feature only once its children are done or cancelled |
 | `block_task` | Doing to waiting, `reason` required |
 | `unblock_task` | Waiting to doing |
-| `set_criterion_done` | Check or uncheck a DoD criterion by its number |
-| `add_criterion` | Append a DoD criterion (`description`) |
-| `update_criterion` | Reword criterion number `index` (`description`) |
-| `delete_criterion` | Delete criterion number `index`; refused for the last one, later numbers shift down |
-| `start_version` | Planned to in progress; returns the version like `get_version` |
-| `release_version` | In progress to released; refused while a task is unfinished (cancelled ones don't count) or a criterion is unchecked |
 
-Version and criterion tools return the version like `get_version`. Criteria
-of a released version can't be changed; blank text is refused
-([0010](../architecture/adr/0010-dod-editing-in-cli-and-mcp.md)).
-
-Not exposed, use the web UI: deleting tasks, versions or projects, archiving, and
-arbitrary state changes.
+Not exposed, use the web UI: deleting, archiving, and arbitrary state
+changes. No clarify, move or change-kind tool yet (planned for a later
+increment).
 
 ## Identification
 
-- Project: its key. Task: its ref (`t-4k2`). Version: its ref (`v-9xa`), or
-  its number together with `project`.
+- Project or subproject: its key.
+  Feature or task: its ref (`f-4k2`, `t-4k2`); a task turned into a
+  feature answers to both.
+- Serialized items carry `kind` and `parent`.
 - Results never contain integer ids.
 - Each tool has a strict JSON Schema; unknown arguments are refused and
   strings are stripped.
@@ -76,7 +64,7 @@ arbitrary state changes.
 
 - A result carries `content` (JSON text) and `structuredContent`.
 - A refusal by validation or by a service (unknown ref, invalid transition,
-  released version...) is a tool result with `isError: true` and the
+  feature with open children...) is a tool result with `isError: true` and the
   message; HTTP status stays 200 and the change is rolled back.
 - An unexpected exception becomes an `isError` result "internal error, see
   the server log"; the traceback is in `app.log`.

@@ -1,11 +1,13 @@
 ---
-status: accepted
+status: superseded
 date: 2026-09-23
 ---
 
 # 0009 — Version lifecycle in the CLI and the MCP server
 
 ## Status
+
+Superseded by [0013](0013-project-feature-task-tree.md): versions and their DoD were removed in 2.0.
 
 Accepted. Narrows the scope limits of
 [0006](0006-cli-shares-the-database.md) and

@@ -7,7 +7,7 @@ date: 2026-09-11
 
 ## Status
 
-Accepted
+Accepted. Since 2.0, the version entity, its actions, `planned` / `unplanned`, the `moved` payload and `events.changelog` are replaced by [0013](0013-project-feature-task-tree.md).
 
 ## Decision
 

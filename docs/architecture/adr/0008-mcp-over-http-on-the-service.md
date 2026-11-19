@@ -7,7 +7,7 @@ date: 2026-09-21
 
 ## Status
 
-Accepted
+Accepted. Since 2.0, the version and DoD tools are gone: 15 tools (7 read, 8 write), see [0013](0013-project-feature-task-tree.md).
 
 ## Decision
 
