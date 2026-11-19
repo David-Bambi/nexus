@@ -7,7 +7,7 @@ date: 2026-09-11
 
 ## Status
 
-Accepted. Since 2.0, the version entity, its actions, `planned` / `unplanned`, the `moved` payload and `events.changelog` are replaced by [0013](0013-project-feature-task-tree.md).
+Accepted. Since 2.0, the version entity, its actions, `planned` / `unplanned`, the `moved` payload and `events.changelog` are replaced by [0013](0013-project-feature-task-tree.md). Version and criterion actions: [0016](0016-computed-version.md).
 
 ## Decision
 
@@ -44,7 +44,8 @@ leaves no event. The session runs with `autoflush=False`, so services
 |---|---|
 | task | `created`, `updated`, `clarified`, `planned`, `unplanned`, `started`, `blocked`, `unblocked`, `completed`, `reopened`, `deferred`, `cancelled`, `restored`, `moved`, `deleted` |
 | version | `created`, `started`, `released`, `deleted`, `dod_added`, `dod_updated`, `dod_deleted`, `dod_checked`, `dod_unchecked` |
-| project | `created`, `archived`, `deleted`, `versions_reordered` |
+| project | `created`, `archived`, `deleted`, `versions_reordered`, `minor_bumped`, `major_released`, `version_set` |
+| criterion | `criterion_added`, `criterion_updated`, `criterion_checked`, `criterion_deleted` |
 
 `versions_reordered` is logged on the project, with payload `ordered_ids`.
 

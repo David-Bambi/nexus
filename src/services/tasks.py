@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from src.models.project import Project
 from src.models.task import Task, TaskKind, TaskState
-from src.services import events, projects, refs
+from src.services import events, projects, refs, versioning
 from src.services.errors import ConflictError, InvalidTransitionError, NotFoundError, ValidationError
 
 # Fields update() is allowed to touch; state, kind, placement in the tree and
@@ -475,6 +475,9 @@ def unblock(session : Session, task_id : int, actor : str = events.ACTOR_WEB) ->
 def complete(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -> Task:
     """Complete a feature or task that's being worked on.
 
+    A feature completed for the first time raises MINOR on its nearest
+    project and records the version it shipped in.
+
     Args:
         session: Database session to use.
         task_id: Id of the task.
@@ -499,6 +502,8 @@ def complete(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -
     task.closed_at = datetime.utcnow()
 
     _log_transition(session, task, "completed", TaskState.DOING, actor=actor)
+    # A feature shipping raises MINOR on its nearest project, once.
+    versioning.bump_minor(session, task, actor=actor)
     session.commit()
     return task
 

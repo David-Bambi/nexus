@@ -261,3 +261,59 @@ def test_existing_subproject_cant_be_imported_as_a_root_project(session):
     projects.create(session, "bilan", "Bilan", parent_key="metrique")
     errors = importer.validate(session, {"projects": [{"key": "bilan"}]})
     assert errors == ["projects[0] ('bilan'): already exists as a subproject of 'metrique'"]
+
+
+# Version and criteria ----------------------------------------------------------------------------
+
+VERSIONED = {"projects": [{
+    "key": "metrique", "name": "Metrique", "version": "1.4",
+    "criteria": ["Bilan done", {"text": "Docs built", "done": True}],
+    "subprojects": [{"key": "bilan", "name": "Bilan", "version": "0.2"}],
+}]}
+
+
+def test_import_sets_version_and_criteria(session):
+    """
+    Given a document giving projects a version and criteria
+    When importing it
+    Then each new project has them, in order
+    """
+    _apply(session, VERSIONED)
+
+    metrique = projects.get(session, "metrique")
+    assert (metrique.version_major, metrique.version_minor) == (1, 4)
+    assert [(c.text, c.done) for c in metrique.criteria] == [("Bilan done", False), ("Docs built", True)]
+    assert (projects.get(session, "bilan").version_minor) == 2
+
+
+def test_import_version_dry_run_writes_nothing(session):
+    """A dry run with versions and criteria writes nothing."""
+    _apply(session, VERSIONED, dry_run=True)
+    assert projects.list(session) == []
+
+
+def test_import_version_on_existing_project_is_refused(session):
+    """An existing project's version and criteria are never overwritten."""
+    projects.create(session, "metrique", "Metrique")
+    with pytest.raises(importer.ImportInvalid) as error:
+        _apply(session, {"projects": [{"key": "metrique", "version": "2.0", "criteria": ["X"]}]})
+    assert error.value.errors == [
+        "projects[0] ('metrique'): 'version' can't be set on an existing project",
+        "projects[0] ('metrique'): 'criteria' can't be set on an existing project",
+    ]
+
+
+def test_import_invalid_version_and_criteria(session):
+    """Every malformed version or criterion is reported."""
+    errors = importer.validate(session, {"projects": [{
+        "key": "x", "name": "X", "version": "1",
+        "criteria": [3, " ", {"text": "", "done": "y", "extra": 1}],
+    }]})
+    assert errors == [
+        "projects[0] ('x'): 'version' must look like '1.4'",
+        "projects[0] ('x') criteria[0]: must be a string or an object",
+        "projects[0] ('x') criteria[1]: text is required",
+        "projects[0] ('x') criteria[2]: unknown field 'extra'",
+        "projects[0] ('x') criteria[2]: 'text' is required",
+        "projects[0] ('x') criteria[2]: 'done' must be true or false",
+    ]

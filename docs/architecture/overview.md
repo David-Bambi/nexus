@@ -13,11 +13,16 @@ Features and tasks share the `task` table, told apart by `kind`.
 - `Task.parent_id`: the feature directly above, null at the top of a
   project. Only a feature has children (features or tasks, any depth, no
   cycles).
+- `Project.version_major` / `version_minor`: computed version, kept by
+  services; `Task.released_in`: version a feature shipped in;
+  `MajorCriterion`: criteria for the next major version
+  ([0016](adr/0016-computed-version.md)).
 
 ```mermaid
 erDiagram
     PROJECT ||--o{ PROJECT : "has subprojects (one level)"
     PROJECT ||--o{ TASK : "has (optional)"
+    PROJECT ||--o{ MAJOR_CRITERION : "next major needs"
     TASK ||--o{ TASK : "feature has children"
     TASK }o--o{ TAG : has
 ```
@@ -34,7 +39,7 @@ shown here: it has no foreign keys by design, referencing any entity by
 [0002](adr/0002-append-only-event-log.md).
 
 Migration history restarted at 2.0 with one initial revision,
-`87dc79bc1cbb`; a 1.x database is refused at startup
+`87dc79bc1cbb` (then `b3c1e7a2d904`, computed version); a 1.x database is refused at startup
 ([0014](adr/0014-restart-migrations-refuse-1x.md)).
 
 ## Task lifecycle
@@ -96,8 +101,8 @@ belong to any one entity. Both stay framework-agnostic per ADR-0001.
 Two further modules are read-only: `services/events.py` also holds the
 event-log reader `history` (see [0002](adr/0002-append-only-event-log.md)),
 and `services/export.py` provides `dump_json()`, a full database dump
-(projects with `parent_id` and `ref`, tasks with `kind`, `parent_id`, `ref`
-and their tags, tags, events). Enums are exported by name and dates in ISO
+(projects with `parent_id`, `ref` and version, tasks with `kind`,
+`parent_id`, `ref`, `released_in` and their tags, tags, criteria, events). Enums are exported by name and dates in ISO
 8601. The export is not re-importable (raw integer ids); bulk import is a
 separate format, see `services/importer.py` below.
 

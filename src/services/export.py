@@ -4,6 +4,7 @@ from enum import Enum
 from sqlalchemy import inspect
 from sqlalchemy.orm import Session, selectinload
 
+from src.models.criterion import MajorCriterion
 from src.models.event import Event
 from src.models.project import Project
 from src.models.tag import Tag
@@ -62,9 +63,11 @@ def dump_json(session : Session) -> dict:
 
     Returns:
         A dict with the export time and every table: "projects" (root
-        projects and subprojects, a subproject with its "parent_id"),
-        "tasks" (features and tasks, each with its "kind", "parent_id" and
-        "tags" names), "tags" and "events". Enums are given by name and
+        projects and subprojects, a subproject with its "parent_id", each
+        with its "version_major" and "version_minor"), "criteria" (major
+        criteria, by "project_id"), "tasks" (features and tasks, each with
+        its "kind", "parent_id", "released_in" and "tags" names), "tags"
+        and "events". Enums are given by name and
         dates in ISO 8601. Archived projects and done tasks are included.
     """
     tasks = [
@@ -75,6 +78,7 @@ def dump_json(session : Session) -> dict:
     return {
         "exported_at": _json_value(datetime.utcnow()),
         "projects": [_row(p) for p in _all(session, Project)],
+        "criteria": [_row(c) for c in _all(session, MajorCriterion)],
         "tasks": tasks,
         "tags": [_row(t) for t in _all(session, Tag)],
         "events": [_row(e) for e in _all(session, Event)],

@@ -96,6 +96,11 @@ class Task(Base):
     # Set on completion, cleared on reopen.
     closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
+    # Version of the nearest project the feature first shipped in (e.g.
+    # "1.4"); set on its first completion and kept on reopen. Always null
+    # on a task.
+    released_in: Mapped[Optional[str]] = mapped_column(String)
+
     # Nearest project or subproject; None on a raw capture.
     project: Mapped[Optional["Project"]] = relationship(back_populates="tasks")
 

@@ -297,7 +297,7 @@ def test_export_json_is_an_attachment_with_all_tables(client):
     assert response.headers["Content-Disposition"].startswith("attachment; filename=")
 
     data = response.get_json()
-    assert set(data) == {"exported_at", "projects", "tasks", "tags", "events"}
+    assert set(data) == {"exported_at", "projects", "criteria", "tasks", "tags", "events"}
     assert [p["key"] for p in data["projects"]] == ["nexus"]
     assert [t["title"] for t in data["tasks"]] == ["Write the docs"]
     assert data["events"]

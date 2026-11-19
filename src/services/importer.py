@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from src.models.project import Project
 from src.models.task import TaskKind
-from src.services import projects, tasks
+from src.services import projects, tasks, versioning
 from src.services.errors import NotFoundError, ValidationError
 
 # Sizes a task may take.
@@ -15,7 +15,7 @@ _KINDS = {"feature": TaskKind.FEATURE, "task": TaskKind.TASK}
 
 # Fields each kind of entry accepts; anything else is reported as an error.
 _DOCUMENT_FIELDS = {"projects", "tasks"}
-_SUBPROJECT_FIELDS = {"key", "name", "description", "items"}
+_SUBPROJECT_FIELDS = {"key", "name", "description", "version", "criteria", "items"}
 _PROJECT_FIELDS = _SUBPROJECT_FIELDS | {"subprojects"}
 _TASK_FIELDS = {"title", "body", "context", "size"}
 _ITEM_FIELDS = _TASK_FIELDS | {"kind", "children"}
@@ -201,6 +201,49 @@ def _check_items(container : dict, field_name : str, where : str, errors : list)
                 _check_items(item, "children", item_where, errors)
 
 
+def _check_version(entry : dict, where : str, existing : bool, errors : list) -> None:
+    """Check a project entry's "version" and "criteria".
+
+    Both only apply to a project the import creates: an existing one is
+    never overwritten.
+
+    Args:
+        entry: The project entry.
+        where: Label of the entry, for messages.
+        existing: Whether the project already exists.
+        errors: List receiving the problems found.
+    """
+    for name in ("version", "criteria"):
+        if existing and name in entry:
+            errors.append(f"{where}: '{name}' can't be set on an existing project")
+    if existing:
+        return
+
+    version = _text(entry, "version", where, errors)
+    if version is not None and versioning.parse_label(version) is None:
+        errors.append(f"{where}: 'version' must look like '1.4'")
+
+    criteria = entry.get("criteria")
+    if criteria is None:
+        return
+    if not isinstance(criteria, list):
+        errors.append(f"{where}: 'criteria' must be a list")
+        return
+    for index, criterion in enumerate(criteria):
+        criterion_where = f"{where} criteria[{index}]"
+        if isinstance(criterion, str):
+            if not criterion.strip():
+                errors.append(f"{criterion_where}: text is required")
+            continue
+        if not isinstance(criterion, dict):
+            errors.append(f"{criterion_where}: must be a string or an object")
+            continue
+        _unknown_fields(criterion, {"text", "done"}, criterion_where, errors)
+        _text(criterion, "text", criterion_where, errors, required=True)
+        if not isinstance(criterion.get("done", False), bool):
+            errors.append(f"{criterion_where}: 'done' must be true or false")
+
+
 def _check_project(session : Session, entry : dict, where : str, parent_key : str | None,
                    declared : set, errors : list) -> None:
     """Check one project or subproject entry, its subprojects and its items.
@@ -234,6 +277,7 @@ def _check_project(session : Session, entry : dict, where : str, parent_key : st
             place = f"a subproject of '{existing_parent}'" if existing_parent else "a root project"
             errors.append(f"{where}: already exists as {place}")
     _text(entry, "description", where, errors)
+    _check_version(entry, where, existing is not None, errors)
     _check_items(entry, "items", where, errors)
 
     for index, sub in _entries(entry, "subprojects", where, errors):
@@ -279,7 +323,8 @@ def apply(session : Session, data : object, actor : str, dry_run : bool = False)
     """Import projects, subprojects, features and tasks from a document.
 
     Projects and subprojects are matched by their key: an existing one is
-    reused and never overwritten, a missing one is created. Features and
+    reused and never overwritten, a missing one is created, with its
+    version and major criteria if the document gives them. Features and
     tasks are always created: those placed in a project's tree are refined
     (already triaged), loose ones land in the inbox. Tasks are always created. Refs and
     ids in the document are not part of the format. The whole import is
@@ -288,11 +333,14 @@ def apply(session : Session, data : object, actor : str, dry_run : bool = False)
     Args:
         session: Database session to use.
         data: The parsed document: {"projects": [{"key", "name",
-            "description", "items": [ITEM], "subprojects": [{"key", "name",
-            "description", "items": [ITEM]}]}], "tasks": [{"title", "body",
+            "description", "version", "criteria", "items": [ITEM],
+            "subprojects": [{"key", "name", "description", "version",
+            "criteria", "items": [ITEM]}]}], "tasks": [{"title", "body",
             "context", "size", "project"}]}, where an ITEM is {"kind":
             "feature" or "task" (default), "title", "body", "context",
-            "size", "children": [ITEM] (features only)}.
+            "size", "children": [ITEM] (features only)}. "version" is
+            "MAJOR.MINOR"; "criteria" is a list of texts or {"text",
+            "done"} objects.
         actor: Who runs the import, recorded in the event log.
         dry_run: If True, run everything then discard it, so the result
             shows what would happen.
@@ -339,6 +387,7 @@ def _create_project(session : _DeferredCommit, entry : dict, parent_key : str | 
         projects.create(session, key, entry["name"].strip(),
                         (entry.get("description") or "").strip() or None,
                         parent_key=parent_key, actor=actor)
+        _create_version(session, entry, key, actor)
         result.projects_created += 1
     else:
         result.projects_reused += 1
@@ -347,6 +396,20 @@ def _create_project(session : _DeferredCommit, entry : dict, parent_key : str | 
         _create_item(session, item, key, None, actor, result)
     for sub in entry.get("subprojects", []):
         _create_project(session, sub, key, actor, result)
+
+
+def _create_version(session : _DeferredCommit, entry : dict, key : str, actor : str) -> None:
+    """Give a newly created project its version and major criteria, if any."""
+    version = (entry.get("version") or "").strip()
+    if version:
+        major, minor = versioning.parse_label(version)
+        versioning.set_version(session, key, major, minor, actor=actor)
+    for criterion in entry.get("criteria", []):
+        if isinstance(criterion, str):
+            criterion = {"text": criterion}
+        added = versioning.add_criterion(session, key, criterion["text"], actor=actor)
+        if criterion.get("done", False):
+            versioning.set_criterion_done(session, added.id, True, actor=actor)
 
 
 def _fields(entry : dict) -> dict:

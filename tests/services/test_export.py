@@ -15,7 +15,7 @@ def test_dump_empty_database(session):
     result = export.dump_json(session)
 
     assert result["exported_at"]
-    for section in ("projects", "tasks", "tags", "events"):
+    for section in ("projects", "criteria", "tasks", "tags", "events"):
         assert "versions" not in result
         assert result[section] == []
 
@@ -143,3 +143,27 @@ def test_dump_query_count_does_not_grow_with_the_data(session):
     large = _count_queries(session, lambda: export.dump_json(session))
 
     assert large == small
+
+
+def test_dump_gives_versions_criteria_and_released_in(session):
+    """
+    Given a project with a shipped feature and a major criterion
+    When dumping
+    Then the project's version, its criteria and the feature's version are given
+    """
+    from src.services import versioning
+
+    projects.create(session, "nexus", "Nexus")
+    feature = tasks.create(session, "Login", project_key="nexus", kind=TaskKind.FEATURE)
+    tasks.clarify(session, feature.id, "Login", None, "nexus", None, None)
+    tasks.start(session, feature.id)
+    tasks.complete(session, feature.id)
+    versioning.add_criterion(session, "nexus", "Tests green")
+
+    data = export.dump_json(session)
+
+    project = data["projects"][0]
+    assert (project["version_major"], project["version_minor"]) == (0, 1)
+    assert [(c["text"], c["done"], c["project_id"]) for c in data["criteria"]] == [
+        ("Tests green", False, project["id"])]
+    assert data["tasks"][0]["released_in"] == "0.1"

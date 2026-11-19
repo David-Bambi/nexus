@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import Enum, auto
 from typing import Optional
 
-from sqlalchemy import DateTime, Enum as SAEnum, ForeignKey, String, Text
+from sqlalchemy import DateTime, Enum as SAEnum, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.db import Base
@@ -53,6 +53,14 @@ class Project(Base):
         default=ProjectStatus.ACTIVE,
     )
 
+    # MAJOR part of the computed version; raised by hand once every major
+    # criterion is checked (services/versioning).
+    version_major: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    # MINOR part of the computed version; raised by each feature completed
+    # under this project, reset to 0 by a major release.
+    version_minor: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
     # Creation time (UTC).
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
@@ -67,3 +75,11 @@ class Project(Base):
 
     # Every feature and task whose nearest project is this one.
     tasks: Mapped[list["Task"]] = relationship(back_populates="project")
+
+    # Criteria for the next major version, in display order. Cascaded: the
+    # list belongs to the project and is emptied by each major release.
+    criteria: Mapped[list["MajorCriterion"]] = relationship(
+        back_populates="project",
+        order_by="MajorCriterion.position",
+        cascade="all, delete-orphan",
+    )
