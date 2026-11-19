@@ -153,12 +153,14 @@ def _apply_transition(task_id, fn):
 
 @bp.route("/tasks/<int:task_id>/update", methods=["POST"])
 def task_update(task_id):
-    """Update a task's descriptive fields."""
+    """Update a task's descriptive fields; with the "correction" box ticked,
+    the change is logged as a correction."""
     return _apply_transition(
         task_id,
         lambda s: tasks.update(
             s,
             task_id,
+            correction=request.form.get("correction") == "1",
             title=request.form["title"],
             body=request.form.get("body") or None,
             context=request.form.get("context") or None,

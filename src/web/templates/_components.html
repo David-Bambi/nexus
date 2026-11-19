@@ -144,7 +144,7 @@
 </ul>
 {% endmacro %}
 
-{# Events, oldest first; with `show_entity`, each row names its entity and links tasks. #}
+{# Events, oldest first; with `show_entity`, each row names its entity and links tasks. Empty payload values are left out. #}
 {% macro event_list(events, show_entity=false) %}
 <ul class="events">
     {% for e in events %}
@@ -157,7 +157,7 @@
         {% endif %}
         {% if e.payload %}
         {% if 'from' in e.payload and 'to' in e.payload %}: {{ e.payload['from'] }} → {{ e.payload['to'] }}{% endif %}
-        {% for key, value in e.payload.items() if key not in ('from', 'to') %}
+        {% for key, value in e.payload.items() if key not in ('from', 'to') and value is not none %}
         · {{ key }}:
         {% if value is mapping %}{{ value['from'] }} → {{ value['to'] }}{% elif value is iterable and value is not string %}{{ value | join(', ') }}{% else %}{{ value }}{% endif %}
         {% endfor %}

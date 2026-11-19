@@ -132,6 +132,31 @@ def _set_place(task : Task, project : Project | None, parent : Task | None) -> N
     for descendant in _descendants(task):
         descendant.project = project
 
+def _log(session : Session, actor : str, task : Task, action : str, payload : dict | None = None) -> None:
+    """Log a change to a work item, with the ref of its parent feature at
+    that moment, so the change can be tied to the right feature later even
+    if the item moves.
+
+    Args:
+        session: Database session to use.
+        actor: Who made the change, recorded in the event log.
+        task: The work item changed.
+        action: Event action (e.g. "updated").
+        payload: Detail of the change; "parent" is added unless present.
+    """
+    payload = dict(payload or {})
+    payload.setdefault("parent", task.parent.ref if task.parent else None)
+    events.log(session, actor, "task", task.id, action, payload)
+
+def _has_started_before(session : Session, task : Task) -> bool:
+    """Tell whether a work item was already started once.
+
+    Args:
+        session: Database session to use.
+        task: The work item.
+    """
+    return any(event.action == "started" for event in events.history(session, "task", task.id))
+
 def _log_transition(session : Session, task : Task, action : str, previous : TaskState,
                     actor : str = events.ACTOR_WEB, **extra : object) -> None:
     """Log a task state change in the event log.
@@ -145,7 +170,7 @@ def _log_transition(session : Session, task : Task, action : str, previous : Tas
         **extra: Additional payload entries (e.g. reason).
     """
     payload = {"from": previous.name, "to": task.state.name, **extra}
-    events.log(session, actor, "task", task.id, action, payload)
+    _log(session, actor, task, action, payload)
 
 # -----------------------------------------------------------------------------
 # Reading
@@ -229,7 +254,7 @@ def capture(session : Session, title : str, actor : str = events.ACTOR_WEB) -> T
     task = Task(ref=refs.generate(session, refs.KIND_PREFIXES[TaskKind.TASK]), title=title, state=TaskState.INBOX)
     session.add(task)
     session.flush()
-    events.log(session, actor, "task", task.id, "created", {"title": title})
+    _log(session, actor, task, "created", {"title": title})
     session.commit()
     return task
 
@@ -279,7 +304,7 @@ def create(session : Session,
                 state=TaskState.INBOX)
     session.add(task)
     session.flush()
-    events.log(session, actor, "task", task.id, "created",
+    _log(session, actor, task, "created",
                {"title": title, "kind": kind.name, **_where(task)})
     session.commit()
     return task
@@ -330,14 +355,18 @@ def add_to_tree(session : Session,
 # Editing
 # -----------------------------------------------------------------------------
 
-def update(session : Session, task_id : int, actor : str = events.ACTOR_WEB, **fields : str | None) -> Task:
+def update(session : Session, task_id : int, actor : str = events.ACTOR_WEB, correction : bool = False,
+           **fields : str | None) -> Task:
     """Update a task's descriptive fields.
 
     Args:
         session: Database session to use.
         task_id: Id of the task.
-        **fields: Values for any of "title", "body", "context", "size".
         actor: Who made the change, recorded in the event log.
+        correction: True when the change fixes a mistake (a typo, a wrong
+            size) rather than changing the work: it is logged as "corrected"
+            instead of "updated", so plan-drift measures can leave it out.
+        **fields: Values for any of "title", "body", "context", "size".
 
     Returns:
         The updated Task.
@@ -360,7 +389,7 @@ def update(session : Session, task_id : int, actor : str = events.ACTOR_WEB, **f
         setattr(task, name, value)
 
     if changes:
-        events.log(session, actor, "task", task.id, "updated", changes)
+        _log(session, actor, task, "corrected" if correction else "updated", changes)
 
     session.commit()
     return task
@@ -451,7 +480,12 @@ def start(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -> T
 
     task.state = TaskState.DOING
 
-    _log_transition(session, task, "started", TaskState.REFINED, actor=actor)
+    extra = {}
+    if task.kind is TaskKind.FEATURE and not _has_started_before(session, task):
+        # The feature's plan, frozen at its first start: later additions,
+        # removals, cancellations, reopenings and renames are plan drift.
+        extra["plan"] = [child.ref for child in task.children]
+    _log_transition(session, task, "started", TaskState.REFINED, actor=actor, **extra)
     session.commit()
     return task
 
@@ -639,7 +673,7 @@ def move(session : Session, task_id : int, project_key : str | None = None,
     _set_place(task, project, parent)
     task.position = _next_position(session, project, parent)
 
-    events.log(session, actor, "task", task.id, "moved", {"from": previous, "to": _where(task)})
+    _log(session, actor, task, "moved", {"from": previous, "to": _where(task)})
     session.commit()
     return task
 
@@ -692,7 +726,7 @@ def reorder(session : Session, task_id : int, direction : str, actor : str = eve
     for position, sibling in enumerate(siblings):
         sibling.position = position
 
-    events.log(session, actor, "task", task.id, "reordered",
+    _log(session, actor, task, "reordered",
                {"from": previous, "to": task.position, "direction": direction})
     session.commit()
     return task
@@ -715,7 +749,7 @@ def _change_kind(session : Session, task : Task, kind : TaskKind, actor : str) -
     previous_kind, previous_ref = task.kind, task.ref
     task.kind = kind
     task.ref = refs.with_kind(task.ref, kind)
-    events.log(session, actor, "task", task.id, "kind_changed",
+    _log(session, actor, task, "kind_changed",
                {"from": previous_kind.name, "to": kind.name,
                 "ref": {"from": previous_ref, "to": task.ref}})
 
@@ -866,7 +900,7 @@ def delete(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -> 
     if task.children:
         raise ConflictError(
             f"feature '{task.ref}' isn't empty: delete or move its children first.")
-    events.log(session, actor, "task", task.id, "deleted",
+    _log(session, actor, task, "deleted",
                {"title": task.title, "kind": task.kind.name, "ref": task.ref})
     session.delete(task)
     session.commit()

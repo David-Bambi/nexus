@@ -352,19 +352,23 @@ def import_data(session : Session, args : dict) -> dict:
             "created": [{"kind": kind, "ref": ref, "title": title} for kind, ref, title in result.created]}
 
 
-@tool("update_task", "Change a task's title, body, context or size. A blank body, context or size clears it.",
+@tool("update_task",
+      "Change a task's title, body, context or size. A blank body, context or size clears it. Set correction to "
+      "true when the change only fixes a mistake (typo, wrong size), not the work itself.",
       {"ref": _REF, "title": _string("New title."), "body": _string("New detail."),
-       "context": _string("New context tag."), "size": _string("New size.", SIZES)},
+       "context": _string("New context tag."), "size": _string("New size.", SIZES),
+       "correction": _boolean("The change fixes a mistake; logged as 'corrected' (default false).")},
       ["ref"], idempotent=True)
 def update_task(session : Session, args : dict) -> dict:
-    """Update a task's fields."""
+    """Update a task's fields, as a change or a correction."""
     task = _task_of(session, args)
     fields = {name: args[name] for name in ("title", "body", "context", "size") if name in args}
     if not fields:
         raise ValidationError("give at least one field to change")
     if "title" in fields and fields["title"] is None:
         raise ValidationError("'title' must not be blank")
-    return serialize.task(tasks.update(session, task.id, actor=ACTOR, **fields))
+    return serialize.task(tasks.update(session, task.id, actor=ACTOR,
+                                       correction=bool(args.get("correction")), **fields))
 
 
 def _transition(name : str, description : str, action : Callable, extra : dict | None = None,
@@ -407,27 +411,33 @@ _transition("defer_task", "Defer an inbox or refined item to someday.", tasks.de
       "unique and can't change later.",
       {"key": _string("Unique short key, e.g. nexus."), "name": _string("Display name."),
        "description": _string("Free-text description."),
-       "parent": _string("Key of the root project to create a subproject under.")},
+       "parent": _string("Key of the root project to create a subproject under."),
+       "directory": _string("Absolute path of the project's folder on this machine (~ is expanded).")},
       ["key", "name"])
 def create_project(session : Session, args : dict) -> dict:
     """Create a project or subproject."""
     return serialize.project(projects.create(session, args["key"], args["name"], args.get("description"),
-                                             parent_key=args.get("parent"), actor=ACTOR))
+                                             parent_key=args.get("parent"), directory=args.get("directory"),
+                                             actor=ACTOR))
 
 
-@tool("update_project", "Change a project's name and/or description. A blank description clears it.",
-      {"project": _PROJECT, "name": _string("New display name."), "description": _string("New description.")},
+@tool("update_project",
+      "Change a project's name, description and/or directory. A blank description or directory clears it.",
+      {"project": _PROJECT, "name": _string("New display name."), "description": _string("New description."),
+       "directory": _string("New absolute folder path (~ is expanded).")},
       ["project"], idempotent=True)
 def update_project(session : Session, args : dict) -> dict:
-    """Change a project's name or description."""
+    """Change a project's name, description or directory."""
     project = projects.get(session, args["project"])
-    if "name" not in args and "description" not in args:
+    if not {"name", "description", "directory"} & set(args):
         raise ValidationError("give at least one field to change")
     if "name" in args and args["name"] is None:
         raise ValidationError("'name' must not be blank")
     name = args.get("name") or project.name
     description = args["description"] if "description" in args else project.description
-    return serialize.project(projects.update(session, project.key, name, description, actor=ACTOR))
+    directory = args["directory"] if "directory" in args else projects.KEEP
+    return serialize.project(projects.update(session, project.key, name, description, directory=directory,
+                                             actor=ACTOR))
 
 
 # Schema of the argument numbering a criterion.

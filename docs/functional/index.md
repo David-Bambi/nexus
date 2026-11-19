@@ -22,9 +22,11 @@ Routes and templates: [Architecture overview](../architecture/overview.md#web-pa
 
 - **Projects** (`/projects`): root projects with their subprojects indented
   below (with their `s-…` ref), each showing its computed version `vX.Y`.
-  Archived projects are hidden.
+  Archived projects are hidden. The creation form takes an optional
+  *Directory*.
 - **Project** (`/projects/<key>`): key, status and version in the header;
-  a refused action's error at the top. Sections:
+  a refused action's error at the top; its *Directory*, or the parent's
+  with "(from <parent name>)" for a subproject without one. Sections:
     - *Work*: the tree of features (collapsible) and tasks in sibling
       order, with ref, state and, for a shipped feature, its released
       version. Done and cancelled items are hidden unless "Show closed".
@@ -34,19 +36,29 @@ Routes and templates: [Architecture overview](../architecture/overview.md#web-pa
     - *Next major version*: the major criteria (check / uncheck, edit,
       delete, add) and "Release N+1.0", enabled once every criterion is
       checked.
-    - *Edit*: name and description (the key can't change).
-    - *New subproject* (root projects only).
+    - *Edit*: name, description and directory (the key can't change;
+      blank directory clears it).
+    - *New subproject* (root projects only), with an optional directory
+      (else the parent's is used).
     - *Status*: Archive / Restore.
     - *Danger zone*: delete, once the key is typed.
 - **Item** (`/tasks/<id>`): for a feature, its *Children* (whole subtree,
   closed items included, with ↑ / ↓) and an Add form, and "Released in" in the side
   panel. For every item, *Place*: "Move to" (project key and/or parent
   feature ref) and "Change to feature / task" (a feature with children
-  can't become a task).
+  can't become a task). The edit form's *Correction* checkbox logs the
+  change as `corrected` (a fixed mistake) instead of `updated`.
 - **Inbox** and the clarify form: *Kind* (task / feature) and *Parent
   feature ref*; with no project key, the parent's project is used.
 
 A refused move (already first / last) shows the item page with the reason.
+
+Directory: absolute path, `~` expanded, relative paths refused; the folder
+need not exist.
+
+**Feature export** (`/export/features.json`): the `nexus.features/1` JSON
+for metrique, shown inline
+([0017](../architecture/adr/0017-stable-feature-export-for-metrique.md)).
 
 ## Pages
 

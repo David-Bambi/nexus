@@ -125,6 +125,10 @@
         {{ ui.field("Body", "body", task.body, kind="textarea") }}
         {{ ui.field("Context", "context", task.context) }}
         {{ ui.size_select(task.size) }}
+        <label class="field-check">
+            <input type="checkbox" name="correction" value="1">
+            Correction: this fixes a mistake (typo, wrong size), the work itself doesn't change
+        </label>
         <div class="form-actions"><button class="button-primary" type="submit">Save</button></div>
     </form>
 

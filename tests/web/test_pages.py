@@ -1022,3 +1022,56 @@ def test_reorder_without_next_goes_back_to_the_project(client):
     client.post("/projects/nexus/items", data={"title": "Item B"})
     response = client.post("/tasks/2/reorder", data={"direction": "up"})
     assert response.headers["Location"] == "/projects/nexus"
+
+
+# Project directory -----------------------------------------------------------------------------------
+
+def test_project_directory_set_on_creation_shown_and_inherited(client):
+    """
+    Given a project created with a directory and a subproject without one
+    When viewing them
+    Then the project shows its directory and the subproject the inherited one
+    """
+    client.post("/projects", data={"key": "nexus", "name": "Nexus", "directory": "/srv/nexus/"})
+    client.post("/projects/nexus/subprojects", data={"key": "web", "name": "Web"})
+    assert '<code data-field="directory">/srv/nexus</code>' in client.get("/projects/nexus").get_data(as_text=True)
+    sub = client.get("/projects/web").get_data(as_text=True)
+    assert '<code data-field="directory">/srv/nexus</code> (from Nexus)' in sub
+
+
+def test_project_edit_changes_or_clears_the_directory(client):
+    """The edit form sets the directory, refuses a relative one, and clears it when blank."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    client.post("/projects/nexus/update", data={"name": "Nexus", "directory": "/srv/nexus"})
+    assert 'value="/srv/nexus"' in client.get("/projects/nexus").get_data(as_text=True)
+
+    response = client.post("/projects/nexus/update", data={"name": "Nexus", "directory": "rel"})
+    assert response.status_code == 400 and "absolute path" in response.get_data(as_text=True)
+
+    client.post("/projects/nexus/update", data={"name": "Nexus", "directory": ""})
+    assert 'data-field="directory"' not in client.get("/projects/nexus").get_data(as_text=True)
+
+
+def test_task_edit_with_the_correction_box_logs_corrected(client):
+    """The edit form's correction box logs the change as corrected."""
+    from src.models.event import Event
+
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    client.post("/projects/nexus/items", data={"title": "Wirte docs"})
+    assert 'name="correction"' in client.get("/tasks/1").get_data(as_text=True)
+
+    client.post("/tasks/1/update", data={"title": "Write docs", "correction": "1"})
+    client.post("/tasks/1/update", data={"title": "Write the docs"})
+    session = client.application.extensions["db_session"]
+    actions = [e.action for e in session.query(Event).filter_by(entity_type="task").order_by(Event.id)]
+    assert actions[-2:] == ["corrected", "updated"]
+
+
+def test_features_export_is_served_as_json(client):
+    """The feature export is served inline as JSON, under its schema name."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    client.post("/projects/nexus/items", data={"title": "Auth", "kind": "feature"})
+    response = client.get("/export/features.json")
+    assert response.status_code == 200 and response.mimetype == "application/json"
+    data = response.get_json()
+    assert data["schema"] == "nexus.features/1" and [f["title"] for f in data["features"]] == ["Auth"]

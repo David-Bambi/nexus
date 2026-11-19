@@ -17,6 +17,9 @@ Features and tasks share the `task` table, told apart by `kind`.
   services; `Task.released_in`: version a feature shipped in;
   `MajorCriterion`: criteria for the next major version
   ([0016](adr/0016-computed-version.md)).
+- `Project.directory`: optional absolute folder path; a subproject without
+  one inherits its parent's (`projects.directory_of`)
+  ([0017](adr/0017-stable-feature-export-for-metrique.md)).
 
 ```mermaid
 erDiagram
@@ -39,7 +42,7 @@ shown here: it has no foreign keys by design, referencing any entity by
 [0002](adr/0002-append-only-event-log.md).
 
 Migration history restarted at 2.0 with one initial revision,
-`87dc79bc1cbb` (then `b3c1e7a2d904`, computed version); a 1.x database is refused at startup
+`87dc79bc1cbb` (then `b3c1e7a2d904`, computed version; `c7d2f4a1e835`, project directory); a 1.x database is refused at startup
 ([0014](adr/0014-restart-migrations-refuse-1x.md)).
 
 ## Task lifecycle
@@ -107,14 +110,17 @@ and `services/export.py` provides `dump_json()`, a full database dump
 (projects with `parent_id`, `ref` and version, tasks with `kind`,
 `parent_id`, `ref`, `released_in` and their tags, tags, criteria, events). Enums are exported by name and dates in ISO
 8601. The export is not re-importable (raw integer ids); bulk import is a
-separate format, see `services/importer.py` below.
+separate format, see `services/importer.py` below. `export.features()` is
+the stable feature export read by metrique (schema `nexus.features/1`,
+UTC dates with offset), see
+[0017](adr/0017-stable-feature-export-for-metrique.md).
 
 ## Command line
 
 `src/cli/` is a second adapter over `services/`, next to `web/`
 ([0006](adr/0006-cli-shares-the-database.md)): it shares the service's
 SQLite database and calls the services directly, with no HTTP. Modules:
-`main.py` (dispatch, exit codes), `views.py` (read commands), `add.py`, `import_cmd.py`,
+`main.py` (dispatch, exit codes), `views.py` (read commands), `add.py`, `import_cmd.py`, `export_cmd.py`,
 `session.py`, `format.py`, `errors.py`, `commands.py` (registries). Usage:
 [Command line](../functional/cli.md).
 
@@ -165,7 +171,7 @@ inline style or script ([0012](adr/0012-plain-static-css-and-js.md),
 - `/projects` lists root projects with their subprojects indented below,
   each with its computed version; archived ones are hidden. It holds the
   creation form.
-- `/projects/<key>` (`projects.py`) shows key, status and version, the work
+- `/projects/<key>` (`projects.py`) shows key, status, version and directory (own or inherited), the work
   tree (`ui.work_tree`; closed items behind `?closed=1`) with add forms
   (`POST /projects/<key>/items`, item created refined), the edit form
   (`/update`), a "New subproject" form for root projects (`/subprojects`)
@@ -187,7 +193,8 @@ inline style or script ([0012](adr/0012-plain-static-css-and-js.md),
   redirects to the safe `next` (keeping `?closed=1`), else to the item's
   project; a refusal (unknown direction, no project, already first / last)
   re-renders the item page with the message.
-- The task page shows its History (`ui.event_list`, drawn as a timeline).
+- The task page shows its History (`ui.event_list`, drawn as a timeline;
+  empty payload values, e.g. a null `parent`, are hidden).
   It has two columns: actions, edit form and history, beside a sticky
   details panel (state, ref, kind, project, parent...); the panel goes on
   top on narrow screens.
@@ -216,7 +223,9 @@ inline style or script ([0012](adr/0012-plain-static-css-and-js.md),
   (`task_restore`, `web/pages/tasks.py`) call `tasks.cancel` / `tasks.restore`.
   `task.html` shows a "Cancel task" button (hidden for done and cancelled
   tasks) and, for cancelled tasks, a "Restore to refined" button.
-- `GET /export.json` downloads the export as an attachment.
+- `GET /export.json` downloads the export as an attachment;
+  `GET /export/features.json` shows the feature export inline
+  ([0017](adr/0017-stable-feature-export-for-metrique.md)).
 - The header holds the brand, the nav bar (Dashboard, Projects, Tasks,
   Inbox, Refine, Search, Export; the current section, matched by path
   prefix, carries `aria-current="page"`) and the capture bar (`c` focuses

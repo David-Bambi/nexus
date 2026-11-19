@@ -44,7 +44,7 @@ Item write tools:
 | `capture_task` | Title into the inbox |
 | `add_task` | Into a project's tree, refined: `project` and/or `parent` (only a parent: its project), `title`, `kind` (`task` default, `feature`), `body`, `context`, `size` |
 | `clarify_task` | Inbox or someday item to refined: `title`, `project`, `parent`, `kind`, `body`, `context`, `size`; omitted fields keep their value |
-| `update_task` | Change title, body, context, size; blank body/context/size clears it, blank title refused |
+| `update_task` | Change title, body, context, size; blank body/context/size clears it, blank title refused; `correction: true` logs it as `corrected` (a fixed mistake) |
 | `move_task` | To a project's top level and/or under a feature (`project`, `parent`); keeps its state, a feature takes its subtree |
 | `change_kind` | Task to feature, or empty feature to task; the ref letter follows (`t-` / `f-`) |
 | `reorder_task` | `direction` `up` or `down` among siblings; an open item skips closed ones |
@@ -62,8 +62,8 @@ Project and version write tools:
 
 | Tool | Purpose |
 |---|---|
-| `create_project` | `key`, `name`, `description`; `parent` (a root key) makes a subproject |
-| `update_project` | `name` and/or `description`; blank description clears it |
+| `create_project` | `key`, `name`, `description`, `directory` (absolute, `~` expanded); `parent` (a root key) makes a subproject |
+| `update_project` | `name`, `description` and/or `directory`; blank description or directory clears it, omitted keeps it |
 | `add_criterion` | Append a criterion for the next major version (`text`) |
 | `update_criterion` | Change criterion `number`'s `text` |
 | `set_criterion_done` | Check or uncheck criterion `number` (`done`) |
@@ -89,6 +89,8 @@ restoring projects, arbitrary state changes.
 - Serialized items carry `kind`, `parent` and `released_in` (the
   version a feature shipped in, else null). In `tree`, each item also has
   nested `children`.
+- Serialized projects carry `directory` (own, or null) and
+  `effective_directory` (own, else the parent's).
 - Criteria are identified by `number`, counted from 1 in list order
   (`criteria`: `{number, text, done}`).
 - Results never contain integer ids.

@@ -176,7 +176,7 @@ def test_update_changes_fields_and_logs_only_changes(session):
     task = tasks.capture(session, "Old")
     tasks.update(session, task.id, title="New", body=None)
     assert task.title == "New"
-    assert _history(session, task.id)[-1] == ("updated", {"title": {"from": "Old", "to": "New"}})
+    assert _history(session, task.id)[-1] == ("updated", {"title": {"from": "Old", "to": "New"}, "parent": None})
 
 def test_update_rejects_unknown_field(session):
     """Kind, state and placement can't be updated this way
@@ -266,11 +266,11 @@ def test_transitions_log_events(session):
 
     assert _history(session, task.id)[1:] == [
         ("clarified", {"from": "INBOX", "to": "REFINED", "project": None, "parent": None}),
-        ("started", {"from": "REFINED", "to": "DOING"}),
-        ("blocked", {"from": "DOING", "to": "WAITING", "reason": "Waiting for review"}),
-        ("unblocked", {"from": "WAITING", "to": "DOING"}),
-        ("completed", {"from": "DOING", "to": "DONE"}),
-        ("reopened", {"from": "DONE", "to": "DOING"}),
+        ("started", {"from": "REFINED", "to": "DOING", "parent": None}),
+        ("blocked", {"from": "DOING", "to": "WAITING", "reason": "Waiting for review", "parent": None}),
+        ("unblocked", {"from": "WAITING", "to": "DOING", "parent": None}),
+        ("completed", {"from": "DOING", "to": "DONE", "parent": None}),
+        ("reopened", {"from": "DONE", "to": "DOING", "parent": None}),
     ]
 
 def test_start_needs_a_refined_task(session):
@@ -404,7 +404,8 @@ def test_move_under_a_feature_keeps_the_state(session, nexus):
     assert task.parent is feature and task.state is TaskState.DOING
     assert _history(session, task.id)[-1] == ("moved", {
         "from": {"project": "nexus", "parent": None},
-        "to": {"project": "nexus", "parent": feature.ref}})
+        "to": {"project": "nexus", "parent": feature.ref},
+        "parent": feature.ref})
 
 def test_move_a_feature_takes_its_subtree(session, nexus):
     """A moved feature takes its descendants to the new project
@@ -462,7 +463,7 @@ def test_change_kind_respells_the_ref(session, nexus):
     tasks.change_kind(session, task.id, TaskKind.TASK)
     assert task.ref == f"t-{code}"
     assert _history(session, task.id)[1] == (
-        "kind_changed", {"from": "TASK", "to": "FEATURE", "ref": {"from": f"t-{code}", "to": f"f-{code}"}})
+        "kind_changed", {"from": "TASK", "to": "FEATURE", "ref": {"from": f"t-{code}", "to": f"f-{code}"}, "parent": None})
 
 def test_change_kind_of_a_feature_with_children_is_refused(session, nexus):
     """A feature with children can't become a task
@@ -500,7 +501,7 @@ def test_delete_logs_deleted_and_keeps_history(session):
     with pytest.raises(NotFoundError):
         tasks.get(session, task_id)
     assert _history(session, task_id)[-1] == (
-        "deleted", {"title": "Write the docs", "kind": "TASK", "ref": ref})
+        "deleted", {"title": "Write the docs", "kind": "TASK", "ref": ref, "parent": None})
 
 def test_delete_a_feature_with_children_is_refused(session, nexus):
     """A feature is deleted only once empty
@@ -547,7 +548,7 @@ def test_reorder_up_and_down_logs_the_move(session, nexus):
 
     tasks.reorder(session, a.id, "down")
     assert _siblings(session) == ["C", "A", "B"]
-    assert _history(session, a.id)[-1] == ("reordered", {"from": 0, "to": 1, "direction": "down"})
+    assert _history(session, a.id)[-1] == ("reordered", {"from": 0, "to": 1, "direction": "down", "parent": None})
 
 
 def test_reorder_first_up_or_last_down_is_refused(session, nexus):
@@ -623,3 +624,70 @@ def test_add_to_tree_refuses_a_parent_of_another_project_before_writing(session,
     with pytest.raises(ValidationError):
         tasks.add_to_tree(session, "Stray", project_key="other", parent_ref=feature.ref)
     assert [t.title for t in tasks.list(session)] == ["Auth"]
+
+
+# Correction --------------------------------------------------------------------------------------
+
+def test_update_as_a_correction_logs_corrected(session, nexus):
+    """
+    Given a refined task
+    When its title is fixed as a correction, then changed normally
+    Then the first is logged as corrected and the second as updated, with the same payload shape
+    """
+    (task,) = _top_items(session, "Wirte docs")
+    tasks.update(session, task.id, correction=True, title="Write docs")
+    tasks.update(session, task.id, size="M")
+    assert _history(session, task.id)[-2:] == [
+        ("corrected", {"title": {"from": "Wirte docs", "to": "Write docs"}, "parent": None}),
+        ("updated", {"size": {"from": None, "to": "M"}, "parent": None}),
+    ]
+
+
+
+# Plan drift facts --------------------------------------------------------------------------------
+
+def test_every_item_event_records_its_parent_at_that_moment(session, nexus):
+    """
+    Given a task under a feature
+    When it is renamed, moved to the top, then cancelled
+    Then each event names the parent it had at that moment
+    """
+    feature = tasks.add_to_tree(session, "Auth", project_key="nexus", kind=TaskKind.FEATURE)
+    task = tasks.add_to_tree(session, "Login", parent_ref=feature.ref)
+    tasks.update(session, task.id, title="Login form")
+    tasks.move(session, task.id, project_key="nexus")
+    tasks.cancel(session, task.id)
+
+    parents = [(action, payload["parent"]) for action, payload in _history(session, task.id)]
+    assert parents == [("created", feature.ref), ("clarified", feature.ref), ("updated", feature.ref),
+                       ("moved", None), ("cancelled", None)]
+
+
+def test_first_start_of_a_feature_freezes_its_plan(session, nexus):
+    """
+    Given a feature with two children
+    When it starts, is cancelled, restored and started again
+    Then only the first started event carries the plan, in sibling order
+    """
+    feature = tasks.add_to_tree(session, "Auth", project_key="nexus", kind=TaskKind.FEATURE)
+    login = tasks.add_to_tree(session, "Login", parent_ref=feature.ref)
+    logout = tasks.add_to_tree(session, "Logout", parent_ref=feature.ref)
+    tasks.start(session, feature.id)
+    tasks.add_to_tree(session, "Added later", parent_ref=feature.ref)
+    tasks.cancel(session, login.id)
+    tasks.cancel(session, logout.id)
+    tasks.cancel(session, tasks.list(session)[-1].id)
+    tasks.cancel(session, feature.id)
+    tasks.restore(session, feature.id)
+    tasks.start(session, feature.id)
+
+    starts = [payload for action, payload in _history(session, feature.id) if action == "started"]
+    assert starts[0]["plan"] == [login.ref, logout.ref]
+    assert "plan" not in starts[1]
+
+
+def test_a_started_task_has_no_plan(session, nexus):
+    """A task (a leaf) never carries a plan."""
+    (task,) = _top_items(session, "Readme")
+    tasks.start(session, task.id)
+    assert "plan" not in _history(session, task.id)[-1][1]

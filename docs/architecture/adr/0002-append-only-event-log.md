@@ -7,7 +7,7 @@ date: 2026-09-11
 
 ## Status
 
-Accepted. Since 2.0, the version entity, its actions, `planned` / `unplanned`, the `moved` payload and `events.changelog` are replaced by [0013](0013-project-feature-task-tree.md). Version and criterion actions: [0016](0016-computed-version.md).
+Accepted. Since 2.0, the version entity, its actions, `planned` / `unplanned`, the `moved` payload and `events.changelog` are replaced by [0013](0013-project-feature-task-tree.md). Version and criterion actions: [0016](0016-computed-version.md). `corrected`, `parent`, `plan` and project `directory`: [0017](0017-stable-feature-export-for-metrique.md).
 
 ## Decision
 
@@ -42,7 +42,7 @@ leaves no event. The session runs with `autoflush=False`, so services
 
 | Entity | Actions |
 |---|---|
-| task | `created`, `updated`, `clarified`, `planned`, `unplanned`, `started`, `blocked`, `unblocked`, `completed`, `reopened`, `deferred`, `cancelled`, `restored`, `moved`, `reordered`, `deleted` |
+| task | `created`, `updated`, `corrected`, `clarified`, `planned`, `unplanned`, `started`, `blocked`, `unblocked`, `completed`, `reopened`, `deferred`, `cancelled`, `restored`, `moved`, `reordered`, `deleted` |
 | version | `created`, `started`, `released`, `deleted`, `dod_added`, `dod_updated`, `dod_deleted`, `dod_checked`, `dod_unchecked` |
 | project | `created`, `updated`, `archived`, `restored`, `deleted`, `versions_reordered`, `minor_bumped`, `major_released`, `version_set` |
 | criterion | `criterion_added`, `criterion_updated`, `criterion_checked`, `criterion_deleted` |
@@ -64,7 +64,13 @@ when the state doesn't change.
   carries `{from, to, version}` (`version` is the deleted version's ref,
   see [0011](0011-deleting-a-version.md)).
 - `updated`: only the changed fields, as `{field: {"from", "to"}}`. No
-  event if nothing changed.
+  event if nothing changed. `corrected`: same payload, for a change that
+  only fixes a mistake.
+- Every task event payload carries `parent`: the ref of the parent
+  feature at that moment, or null.
+- `started` on a feature's first start carries `plan`: its children's
+  refs, in sibling order.
+- Project `created` / `updated` may carry `directory`.
 - `created` / `deleted`: carry the title (or key/name/number) so a deleted
   entity's history stays readable.
 

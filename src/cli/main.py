@@ -3,7 +3,7 @@ from typing import Callable, TextIO
 
 from sqlalchemy.orm import Session
 
-from src.cli import add, commands, import_cmd, views  # noqa: F401  (register commands)
+from src.cli import add, commands, export_cmd, import_cmd, views  # noqa: F401  (register commands)
 from src.cli.errors import UsageError
 from src.services.resolve import resolve
 from src.cli.session import open_session
@@ -22,6 +22,7 @@ USAGE = """usage: nexus <command> | <reference>
                            [--context C] [--size S]   add to the tree, refined
   nexus "<description>"     capture a task into the inbox
   nexus import <file|->
+  nexus export features [-o FILE]   feature export for metrique (JSON)
 
 A reference is a project key, a subproject ref (s-4k2), a feature ref
 (f-4k2) or a task ref (t-4k2)."""

@@ -304,6 +304,14 @@ button:disabled {
     color: var(--color-text-muted);
 }
 
+/* A checkbox with its label on the same line. */
+.field-check {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-sm);
+}
+
 .form-actions {
     display: flex;
     gap: var(--space-2);

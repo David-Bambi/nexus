@@ -40,6 +40,7 @@ nav:
           - "0014 — Restart migrations, refuse 1.x": architecture/adr/0014-restart-migrations-refuse-1x.md
           - "0015 — Tree import format": architecture/adr/0015-tree-import-format.md
           - "0016 — Computed version": architecture/adr/0016-computed-version.md
+          - "0017 — Stable feature export for metrique": architecture/adr/0017-stable-feature-export-for-metrique.md
   - Functional:
       - Overview: functional/index.md
       - Command line: functional/cli.md

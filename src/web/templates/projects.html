@@ -34,6 +34,11 @@
     {{ ui.field("Key", "key", required=true) }}
     {{ ui.field("Name", "name", required=true) }}
     {{ ui.field("Description", "description", kind="textarea") }}
+    <label class="field">
+        <span class="field-label">Directory</span>
+        <input type="text" name="directory" value="" placeholder="~/projets/my-project">
+        <span class="hint">Optional: absolute path of the project's folder on this machine; ~ is expanded.</span>
+    </label>
     <div class="form-actions"><button class="button-primary" type="submit">Create</button></div>
 </form>
 {% endblock %}

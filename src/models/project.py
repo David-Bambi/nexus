@@ -53,6 +53,11 @@ class Project(Base):
         default=ProjectStatus.ACTIVE,
     )
 
+    # Absolute path of the project's folder on this machine (e.g.
+    # "/home/me/projets/nexus"), normalised by services/projects; null when
+    # not set. Ties Claude Code sessions to the project.
+    directory: Mapped[Optional[str]] = mapped_column(String)
+
     # MAJOR part of the computed version; raised by hand once every major
     # criterion is checked (services/versioning).
     version_major: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

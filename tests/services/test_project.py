@@ -333,3 +333,52 @@ def test_restore_an_active_project_is_refused(session):
     projects.create(session, "nexus", "Nexus")
     with pytest.raises(ConflictError):
         projects.restore(session, "nexus")
+
+
+# Directory ---------------------------------------------------------------------------------------
+
+def test_create_with_a_directory_normalises_and_logs_it(session):
+    """
+    Given a directory typed with ~ and a trailing slash
+    When creating a project with it
+    Then the absolute, normalised path is stored and logged
+    """
+    import os
+
+    project = projects.create(session, "nexus", "Nexus", directory="~/projets/nexus/")
+    expected = os.path.join(os.path.expanduser("~"), "projets", "nexus")
+    assert project.directory == expected
+    assert _actions(session, project)[0][1]["directory"] == expected
+
+
+def test_relative_directory_is_refused(session):
+    """A relative path is refused, on creation and on update, and nothing is written."""
+    with pytest.raises(ValidationError, match="absolute"):
+        projects.create(session, "nexus", "Nexus", directory="projets/nexus")
+    assert projects.list(session) == []
+    projects.create(session, "nexus", "Nexus")
+    with pytest.raises(ValidationError, match="absolute"):
+        projects.update(session, "nexus", "Nexus", None, directory="./here")
+
+
+def test_update_sets_keeps_and_clears_the_directory(session):
+    """A directory is set and logged, kept when not given, cleared when blank."""
+    project = projects.create(session, "nexus", "Nexus")
+    projects.update(session, "nexus", "Nexus", None, directory="/srv/nexus")
+    assert _actions(session, project)[-1] == ("updated", {"directory": {"from": None, "to": "/srv/nexus"}})
+
+    projects.update(session, "nexus", "Nexus 2", None)
+    assert project.directory == "/srv/nexus"
+
+    projects.update(session, "nexus", "Nexus 2", None, directory=" ")
+    assert project.directory is None
+
+
+def test_directory_of_falls_back_to_the_parent(session):
+    """A subproject without a directory uses its parent's; its own wins when set."""
+    projects.create(session, "nexus", "Nexus", directory="/srv/nexus")
+    sub = projects.create(session, "web", "Web", parent_key="nexus")
+    assert projects.directory_of(sub) == "/srv/nexus"
+    projects.update(session, "web", "Web", None, directory="/srv/nexus-web")
+    assert projects.directory_of(sub) == "/srv/nexus-web"
+    assert projects.directory_of(None) is None

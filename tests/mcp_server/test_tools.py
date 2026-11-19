@@ -194,7 +194,8 @@ def test_list_and_show_tools_return_refs_and_no_integer_ids(session, world):
     assert by_ref[planned.parent.ref]["kind"] == "FEATURE"
     shown = ok(session, "get_project", project="nx")
     assert shown["subprojects"] == [{"key": "v2", "ref": sub.ref, "parent": "nx", "name": "Nexus 2",
-                                     "description": None, "status": "ACTIVE", "version": "0.0"}]
+                                     "description": None, "status": "ACTIVE", "version": "0.0",
+                                     "directory": None, "effective_directory": None}]
     assert not _id_keys(shown) and not _id_keys(listed)
 
 
@@ -631,3 +632,23 @@ def test_criteria_by_number_then_major_release(session):
 
     released = ok(session, "release_major", project="nx")
     assert (released["version"], released["criteria"]) == ("1.0", [])
+
+
+def test_project_directory_through_create_and_update(session):
+    """A directory is set on creation, inherited by a subproject, kept, then cleared."""
+    root = ok(session, "create_project", key="nx", name="Nexus", directory="/srv/nexus/")
+    sub = ok(session, "create_project", key="web", name="Web", parent="nx")
+    assert (root["directory"], sub["directory"], sub["effective_directory"]) == ("/srv/nexus", None, "/srv/nexus")
+    assert "absolute" in refused(session, "update_project", project="nx", directory="relative/path")
+
+    assert ok(session, "update_project", project="nx", name="Nexus 2")["directory"] == "/srv/nexus"
+    assert ok(session, "update_project", project="nx", directory="")["directory"] is None
+
+
+def test_update_task_as_a_correction(session, world):
+    """With correction, the change is logged as corrected."""
+    _, planned, _, _ = world
+    ok(session, "update_task", ref=planned.ref, title="Planned task!", correction=True)
+    assert _last_event(session).action == "corrected"
+    ok(session, "update_task", ref=planned.ref, size="M")
+    assert _last_event(session).action == "updated"

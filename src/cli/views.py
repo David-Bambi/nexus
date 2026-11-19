@@ -70,6 +70,14 @@ def list_projects(session : Session, args : list[str], out : TextIO) -> None:
 # Details
 # -----------------------------------------------------------------------------
 
+def _directory_label(project) -> str | None:
+    """The project's directory, or its parent's marked as inherited; None if neither."""
+    if project.directory:
+        return project.directory
+    inherited = projects.directory_of(project)
+    return f"{inherited} (from {project.parent.key})" if inherited else None
+
+
 def _view_project(session : Session, target : Target, args : list[str], out : TextIO) -> None:
     """`nexus <project> [--all]` or `nexus <subproject ref> [--all]`: project
     detail, its criteria for the next major version, its subprojects and its
@@ -85,6 +93,7 @@ def _view_project(session : Session, target : Target, args : list[str], out : Te
                       ("Parent", project.parent.key if project.parent else None),
                       ("Status", project.status.name),
                       ("Version", versioning.label(project)),
+                      ("Directory", _directory_label(project)),
                       ("Description", project.description)]), file=out)
     if project.criteria:
         lines = [f"[{'x' if c.done else ' '}] {number}. {c.text}"

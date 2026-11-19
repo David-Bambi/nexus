@@ -1,3 +1,5 @@
+import os
+
 from sqlalchemy.orm import Session
 
 from src.models.project import Project, ProjectStatus
@@ -6,7 +8,44 @@ from src.services.errors import ConflictError, NotFoundError, ValidationError
 
 # Keys a project may not take: the command line reads them as commands, not
 # as project keys.
-RESERVED_KEYS = frozenset({"add", "help", "import", "projects", "tasks", "version"})
+RESERVED_KEYS = frozenset({"add", "export", "help", "import", "projects", "tasks", "version"})
+
+# Default of update()'s directory argument: leave the directory as it is.
+KEEP = object()
+
+def normalize_directory(directory : str | None) -> str | None:
+    """Turn a typed folder path into the stored form.
+
+    Args:
+        directory: Path as typed; "~" is expanded. None or blank means none.
+
+    Returns:
+        The absolute, normalised path without a trailing slash, or None.
+
+    Raises:
+        ValidationError: If the path is relative.
+    """
+    if directory is None or not directory.strip():
+        return None
+    path = os.path.expanduser(directory.strip())
+    if not os.path.isabs(path):
+        raise ValidationError(f"the directory must be an absolute path (or start with ~): '{directory.strip()}'.")
+    return os.path.normpath(path)
+
+def directory_of(project : Project | None) -> str | None:
+    """The folder a project's work happens in: its own, else its parent's.
+
+    Args:
+        project: Project or subproject, or None.
+
+    Returns:
+        The nearest directory set, or None.
+    """
+    if project is None:
+        return None
+    if project.directory is None and project.parent is not None:
+        return project.parent.directory
+    return project.directory
 
 def is_reserved_key(key : str) -> bool:
     """Tell whether a project key is refused as a command word or ref lookalike.
@@ -17,7 +56,8 @@ def is_reserved_key(key : str) -> bool:
     return key.strip().lower() in RESERVED_KEYS or refs.is_ref(key)
 
 def create(session : Session, key : str, name : str, description : str | None = None,
-           parent_key : str | None = None, actor : str = events.ACTOR_WEB) -> Project:
+           parent_key : str | None = None, directory : str | None = None,
+           actor : str = events.ACTOR_WEB) -> Project:
     """Create a root project, or a subproject when a parent is given.
 
     Args:
@@ -27,6 +67,8 @@ def create(session : Session, key : str, name : str, description : str | None = 
         description: Optional free-text description.
         parent_key: Key of the root project to create a subproject under;
             None for a root project.
+        directory: Optional folder of the project on this machine (see
+            normalize_directory).
         actor: Who made the change, recorded in the event log.
 
     Returns:
@@ -36,9 +78,11 @@ def create(session : Session, key : str, name : str, description : str | None = 
         ConflictError: If a project with this key already exists.
         NotFoundError: If the parent project doesn't exist.
         ValidationError: If the key is a reserved word or looks like a
-            subproject, feature or task ref, or if the parent is itself a
-            subproject (only one level of subprojects).
+            subproject, feature or task ref, if the parent is itself a
+            subproject (only one level of subprojects), or if the directory
+            is a relative path.
     """
+    directory = normalize_directory(directory)
     if is_reserved_key(key):
         raise ValidationError(f"project key '{key}' is reserved.")
 
@@ -56,11 +100,14 @@ def create(session : Session, key : str, name : str, description : str | None = 
                       name=name,
                       description=description,
                       parent_id=parent.id if parent else None,
+                      directory=directory,
                       ref=refs.generate(session, refs.SUBPROJECT) if parent else None)
     session.add(project)
     session.flush()
 
     payload = {"key": key, "name": name}
+    if directory is not None:
+        payload["directory"] = directory
     if parent is not None:
         payload.update(ref=project.ref, parent=parent.key)
     events.log(session, actor, "project", project.id, "created", payload)
@@ -142,14 +189,16 @@ def archive(session : Session, key : str, actor : str = events.ACTOR_WEB) -> Pro
     return project
 
 def update(session : Session, key : str, name : str, description : str | None,
-           actor : str = events.ACTOR_WEB) -> Project:
-    """Change a project's name and description; its key never changes.
+           directory : str | None | object = KEEP, actor : str = events.ACTOR_WEB) -> Project:
+    """Change a project's name, description and directory; its key never changes.
 
     Args:
         session: Database session to use.
         key: Unique slug identifying the project.
         name: New display name.
         description: New description; None or blank clears it.
+        directory: New folder (see normalize_directory); None or blank
+            clears it; KEEP (the default) leaves it unchanged.
         actor: Who made the change, recorded in the event log.
 
     Returns:
@@ -158,13 +207,15 @@ def update(session : Session, key : str, name : str, description : str | None,
 
     Raises:
         NotFoundError: If no project has this key.
-        ValidationError: If the name is empty.
+        ValidationError: If the name is empty or the directory relative.
     """
     if not name.strip():
         raise ValidationError("The project name must be specified.")
     project = get(session, key)
 
     new_values = {"name": name.strip(), "description": (description or "").strip() or None}
+    if directory is not KEEP:
+        new_values["directory"] = normalize_directory(directory)
     changes = {}
     for field, value in new_values.items():
         previous = getattr(project, field)

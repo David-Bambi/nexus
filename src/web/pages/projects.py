@@ -26,6 +26,13 @@ def export_json():
     return response
 
 
+@bp.route("/export/features.json")
+def export_features_json():
+    """Show the feature export for metrique as JSON (served inline, not as a download)."""
+    body = json.dumps(export.features(_session()), ensure_ascii=False, indent=2)
+    return current_app.response_class(body, mimetype="application/json")
+
+
 @bp.route("/projects", methods=["GET", "POST"])
 def projects_list():
     """List all projects and subprojects.
@@ -41,6 +48,7 @@ def projects_list():
                 request.form["key"],
                 request.form["name"],
                 request.form.get("description") or None,
+                directory=request.form.get("directory"),
             )
             return redirect(url_for("pages.projects_list"))
         except (ConflictError, ValidationError) as e:
@@ -127,14 +135,16 @@ def project_add_subproject(key):
     """Create a subproject under a root project, then show the root project."""
     return _project_action(key, lambda s: projects.create(
         s, request.form.get("key", "").strip(), request.form.get("name", "").strip(),
-        request.form.get("description") or None, parent_key=key))
+        request.form.get("description") or None, parent_key=key,
+        directory=request.form.get("directory")))
 
 
 @bp.route("/projects/<key>/update", methods=["POST"])
 def project_update(key):
-    """Change a project's name and description."""
+    """Change a project's name, description and directory (blank clears it)."""
     return _project_action(key, lambda s: projects.update(
-        s, key, request.form.get("name", ""), request.form.get("description")))
+        s, key, request.form.get("name", ""), request.form.get("description"),
+        directory=request.form.get("directory", "")))
 
 
 @bp.route("/projects/<key>/archive", methods=["POST"])

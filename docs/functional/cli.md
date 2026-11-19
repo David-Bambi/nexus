@@ -25,7 +25,7 @@ command line. Errors go to stderr.
   its code: `t-4k2` and `f-4k2` both find it. Refs are shown in the web UI
   and in every CLI table.
 - Projects are named by their **key**. Keys that look like a ref, or equal a
-  command word (`add`, `help`, `import`, `projects`, `tasks`, `version`),
+  command word (`add`, `export`, `help`, `import`, `projects`, `tasks`, `version`),
   are refused when creating a project.
 
 ## Commands
@@ -40,8 +40,10 @@ command line. Errors go to stderr.
 | `nexus add task\|feature <project> [-p f-ref] [-t T] [-b B] [-c C] [-s SIZE]` | Add to the project's tree, refined |
 | `nexus "<description>"` | Capture into the inbox |
 | `nexus import <file\|->` | Bulk import, see below |
+| `nexus export features [-o FILE]` | Feature export for metrique, JSON to stdout or to `FILE` |
 
-Project detail: fields (with `Version`), "Criteria for N+1.0" (`[x] 1.
+Project detail: fields (with `Version`, and `Directory`, followed by
+`(from <parent key>)` when a subproject inherits it), "Criteria for N+1.0" (`[x] 1.
 text`, if any), a Subprojects table (with `VERSION`), then "Work": the
 tree, two spaces of indent per level, one line per item `ref  STATE
 title`, plus `(vX.Y)` for a shipped feature; `(none)` if empty. Done and
@@ -103,6 +105,14 @@ Design: [0007](../architecture/adr/0007-importer-mcp-entry-point.md), format
 - `--text` reads one task title per line into the inbox.
 
 The JSON export (`/export.json`) is a backup format and can't be imported.
+
+## Export
+
+`nexus export features` prints the feature export (schema
+`nexus.features/1`, see
+[0017](../architecture/adr/0017-stable-feature-export-for-metrique.md));
+with `-o FILE` it writes the file and prints a one-line summary. Same data
+as `/export/features.json`.
 
 ## Not in scope
 

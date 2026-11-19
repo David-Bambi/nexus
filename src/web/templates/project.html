@@ -11,6 +11,12 @@
 <p class="lead">{{ project.description }}</p>
 {% endif %}
 
+{% if project.directory %}
+<p class="meta">Directory <code data-field="directory">{{ project.directory }}</code></p>
+{% elif project.parent and project.parent.directory %}
+<p class="meta">Directory <code data-field="directory">{{ project.parent.directory }}</code> (from {{ project.parent.name }})</p>
+{% endif %}
+
 {% if project.parent %}
 <p>Subproject of <a href="{{ url_for('pages.project_detail', key=project.parent.key) }}">{{ project.parent.name }}</a></p>
 {% endif %}
@@ -75,6 +81,11 @@
 <form class="form-stacked" method="post" action="{{ url_for('pages.project_update', key=project.key) }}">
     {{ ui.field("Name", "name", project.name, required=true) }}
     {{ ui.field("Description", "description", project.description, kind="textarea") }}
+    <label class="field">
+        <span class="field-label">Directory</span>
+        <input type="text" name="directory" value="{{ project.directory or "" }}" placeholder="~/projets/my-project">
+        <span class="hint">Absolute path of the project's folder on this machine; ~ is expanded. Blank: none.</span>
+    </label>
     <div class="form-actions"><button class="button-primary" type="submit">Save</button></div>
 </form>
 
@@ -84,6 +95,11 @@
     {{ ui.field("Key", "key", required=true) }}
     {{ ui.field("Name", "name", required=true) }}
     {{ ui.field("Description", "description", kind="textarea") }}
+    <label class="field">
+        <span class="field-label">Directory</span>
+        <input type="text" name="directory" value="" placeholder="~/projets/my-project">
+        <span class="hint">Optional; without it, the parent project's directory is used.</span>
+    </label>
     <div class="form-actions"><button class="button-primary" type="submit">Create subproject</button></div>
 </form>
 {% endif %}

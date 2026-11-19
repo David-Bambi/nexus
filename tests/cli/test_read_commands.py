@@ -186,3 +186,13 @@ def test_empty_project_tree_says_none(run, session):
     """A project without items prints (none) under Work."""
     projects.create(session, "empty", "Empty")
     assert "(open items; --all shows done and cancelled)\n(none)" in run("empty")[1]
+
+
+def test_project_detail_shows_own_or_inherited_directory(run, session):
+    """A project shows its directory; a subproject without one shows its parent's, marked."""
+    projects.create(session, "nx", "Nexus", directory="/srv/nexus")
+    projects.create(session, "web", "Web", parent_key="nx")
+    root = run("nx")[1]
+    assert "/srv/nexus" in root and "(from" not in root
+    sub = projects.get(session, "web")
+    assert "/srv/nexus (from nx)" in run(sub.ref)[1]

@@ -107,3 +107,51 @@ def test_usage_errors(run, argv):
     Then it is a usage error with exit code 2
     """
     assert run(*argv)[0] == EXIT_USAGE
+
+
+# Export -------------------------------------------------------------------------------------------
+
+def test_export_features_to_stdout_and_to_a_file(session, tmp_path):
+    """
+    Given a feature
+    When running `nexus export features`, then with -o
+    Then the JSON export goes to stdout, then to the file with a short confirmation
+    """
+    import io
+    import json
+
+    from src.cli.main import EXIT_OK, main
+    from src.models.task import TaskKind
+    from src.services import projects, tasks
+
+    projects.create(session, "nx", "Nexus")
+    tasks.add_to_tree(session, "Auth", project_key="nx", kind=TaskKind.FEATURE)
+
+    def run(*argv):
+        out, err = io.StringIO(), io.StringIO()
+        code = main(list(argv), session_factory=lambda: session, out=out, err=err)
+        return code, out.getvalue(), err.getvalue()
+
+    code, out, _ = run("export", "features")
+    data = json.loads(out)
+    assert code == EXIT_OK and data["schema"] == "nexus.features/1"
+    assert [f["title"] for f in data["features"]] == ["Auth"]
+
+    target = tmp_path / "features.json"
+    code, out, _ = run("export", "features", "-o", str(target))
+    assert code == EXIT_OK and "Exported 1 feature(s)" in out
+    assert json.loads(target.read_text())["features"][0]["title"] == "Auth"
+
+
+def test_export_with_a_wrong_command_line_is_a_usage_error(session, tmp_path):
+    """An unknown export, or an unwritable file, is a usage error."""
+    import io
+
+    from src.cli.main import EXIT_USAGE, main
+
+    def code(*argv):
+        return main(list(argv), session_factory=lambda: session, out=io.StringIO(), err=io.StringIO())
+
+    assert code("export") == EXIT_USAGE
+    assert code("export", "tasks") == EXIT_USAGE
+    assert code("export", "features", "-o", str(tmp_path / "missing" / "f.json")) == EXIT_USAGE

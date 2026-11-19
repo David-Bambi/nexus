@@ -167,3 +167,65 @@ def test_dump_gives_versions_criteria_and_released_in(session):
     assert [(c["text"], c["done"], c["project_id"]) for c in data["criteria"]] == [
         ("Tests green", False, project["id"])]
     assert data["tasks"][0]["released_in"] == "0.1"
+
+
+# Feature export ---------------------------------------------------------------------------------------
+
+def test_features_export_gives_the_plan_directory_children_and_drift_events(session):
+    """
+    Given a feature in a subproject without a directory, started with two children,
+    then a child added, one renamed as a correction, one moved out, one cancelled
+    When exporting features
+    Then the plan, the inherited directory, the children and every drift event are there, dates in UTC
+    """
+    import json
+
+    from src.services import versioning
+
+    projects.create(session, "nx", "Nexus", directory="/srv/nexus")
+    projects.create(session, "web", "Web", parent_key="nx")
+    feature = tasks.add_to_tree(session, "Auth", project_key="web", kind=TaskKind.FEATURE)
+    login = tasks.add_to_tree(session, "Login", parent_ref=feature.ref, size="S")
+    logout = tasks.add_to_tree(session, "Logout", parent_ref=feature.ref)
+    tasks.start(session, feature.id)
+    added = tasks.add_to_tree(session, "Reset", parent_ref=feature.ref, size="M")
+    tasks.update(session, login.id, correction=True, title="Login form")
+    tasks.move(session, logout.id, project_key="web")
+    tasks.cancel(session, added.id)
+
+    data = export.features(session)
+    json.dumps(data)
+    assert data["schema"] == "nexus.features/1" and data["exported_at"].endswith("+00:00")
+    (exported,) = data["features"]
+    assert (exported["ref"], exported["project"], exported["directory"]) == (feature.ref, "web", "/srv/nexus")
+    assert exported["plan"] == [login.ref, logout.ref]
+    assert exported["started_at"].endswith("+00:00") and exported["closed_at"] is None
+    assert [(c["ref"], c["state"], c["size"]) for c in exported["children"]] == [
+        (login.ref, "REFINED", "S"), (added.ref, "CANCELLED", "M")]
+
+    drift = [(e["ref"], e["action"]) for e in exported["events"] if e["ref"] != feature.ref]
+    assert (added.ref, "created") in drift and (added.ref, "cancelled") in drift
+    assert (login.ref, "corrected") in drift and (logout.ref, "moved") in drift
+    assert (logout.ref, "updated") not in drift
+
+
+def test_features_export_names_deleted_children_and_released_versions(session):
+    """A deleted child's events keep its ref; a shipped feature gives its version and close date."""
+    projects.create(session, "nx", "Nexus")
+    feature = tasks.add_to_tree(session, "Auth", project_key="nx", kind=TaskKind.FEATURE)
+    gone = tasks.add_to_tree(session, "Gone", parent_ref=feature.ref)
+    gone_ref = gone.ref
+    tasks.delete(session, gone.id)
+    tasks.start(session, feature.id)
+    tasks.complete(session, feature.id)
+
+    (exported,) = export.features(session)["features"]
+    assert (exported["released_in"], exported["plan"], exported["children"]) == ("0.1", [], [])
+    assert exported["closed_at"].endswith("+00:00")
+    assert (gone_ref, "deleted") in [(e["ref"], e["action"]) for e in exported["events"]]
+
+
+def test_features_export_of_an_empty_database(session):
+    """No feature: an empty list under the schema name."""
+    data = export.features(session)
+    assert data["features"] == [] and data["schema"] == "nexus.features/1"

@@ -4,7 +4,7 @@ from src.models.criterion import MajorCriterion
 from src.models.event import Event
 from src.models.project import Project
 from src.models.task import Task
-from src.services import versioning
+from src.services import projects, versioning
 from src.services.views import DashboardView, TreeNode
 
 
@@ -21,7 +21,9 @@ def project(item : Project) -> dict:
             "name": item.name,
             "description": item.description,
             "status": item.status.name,
-            "version": versioning.label(item)}
+            "version": versioning.label(item),
+            "directory": item.directory,
+            "effective_directory": projects.directory_of(item)}
 
 
 def criteria(items : list[MajorCriterion]) -> list[dict]:
