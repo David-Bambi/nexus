@@ -3,7 +3,9 @@ from pathlib import Path
 
 from alembic import command
 from alembic.config import Config as AlembicConfig
+from alembic.script import ScriptDirectory
 from flask import Flask
+from sqlalchemy import inspect, text
 from sqlalchemy.engine import make_url
 
 from src.config import Config
@@ -13,6 +15,11 @@ from src.web.pages import bp as pages_bp
 
 # Repo root, used to locate alembic.ini regardless of the working directory.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+class UnsupportedDatabaseError(RuntimeError):
+    """The database was made by a Nexus version this code can't migrate
+    (e.g. a 1.x database met by Nexus 2.0)."""
 
 
 def create_app(config_class: type[Config] = Config) -> Flask:
@@ -86,4 +93,36 @@ def _upgrade_database(database_url: str) -> None:
     # Keep the app's own logging setup: env.py would otherwise replace it
     # with the one from alembic.ini.
     alembic_cfg.attributes["configure_logger"] = False
+    _refuse_unknown_revision(database_url, ScriptDirectory.from_config(alembic_cfg))
     command.upgrade(alembic_cfg, "head")
+
+
+def _refuse_unknown_revision(database_url: str, scripts: ScriptDirectory) -> None:
+    """Refuse a database stamped with a migration this code doesn't know.
+
+    Nexus 2.0 restarted its migration history, so a 1.x database carries a
+    revision that no longer exists. Alembic would fail with an obscure
+    error; this one says what to do.
+
+    Args:
+        database_url: SQLAlchemy connection URL to check.
+        scripts: The app's migration scripts.
+
+    Raises:
+        UnsupportedDatabaseError: If the database's revision is unknown.
+    """
+    engine = get_engine(database_url)
+    try:
+        with engine.connect() as connection:
+            if not inspect(connection).has_table("alembic_version"):
+                return
+            revision = connection.execute(text("SELECT version_num FROM alembic_version")).scalar()
+    finally:
+        engine.dispose()
+
+    known = {script.revision for script in scripts.walk_revisions()}
+    if revision is not None and revision not in known:
+        raise UnsupportedDatabaseError(
+            f"The database {database_url} was made by an older Nexus (migration "
+            f"'{revision}'). Nexus 2.0 starts on an empty database: archive this "
+            "file (see README, \"Upgrade from 1.x\") and start again.")

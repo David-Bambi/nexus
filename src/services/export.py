@@ -8,7 +8,6 @@ from src.models.event import Event
 from src.models.project import Project
 from src.models.tag import Tag
 from src.models.task import Task
-from src.models.version import Version
 
 
 def _json_value(value : object) -> object:
@@ -62,21 +61,12 @@ def dump_json(session : Session) -> dict:
         session: Database session to use.
 
     Returns:
-        A dict with the export time and every table: "projects",
-        "versions" (each with its ordered "definition_of_done" criteria, as
-        {"description", "done"} objects),
-        "tasks" (each with its "tags" names), "tags" and "events". Enums are
-        given by name and dates in ISO 8601. Archived projects and done tasks
-        are included.
+        A dict with the export time and every table: "projects" (root
+        projects and subprojects, a subproject with its "parent_id"),
+        "tasks" (features and tasks, each with its "kind", "parent_id" and
+        "tags" names), "tags" and "events". Enums are given by name and
+        dates in ISO 8601. Archived projects and done tasks are included.
     """
-    versions = []
-    for version in _all(session, Version, selectinload(Version.definition_of_done)):
-        criteria = sorted(version.definition_of_done, key=lambda c: c.position)
-        versions.append({
-            **_row(version),
-            "definition_of_done": [{"description": c.description, "done": c.done} for c in criteria],
-        })
-
     tasks = [
         {**_row(task), "tags": sorted(tag.name for tag in task.tags)}
         for task in _all(session, Task, selectinload(Task.tags))
@@ -85,7 +75,6 @@ def dump_json(session : Session) -> dict:
     return {
         "exported_at": _json_value(datetime.utcnow()),
         "projects": [_row(p) for p in _all(session, Project)],
-        "versions": versions,
         "tasks": tasks,
         "tags": [_row(t) for t in _all(session, Tag)],
         "events": [_row(e) for e in _all(session, Event)],

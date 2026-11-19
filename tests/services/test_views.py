@@ -1,7 +1,7 @@
 import pytest
 
-from src.models.task import TaskState
-from src.services import projects, tasks, versions, views
+from src.models.task import TaskKind, TaskState
+from src.services import projects, tasks, views
 from src.services.errors import NotFoundError
 
 # Inbox --------------------------------------------------------------------------------------------
@@ -42,23 +42,20 @@ def test_inbox_empty(session):
 
 # To refine ------------------------------------------------------------------------------------------
 
-def test_to_refine_returns_only_unplanned_refined_tasks(session):
-    """To-refine lists only refined tasks without a version
-    Given an inbox task, a refined task and a planned task
+def test_to_refine_returns_only_refined_tasks(session):
+    """To-refine lists only refined items, ready to start
+    Given an inbox task, a refined task and a started task
     When listing to-refine
-    Then only the refined, unplanned task is returned
+    Then only the refined task is returned
     """
-    projects.create(session, "nexus", "Nexus", "")
-    version = versions.create(session, "nexus", "0.1.0", "First version", ["Ships"])
-
     tasks.capture(session, "Still in inbox")
 
-    refined = tasks.capture(session, "Needs planning")
-    tasks.clarify(session, refined.id, "Needs planning", None, None, None, None)
+    refined = tasks.capture(session, "Ready")
+    tasks.clarify(session, refined.id, "Ready", None, None, None, None)
 
-    planned = tasks.capture(session, "Already planned")
-    tasks.clarify(session, planned.id, "Already planned", None, None, None, None)
-    tasks.plan(session, planned.id, version.id)
+    started = tasks.capture(session, "Started")
+    tasks.clarify(session, started.id, "Started", None, None, None, None)
+    tasks.start(session, started.id)
 
     result = views.to_refine(session)
     assert [t.id for t in result] == [refined.id]
@@ -162,106 +159,33 @@ def test_search_empty_term_returns_empty(session):
 
 # Dashboard ----------------------------------------------------------------------------------------
 
-def _refined_task(session, title, version=None):
-    """Capture and clarify a task, optionally planning it into a version."""
+def _refined_task(session, title):
+    """Capture and clarify a task."""
     task = tasks.capture(session, title)
-    tasks.clarify(session, task.id, title, None, None, None, None)
-    if version:
-        tasks.plan(session, task.id, version.id)
-    return task
+    return tasks.clarify(session, task.id, title, None, None, None, None)
 
 def test_dashboard_empty(session):
     """Dashboard on an empty database shows nothing
     Given no data
     When building the dashboard
-    Then there are no versions or tasks and both counters are zero
+    Then there are no tasks and both counters are zero
     """
     result = views.dashboard(session)
 
-    assert not result.versions
     assert not result.doing
     assert not result.waiting
     assert result.inbox_count == 0
     assert result.refine_count == 0
 
-def test_dashboard_only_lists_in_progress_versions(session):
-    """Dashboard lists only started, unreleased versions
-    Given a planned, an in-progress and a released version
-    When building the dashboard
-    Then only the in-progress version is listed
-    """
-    projects.create(session, "nexus", "Nexus", "")
-    versions.create(session, "nexus", "0.1.0", "Released", ["Ships"])
-    started = versions.create(session, "nexus", "0.2.0", "Started", ["Ships"])
-    versions.create(session, "nexus", "0.3.0", "Planned", ["Ships"])
-    released = versions.get(session, "nexus", "0.1.0")
-    versions.start(session, released.id)
-    versions.set_criterion_done(session, released.definition_of_done[0].id, True)
-    versions.release(session, released.id)
-    versions.start(session, started.id)
-
-    result = views.dashboard(session)
-    assert [p.version.number for p in result.versions] == ["0.2.0"]
-
-def test_dashboard_version_progress(session):
-    """Dashboard shows how many of a version's tasks are done
-    Given a started version with two planned tasks, one of them completed
-    When building the dashboard
-    Then the version reports 1 done out of 2
-    """
-    projects.create(session, "nexus", "Nexus", "")
-    version = versions.create(session, "nexus", "0.1.0", "First version", ["Ships"])
-    versions.start(session, version.id)
-    finished = _refined_task(session, "Finished", version)
-    _refined_task(session, "Pending", version)
-    tasks.start(session, finished.id)
-    tasks.complete(session, finished.id)
-
-    [progress] = views.dashboard(session).versions
-    assert (progress.done, progress.total) == (1, 2)
-
-def test_dashboard_version_without_tasks(session):
-    """Dashboard shows a started version with no tasks as 0 out of 0
-    Given a started version with no tasks
-    When building the dashboard
-    Then the version reports 0 done out of 0
-    """
-    projects.create(session, "nexus", "Nexus", "")
-    version = versions.create(session, "nexus", "0.1.0", "First version", ["Ships"])
-    versions.start(session, version.id)
-
-    [progress] = views.dashboard(session).versions
-    assert (progress.done, progress.total) == (0, 0)
-
-def test_dashboard_progress_is_per_version(session):
-    """Dashboard counts each version's tasks separately
-    Given two started versions with one and two planned tasks
-    When building the dashboard
-    Then each version reports its own total
-    """
-    projects.create(session, "nexus", "Nexus", "")
-    first = versions.create(session, "nexus", "0.1.0", "First", ["Ships"])
-    second = versions.create(session, "nexus", "0.2.0", "Second", ["Ships"])
-    versions.start(session, first.id)
-    versions.start(session, second.id)
-    _refined_task(session, "A", first)
-    _refined_task(session, "B", second)
-    _refined_task(session, "C", second)
-
-    result = views.dashboard(session)
-    assert [(p.version.number, p.total) for p in result.versions] == [("0.1.0", 1), ("0.2.0", 2)]
-
 def test_dashboard_splits_doing_and_waiting(session):
-    """Dashboard separates tasks in progress from blocked ones
-    Given a doing task, a waiting task and a merely planned task
+    """Dashboard separates items in progress from blocked ones
+    Given a doing task, a waiting task and a merely refined task
     When building the dashboard
-    Then doing and waiting hold one task each, and the planned task appears in neither
+    Then doing and waiting hold one task each, and the refined task appears in neither
     """
-    projects.create(session, "nexus", "Nexus", "")
-    version = versions.create(session, "nexus", "0.1.0", "First version", ["Ships"])
-    doing = _refined_task(session, "Doing", version)
-    waiting = _refined_task(session, "Waiting", version)
-    _refined_task(session, "Planned", version)
+    doing = _refined_task(session, "Doing")
+    waiting = _refined_task(session, "Waiting")
+    _refined_task(session, "Refined")
     tasks.start(session, doing.id)
     tasks.start(session, waiting.id)
     tasks.block(session, waiting.id, "Waiting for review")
@@ -272,16 +196,14 @@ def test_dashboard_splits_doing_and_waiting(session):
 
 def test_dashboard_counters_match_inbox_and_refine(session):
     """Dashboard counters match the inbox and refine queues
-    Given two inbox tasks, one refined unplanned task and one planned task
+    Given two inbox tasks, one refined task and one started task
     When building the dashboard
     Then the counters equal the lengths of inbox() and to_refine()
     """
-    projects.create(session, "nexus", "Nexus", "")
-    version = versions.create(session, "nexus", "0.1.0", "First version", ["Ships"])
     tasks.capture(session, "First")
     tasks.capture(session, "Second")
-    _refined_task(session, "To plan")
-    _refined_task(session, "Planned", version)
+    _refined_task(session, "Ready")
+    tasks.start(session, _refined_task(session, "Started").id)
 
     result = views.dashboard(session)
     assert result.inbox_count == len(views.inbox(session)) == 2
@@ -323,76 +245,21 @@ def test_search_limit_keeps_the_oldest_matches(session):
     result = views.search(session, "docs", limit=2)
     assert [t.id for t in result] == ids[:2]
 
-def test_dashboard_version_dod_progress(session):
-    """Dashboard shows how many of a version's DOD criteria are checked
-    Given a started version with three criteria, one of them checked
-    When building the dashboard
-    Then the version reports 1 checked out of 3
-    """
-    projects.create(session, "nexus", "Nexus", "")
-    version = versions.create(session, "nexus", "0.1.0", "First version", ["Ships", "Docs", "Tests"])
-    versions.start(session, version.id)
-    versions.set_criterion_done(session, version.definition_of_done[0].id, True)
-
-    [progress] = views.dashboard(session).versions
-    assert (progress.dod_done, progress.dod_total) == (1, 3)
-
-
-def test_dashboard_progress_ignores_cancelled_tasks(session):
-    """Dashboard progress leaves cancelled tasks out of the total
-    Given a started version with a done task and a cancelled task
-    When building the dashboard
-    Then the version reports 1 done out of 1
-    """
-    projects.create(session, "nexus", "Nexus", "")
-    version = versions.create(session, "nexus", "0.1.0", "First version", ["Ships"])
-    versions.start(session, version.id)
-    finished = _refined_task(session, "Finished", version)
-    dropped = _refined_task(session, "Dropped", version)
-    tasks.start(session, finished.id)
-    tasks.complete(session, finished.id)
-    tasks.cancel(session, dropped.id)
-
-    [progress] = views.dashboard(session).versions
-    assert (progress.done, progress.total) == (1, 1)
-
-
-
-def test_version_progress_measures_any_version_in_the_given_order(session):
-    """Version progress works for versions whatever their status, keeping their order
-    Given a planned version with a done task and a checked criterion, and an empty planned version
-    When measuring both, the empty one first, then measuring nothing
-    Then each gets its own counts in the order given, and nothing gives an empty list
-    """
-    projects.create(session, "nexus", "Nexus", "")
-    busy = versions.create(session, "nexus", "0.1.0", "Busy", ["Ships", "Docs"])
-    empty = versions.create(session, "nexus", "0.2.0", "Empty", ["Ships"])
-    finished = _refined_task(session, "Finished", busy)
-    _refined_task(session, "Pending", busy)
-    tasks.start(session, finished.id)
-    tasks.complete(session, finished.id)
-    versions.set_criterion_done(session, busy.definition_of_done[0].id, True)
-
-    result = views.version_progress(session, [empty, busy])
-    assert [(p.version.id, p.done, p.total, p.dod_done, p.dod_total) for p in result] == [
-        (empty.id, 0, 0, 0, 1), (busy.id, 1, 2, 1, 2)]
-    assert views.version_progress(session, []) == []
-
 # List tasks ---------------------------------------------------------------------------------------
 
 @pytest.fixture
 def board(session):
-    """Two projects, a version in the first, and tasks in several states and places."""
+    """Two projects, a feature in the first, and items in several states and places."""
     projects.create(session, "nx", "Nexus", "")
     projects.create(session, "other", "Other", "")
-    version = versions.create(session, "nx", "1.0", "First", ["Ships"])
     loose = tasks.capture(session, "Loose")
     in_project = tasks.create(session, "In project", project_key="nx")
-    planned = tasks.create_in_version(session, version.id, "Planned")
-    doing = tasks.create_in_version(session, version.id, "Doing")
+    feature = tasks.create(session, "Feature", project_key="nx", kind=TaskKind.FEATURE)
+    doing = tasks.create(session, "Doing", parent_ref=feature.ref)
+    tasks.clarify(session, doing.id, "Doing", None, None, None, None, parent_ref=feature.ref)
     tasks.start(session, doing.id)
     elsewhere = tasks.create(session, "Elsewhere", project_key="other")
-    return version, loose, in_project, planned, doing, elsewhere
+    return loose, in_project, feature, doing, elsewhere
 
 
 def _titles(result):
@@ -405,7 +272,7 @@ def test_list_tasks_without_filters_returns_everything_oldest_first(session, boa
     When listing without filters
     Then all come back in creation order
     """
-    assert _titles(views.list_tasks(session)) == ["Loose", "In project", "Planned", "Doing", "Elsewhere"]
+    assert _titles(views.list_tasks(session)) == ["Loose", "In project", "Feature", "Doing", "Elsewhere"]
 
 
 def test_list_tasks_filters_by_states(session, board):
@@ -415,25 +282,23 @@ def test_list_tasks_filters_by_states(session, board):
     Then a task matches if it is in any of the given states
     """
     assert _titles(views.list_tasks(session, states=[TaskState.DOING])) == ["Doing"]
-    assert _titles(views.list_tasks(session, states=[TaskState.DOING, TaskState.PLANNED])) == ["Planned", "Doing"]
+    assert _titles(views.list_tasks(session, states=[TaskState.DOING, TaskState.CANCELLED])) == ["Doing"]
+    assert len(views.list_tasks(session, states=[TaskState.DOING, TaskState.INBOX])) == 5
 
 
-def test_list_tasks_filters_by_project_and_version(session, board):
+def test_list_tasks_filters_by_project(session, board):
     """
-    Given tasks spread over projects and a version
-    When filtering by project, by version, and by both
-    Then only matching tasks are returned
+    Given items spread over projects, some under a feature
+    When filtering by project, alone and with a state
+    Then only matching items are returned, those under a feature included
     """
-    version = board[0]
-    assert _titles(views.list_tasks(session, project_key="nx")) == ["In project", "Planned", "Doing"]
-    assert _titles(views.list_tasks(session, version_id=version.id)) == ["Planned", "Doing"]
-    assert _titles(views.list_tasks(session, project_key="other", version_id=version.id)) == []
-    assert _titles(views.list_tasks(session, project_key="nx", states=[TaskState.INBOX])) == ["In project"]
+    assert _titles(views.list_tasks(session, project_key="nx")) == ["In project", "Feature", "Doing"]
+    assert _titles(views.list_tasks(session, project_key="nx", states=[TaskState.INBOX])) == ["In project", "Feature"]
 
 
 def test_list_tasks_limit_keeps_the_most_recent_oldest_first(session, board):
     """
-    Given five tasks
+    Given five items
     When listing with a limit of two
     Then the two most recently created come back, oldest first
     """

@@ -6,9 +6,8 @@ from sqlalchemy.orm import Session
 
 from src.mcp_server import serialize
 from src.models.task import TaskState
-from src.services import events, importer, projects, refs, tasks, versions, views
+from src.services import events, importer, projects, tasks, views
 from src.services.errors import DomainError, ValidationError
-from src.services.resolve import resolve_version
 
 # Who is recorded in the event log for changes made through a tool.
 ACTOR = events.ACTOR_MCP
@@ -148,29 +147,13 @@ def tool(name : str, description : str, properties : dict | None = None, require
 # -----------------------------------------------------------------------------
 
 # Argument schemas reused by several tools.
-_REF = _string("Task ref, e.g. t-4k2.")
-_VERSION = _string("Version ref (v-9xa), or its number (e.g. 1.2.0) together with 'project'.")
+_REF = _string("Feature or task ref, e.g. f-4k2 or t-4k2.")
 _PROJECT = _string("Project key.")
 
 
 def _limit(args : dict) -> int:
     """The row limit of a list tool, defaulted and capped."""
     return min(args.get("limit") or DEFAULT_LIMIT, MAX_LIMIT)
-
-
-def _version_of(session : Session, args : dict):
-    """The version named by the 'version' argument, by ref or by number within 'project'.
-
-    Raises:
-        ValidationError: If a number is given without a project.
-        NotFoundError: If no such version exists.
-    """
-    reference, project = args["version"], args.get("project")
-    if project:
-        return resolve_version(session, project, reference)
-    if not refs.is_ref(reference):
-        raise ValidationError("'project' is required when the version is given by number")
-    return versions.get_by_ref(session, reference)
 
 
 def _task_of(session : Session, args : dict):
@@ -195,44 +178,25 @@ def list_projects(session : Session, args : dict) -> dict:
     return _listing("projects", [serialize.project(p) for p in items])
 
 
-@tool("list_versions", "List versions, of one project or of all projects.",
-      {"project": _PROJECT}, read_only=True)
-def list_versions(session : Session, args : dict) -> dict:
-    """List versions."""
-    items = versions.list(session, args["project"]) if args.get("project") else versions.list_all(session)
-    return _listing("versions", [serialize.version_brief(v) for v in items])
-
-
-@tool("list_tasks", "List tasks, oldest first, optionally filtered. With a limit, the most recent ones are kept.",
-      {"state": _string("Only tasks in this state.", [s.name for s in TaskState]),
-       "project": _string("Only tasks of this project (key). Also needed to name a version by number."),
-       "version": _VERSION,
-       "limit": _integer(f"Most tasks to return (default {DEFAULT_LIMIT}, max {MAX_LIMIT}).")},
+@tool("list_tasks", "List features and tasks, oldest first, optionally filtered. With a limit, the most recent ones are kept.",
+      {"state": _string("Only items in this state.", [s.name for s in TaskState]),
+       "project": _string("Only items of this project or subproject (key)."),
+       "limit": _integer(f"Most items to return (default {DEFAULT_LIMIT}, max {MAX_LIMIT}).")},
       read_only=True)
 def list_tasks(session : Session, args : dict) -> dict:
     """List tasks."""
     limit = _limit(args)
     states = [TaskState[args["state"]]] if args.get("state") else None
-    version = _version_of(session, args) if args.get("version") else None
-    items = views.list_tasks(session, states=states, project_key=args.get("project"),
-                             version_id=version.id if version else None, limit=limit)
+    items = views.list_tasks(session, states=states, project_key=args.get("project"), limit=limit)
     return _listing("tasks", [serialize.task_brief(t) for t in items], limit)
 
 
-@tool("get_project", "Show a project and its versions.", {"project": _PROJECT}, ["project"], read_only=True)
+@tool("get_project", "Show a project or subproject and its subprojects.", {"project": _PROJECT}, ["project"], read_only=True)
 def get_project(session : Session, args : dict) -> dict:
     """Show a project."""
     project = projects.get(session, args["project"])
     return {**serialize.project(project),
-            "versions": [serialize.version_brief(v) for v in versions.list(session, project.key)]}
-
-
-@tool("get_version", "Show a version: its tasks and its definition-of-done checklist (criteria numbered from 1).",
-      {"version": _VERSION, "project": _PROJECT}, ["version"], read_only=True)
-def get_version(session : Session, args : dict) -> dict:
-    """Show a version."""
-    version = _version_of(session, args)
-    return serialize.version(version, versions.list_tasks(session, version.id))
+            "subprojects": [serialize.project(sub) for sub in project.subprojects]}
 
 
 @tool("get_task", "Show a task with all its fields and its event history.", {"ref": _REF}, ["ref"], read_only=True)
@@ -259,7 +223,7 @@ def search(session : Session, args : dict) -> dict:
     return _listing("tasks", [serialize.task_brief(t) for t in views.search(session, args["term"], limit)], limit)
 
 
-@tool("dashboard", "Overview: in-progress versions with progress, tasks being worked on or waiting, inbox and refine counts.",
+@tool("dashboard", "Overview: items being worked on or waiting, inbox and refine counts.",
       read_only=True)
 def dashboard(session : Session, args : dict) -> dict:
     """Show the dashboard."""
@@ -276,27 +240,21 @@ def capture_task(session : Session, args : dict) -> dict:
     return serialize.task(tasks.capture(session, args["title"], actor=ACTOR))
 
 
-@tool("add_task", "Create a task in a project: in the inbox, or planned straight into a version when 'version' is given.",
-      {"project": _PROJECT, "title": _string("Task title."), "version": _VERSION,
+@tool("add_task", "Create a task in a project's inbox.",
+      {"project": _PROJECT, "title": _string("Task title."),
        "body": _string("Free-text detail."), "context": _string("Context tag, e.g. @ordi."),
        "size": _string("Effort size.", SIZES)},
       ["project", "title"])
 def add_task(session : Session, args : dict) -> dict:
     """Create a task."""
     detail = {name: args.get(name) for name in ("body", "context", "size")}
-    if args.get("version"):
-        version = _version_of(session, args)
-        created = tasks.create_in_version(session, version.id, args["title"], actor=ACTOR, **detail)
-    else:
-        created = tasks.create(session, args["title"], project_key=args["project"], actor=ACTOR, **detail)
-    return serialize.task(created)
+    return serialize.task(tasks.create(session, args["title"], project_key=args["project"], actor=ACTOR, **detail))
 
 
 @tool("import_data",
-      "Import projects, versions and tasks. Give either 'document' (JSON: {\"projects\": [{\"key\", \"name\", "
-      "\"versions\": [{\"number\", \"title\", \"dod\": [...], \"tasks\": [{\"title\", \"body\", \"context\", \"size\"}]}]}], "
-      "\"tasks\": [{\"title\", \"project\", \"version\"}]}) or 'text' (one task title per line, into the inbox). "
-      "Existing projects and versions are reused, never overwritten; tasks are always created. All or nothing. "
+      "Import projects and tasks. Give either 'document' (JSON: {\"projects\": [{\"key\", \"name\", \"description\"}], "
+      "\"tasks\": [{\"title\", \"body\", \"context\", \"size\", \"project\"}]}) or 'text' (one task title per line, "
+      "into the inbox). Existing projects are reused, never overwritten; tasks are always created. All or nothing. "
       "Use dry_run first to check.",
       {"document": _object("The import document."), "text": _string("Plain list, one task title per line."),
        "dry_run": _boolean("Validate and report without writing anything.")})
@@ -308,7 +266,6 @@ def import_data(session : Session, args : dict) -> dict:
     result = importer.apply(session, data, ACTOR, dry_run=bool(args.get("dry_run")))
     return {"dry_run": result.dry_run,
             "projects_created": result.projects_created, "projects_reused": result.projects_reused,
-            "versions_created": result.versions_created, "versions_reused": result.versions_reused,
             "tasks_created": result.tasks_created,
             "created": [{"kind": kind, "ref": ref, "title": title} for kind, ref, title in result.created]}
 
@@ -328,13 +285,6 @@ def update_task(session : Session, args : dict) -> dict:
     return serialize.task(tasks.update(session, task.id, actor=ACTOR, **fields))
 
 
-@tool("plan_task", "Plan a refined task into a version.", {"ref": _REF, "version": _VERSION, "project": _PROJECT},
-      ["ref", "version"])
-def plan_task(session : Session, args : dict) -> dict:
-    """Plan a task into a version."""
-    return serialize.task(tasks.plan(session, _task_of(session, args).id, _version_of(session, args).id, actor=ACTOR))
-
-
 def _transition(name : str, description : str, action : Callable, extra : dict | None = None,
                 required : list[str] | None = None) -> None:
     """Register a tool that moves a task with one lifecycle function.
@@ -352,97 +302,13 @@ def _transition(name : str, description : str, action : Callable, extra : dict |
     tool(name, description, {"ref": _REF, **(extra or {})}, ["ref", *(required or [])])(handler)
 
 
-_transition("unplan_task", "Take a planned task out of its version, back to refined.", tasks.unplan)
-_transition("start_task", "Start working on a planned task (planned to doing).", tasks.start)
-_transition("complete_task", "Mark a task in progress as done.", tasks.complete)
+_transition("start_task", "Start working on a refined task (refined to doing).", tasks.start)
+_transition("complete_task", "Mark a task in progress as done. A feature closes only once its children are done or cancelled.",
+            tasks.complete)
 _transition("block_task", "Mark a task in progress as waiting on something.", tasks.block,
             {"reason": _string("What the task is waiting for.")}, ["reason"])
 _transition("unblock_task", "Resume a waiting task (waiting to doing).", tasks.unblock)
 
-
-# Schema of the argument numbering a criterion.
-_INDEX = _integer("Criterion number, from 1, as listed by get_version.")
-
-
-@tool("set_criterion_done", "Check or uncheck one definition-of-done criterion of a version.",
-      {"version": _VERSION, "project": _PROJECT,
-       "index": _INDEX,
-       "done": _boolean("True to check it, false to uncheck it.")},
-      ["version", "index", "done"], idempotent=True)
-def set_criterion_done(session : Session, args : dict) -> dict:
-    """Check or uncheck a criterion."""
-    version = _version_of(session, args)
-    versions.set_criterion_done(session, _criterion_at(version, args["index"]).id, args["done"], actor=ACTOR)
-    return serialize.version(version, versions.list_tasks(session, version.id))
-
-
-def _criterion_at(version, index : int):
-    """The criterion of a version at a position counted from 1.
-
-    Raises:
-        ValidationError: If the index is out of range.
-    """
-    criteria = version.definition_of_done
-    if not 1 <= index <= len(criteria):
-        raise ValidationError(f"'index' must be between 1 and {len(criteria)}")
-    return criteria[index - 1]
-
-
-@tool("add_criterion", "Append a definition-of-done criterion to a version that is not released.",
-      {"version": _VERSION, "project": _PROJECT, "description": _string("Text of the new criterion.")},
-      ["version", "description"])
-def add_criterion(session : Session, args : dict) -> dict:
-    """Append a criterion."""
-    version = _version_of(session, args)
-    versions.add_criterion(session, version.id, args["description"], actor=ACTOR)
-    return serialize.version(version, versions.list_tasks(session, version.id))
-
-
-@tool("update_criterion", "Change the text of one definition-of-done criterion of a version that is not released.",
-      {"version": _VERSION, "project": _PROJECT, "index": _INDEX,
-       "description": _string("New text of the criterion.")},
-      ["version", "index", "description"])
-def update_criterion(session : Session, args : dict) -> dict:
-    """Change a criterion's text."""
-    version = _version_of(session, args)
-    versions.update_criterion(session, _criterion_at(version, args["index"]).id, args["description"], actor=ACTOR)
-    return serialize.version(version, versions.list_tasks(session, version.id))
-
-
-@tool("delete_criterion", "Delete one definition-of-done criterion of a version that is not released. "
-      "Refused for the last remaining criterion. The numbers of the following criteria shift down by one.",
-      {"version": _VERSION, "project": _PROJECT, "index": _INDEX},
-      ["version", "index"], destructive=True)
-def delete_criterion(session : Session, args : dict) -> dict:
-    """Delete a criterion."""
-    version = _version_of(session, args)
-    versions.delete_criterion(session, _criterion_at(version, args["index"]).id, actor=ACTOR)
-    return serialize.version(version, versions.list_tasks(session, version.id))
-
-
-def _version_transition(name : str, description : str, action : Callable) -> None:
-    """Register a tool that changes a version's status with one lifecycle function.
-
-    Args:
-        name: Tool name.
-        description: Tool description.
-        action: The versions.* function, called as action(session, id, actor=...).
-    """
-    def handler(session : Session, args : dict) -> dict:
-        version = action(session, _version_of(session, args).id, actor=ACTOR)
-        return serialize.version(version, versions.list_tasks(session, version.id))
-    tool(name, description, {"version": _VERSION, "project": _PROJECT}, ["version"])(handler)
-
-
-_version_transition("start_version", "Start a planned version (planned to in progress).", versions.start)
-_version_transition("release_version",
-                    "Release a version in progress. Refused while a task is unfinished (cancelled ones don't count) "
-                    "or a definition-of-done criterion is unchecked.", versions.release)
-
-
-# -----------------------------------------------------------------------------
-# Calling
-# -----------------------------------------------------------------------------
 
 def list_tools() -> list[dict]:
     """Describe every tool the way MCP's tools/list does."""

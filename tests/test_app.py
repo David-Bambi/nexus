@@ -2,7 +2,9 @@ import logging
 import sqlite3
 from contextlib import closing
 
-from src.app import create_app
+import pytest
+
+from src.app import UnsupportedDatabaseError, create_app
 from src.config import Config
 from src.logging_config import configure_logging
 
@@ -78,5 +80,64 @@ def test_migrated_database_accepts_cancelled_tasks(tmp_path):
     create_app(_config_for(database))
     with closing(sqlite3.connect(database)) as connection:
         connection.execute(
-            "INSERT INTO task (ref, title, state, position, created_at, updated_at) "
-            "VALUES ('t-drp', 'Dropped', 'CANCELLED', 0, '2026-09-21', '2026-09-21')")
+            "INSERT INTO task (ref, kind, title, state, position, created_at, updated_at) "
+            "VALUES ('t-drp', 'TASK', 'Dropped', 'CANCELLED', 0, '2026-09-21', '2026-09-21')")
+
+
+def test_migrated_database_has_the_2_0_tables(tmp_path):
+    """A fresh database gets the 2.0 schema, without versions
+    Given an empty database file
+    When the app is created
+    Then the project, task, tag and event tables exist, and no version table
+    """
+    database = tmp_path / "data.db"
+    create_app(_config_for(database))
+    tables = _tables(database)
+    assert {"project", "task", "tag", "task_tag", "event"} <= tables
+    assert "version" not in tables
+    assert "definition_of_done_criterion" not in tables
+
+
+def test_deleted_ids_are_never_reused(tmp_path):
+    """A deleted row's id is not handed out again
+    Given a migrated database where the newest task was deleted
+    When inserting a new task
+    Then it gets a new id
+    """
+    database = tmp_path / "data.db"
+    create_app(_config_for(database))
+    insert = ("INSERT INTO task (ref, kind, title, state, position, created_at, updated_at) "
+              "VALUES (?, 'TASK', 'T', 'INBOX', 0, '2026-11-19', '2026-11-19')")
+    with closing(sqlite3.connect(database)) as connection:
+        first = connection.execute(insert, ("t-aaa",)).lastrowid
+        connection.execute("DELETE FROM task WHERE id = ?", (first,))
+        second = connection.execute(insert, ("t-bbb",)).lastrowid
+    assert second != first
+
+
+def test_a_1_x_database_is_refused(tmp_path):
+    """A database stamped by Nexus 1.x is refused with a clear error
+    Given a database whose migration is the last 1.x one
+    When the app is created
+    Then UnsupportedDatabaseError is raised and the database is left alone
+    """
+    database = tmp_path / "data.db"
+    with closing(sqlite3.connect(database)) as connection:
+        connection.execute("CREATE TABLE alembic_version (version_num VARCHAR(32) NOT NULL)")
+        connection.execute("INSERT INTO alembic_version VALUES ('e8b3f1c9a627')")
+        connection.commit()
+
+    with pytest.raises(UnsupportedDatabaseError, match="Upgrade from 1.x"):
+        create_app(_config_for(database))
+    assert _tables(database) == {"alembic_version"}
+
+
+def test_restarting_on_a_2_0_database_is_accepted(tmp_path):
+    """A database already at the 2.0 schema starts again without error
+    Given a database migrated once
+    When the app is created a second time
+    Then no error is raised
+    """
+    database = tmp_path / "data.db"
+    create_app(_config_for(database))
+    create_app(_config_for(database))

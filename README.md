@@ -145,6 +145,23 @@ rm -f ~/.nexus/data.db-wal ~/.nexus/data.db-shm  # leftovers of the replaced dat
 systemctl --user start nexus                     # pending migrations are applied on start
 ```
 
+### Upgrade from 1.x
+
+Nexus 2.0 replaced versions with a project / feature / task tree and
+restarted its migration history: it refuses to start on a 1.x database and
+says so. Archive the old database, then start again on an empty one:
+
+```bash
+systemctl --user stop nexus
+mkdir -p ~/.nexus/archive
+mv ~/.nexus/data.db ~/.nexus/archive/data-1.x.db
+rm -f ~/.nexus/data.db-wal ~/.nexus/data.db-shm
+systemctl --user start nexus                     # creates an empty 2.0 database
+```
+
+Nothing is migrated: the 1.x data stays readable in the archived file (and
+in a JSON export taken before the upgrade).
+
 ### Move data from the development database
 
 Data created before `~/.nexus` existed lives in `instance/nexus.db`. With no

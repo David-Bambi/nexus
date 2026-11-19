@@ -14,13 +14,6 @@
         <a class="row-title" href="{{ url_for('pages.project_detail', key=project.key) }}">{{ project.name }}</a>
         {{ ui.ref_chip(project.key) }} {{ ui.badge(project.status.name) }}
         {% if project.description %}<span class="hint">{{ project.description }}</span>{% endif %}
-        {% if progress_by_project[project.id] %}
-        <ul class="list list-nested">
-            {% for progress in progress_by_project[project.id] %}
-            {{ ui.version_row(progress) }}
-            {% endfor %}
-        </ul>
-        {% endif %}
     </li>
     {% else %}
     {{ ui.empty("No projects yet.") }}

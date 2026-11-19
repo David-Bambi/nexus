@@ -1,8 +1,8 @@
 from flask import abort, redirect, render_template, request, url_for
 
 from src.models.task import TaskState
-from src.services import events, sizes, tasks, versions
-from src.services.errors import InvalidTransitionError, NotFoundError, ValidationError
+from src.services import events, sizes, tasks
+from src.services.errors import ConflictError, InvalidTransitionError, NotFoundError, ValidationError
 from src.web.pages._shared import PAGE_LIMIT, _session, bp
 
 
@@ -71,7 +71,6 @@ def _render_task(task, error):
         history=events.history(_session(), "task", task.id),
         error=error,
         next=_local_path(request.values.get("next")),
-        versions=versions.list(_session(), task.project.key) if task.project else [],
     )
 
 
@@ -106,7 +105,7 @@ def _run_transition(session, task_id, fn):
     error = None
     try:
         task = fn(session)
-    except (NotFoundError, ValidationError, InvalidTransitionError) as e:
+    except (NotFoundError, ValidationError, InvalidTransitionError, ConflictError) as e:
         error = str(e)
     return task, error
 
@@ -154,23 +153,9 @@ def task_clarify(task_id):
     )
 
 
-@bp.route("/tasks/<int:task_id>/plan", methods=["POST"])
-def task_plan(task_id):
-    """Plan a refined task into a version."""
-    return _apply_transition(
-        task_id, lambda s: tasks.plan(s, task_id, int(request.form["version_id"]))
-    )
-
-
-@bp.route("/tasks/<int:task_id>/unplan", methods=["POST"])
-def task_unplan(task_id):
-    """Unplan a planned task back to refined."""
-    return _apply_transition(task_id, lambda s: tasks.unplan(s, task_id))
-
-
 @bp.route("/tasks/<int:task_id>/start", methods=["POST"])
 def task_start(task_id):
-    """Start a planned task."""
+    """Start a refined task."""
     return _apply_transition(task_id, lambda s: tasks.start(s, task_id))
 
 
@@ -204,14 +189,6 @@ def task_reopen(task_id):
 def task_defer(task_id):
     """Defer a task to someday."""
     return _apply_transition(task_id, lambda s: tasks.defer(s, task_id))
-
-
-@bp.route("/tasks/<int:task_id>/move", methods=["POST"])
-def task_move(task_id):
-    """Move a task to another version of its project."""
-    return _apply_transition(
-        task_id, lambda s: tasks.move_to_version(s, task_id, int(request.form["version_id"]))
-    )
 
 
 @bp.route("/tasks/<int:task_id>/cancel", methods=["POST"])

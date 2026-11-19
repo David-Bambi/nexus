@@ -3,21 +3,14 @@ import copy
 import pytest
 
 from src.models.task import TaskState
-from src.services import events, importer, projects, tasks, versions
+from src.services import events, importer, projects, tasks
 from src.services.errors import ValidationError
 
 DOCUMENT = {
-    "projects": [{
-        "key": "nx", "name": "Nexus", "description": "The manager",
-        "versions": [{
-            "number": "1.0", "title": "First", "goal": "Ship", "dod": ["Ships", "Documented"],
-            "tasks": [{"title": "Planned", "size": "S", "context": "@ordi", "body": "Detail"}],
-        }],
-    }],
+    "projects": [{"key": "nx", "name": "Nexus", "description": "The manager"}],
     "tasks": [
         {"title": "Loose"},
-        {"title": "In project", "project": "nx"},
-        {"title": "In version", "project": "nx", "version": "1.0"},
+        {"title": "In project", "project": "nx", "size": "S", "context": "@ordi", "body": "Detail"},
     ],
 }
 
@@ -34,63 +27,55 @@ def _titles(session):
 
 def test_import_creates_everything(session):
     """
-    Given a document with a project, a version and tasks
+    Given a document with a project and tasks
     When importing it
-    Then all of them are created, planned or in the inbox as described
+    Then all of them are created in the inbox, in their project if they name one
     """
     result = _apply(session, DOCUMENT)
-    assert (result.projects_created, result.versions_created, result.tasks_created) == (1, 1, 4)
+    assert (result.projects_created, result.tasks_created) == (1, 2)
     assert projects.get(session, "nx").description == "The manager"
-    version = versions.get(session, "nx", "1.0")
-    assert [c.description for c in version.definition_of_done] == ["Ships", "Documented"]
     by_title = {t.title: t for t in tasks.list(session)}
-    assert by_title["Planned"].state == TaskState.PLANNED and by_title["Planned"].size == "S"
-    assert (by_title["Planned"].context, by_title["Planned"].body) == ("@ordi", "Detail")
     assert by_title["Loose"].project_id is None and by_title["Loose"].state == TaskState.INBOX
-    assert by_title["In project"].project.key == "nx" and by_title["In project"].version_id is None
-    assert by_title["In version"].version_id == version.id
+    in_project = by_title["In project"]
+    assert in_project.project.key == "nx" and in_project.state == TaskState.INBOX
+    assert (in_project.size, in_project.context, in_project.body) == ("S", "@ordi", "Detail")
 
 
 def test_import_reports_created_refs_and_actor(session):
     """
     Given a document
     When importing it
-    Then the result lists refs of created versions and tasks, and events carry the actor
+    Then the result lists refs of created tasks, and events carry the actor
     """
     result = _apply(session, DOCUMENT)
-    kinds = [kind for kind, _, _ in result.created]
-    assert kinds.count("version") == 1 and kinds.count("task") == 4
-    task = tasks.get_by_ref(session, next(ref for kind, ref, _ in result.created if kind == "task"))
+    assert [kind for kind, _, _ in result.created] == ["task", "task"]
+    task = tasks.get_by_ref(session, result.created[0][1])
     assert events.history(session, "task", task.id)[0].actor == events.ACTOR_CLI
 
 
-def test_import_reuses_existing_project_and_version_without_overwriting(session):
+def test_import_reuses_existing_project_without_overwriting(session):
     """
-    Given an existing project and version
-    When importing a document naming them with other values
-    Then they are reused unchanged, and their tasks are added
+    Given an existing project
+    When importing a document naming it with other values
+    Then it is reused unchanged, and the tasks are added
     """
     projects.create(session, "nx", "Original", "Keep me")
-    versions.create(session, "nx", "1.0", "Original title", ["Only"])
     result = _apply(session, DOCUMENT)
     assert (result.projects_created, result.projects_reused) == (0, 1)
-    assert (result.versions_created, result.versions_reused) == (0, 1)
     assert projects.get(session, "nx").name == "Original"
-    version = versions.get(session, "nx", "1.0")
-    assert version.title == "Original title" and len(version.definition_of_done) == 1
-    assert "Planned" in _titles(session)
+    assert "In project" in _titles(session)
 
 
 def test_import_twice_duplicates_tasks_only(session):
     """
     Given a document imported once
     When importing it again
-    Then projects and versions are reused and the tasks are created again
+    Then the project is reused and the tasks are created again
     """
     _apply(session, DOCUMENT)
     result = _apply(session, DOCUMENT)
-    assert (result.projects_created, result.versions_created, result.tasks_created) == (0, 0, 4)
-    assert len(tasks.list(session)) == 8
+    assert (result.projects_created, result.tasks_created) == (0, 2)
+    assert len(tasks.list(session)) == 4
 
 
 def test_dry_run_writes_nothing_and_hides_refs(session):
@@ -100,7 +85,7 @@ def test_dry_run_writes_nothing_and_hides_refs(session):
     Then the counts are reported, nothing is stored and refs are None
     """
     result = _apply(session, DOCUMENT, dry_run=True)
-    assert result.dry_run and result.tasks_created == 4
+    assert result.dry_run and result.tasks_created == 2
     assert all(ref is None for _, ref, _ in result.created)
     assert tasks.list(session) == [] and projects.list(session) == []
 
@@ -113,19 +98,19 @@ def test_invalid_document_reports_every_problem_and_writes_nothing(session):
     """
     data = {
         "projects": [{"key": "tasks", "name": "Reserved"},
-                     {"key": "ok", "name": "Ok", "versions": [{"number": "1", "title": "V", "dod": []}]},
+                     {"key": "ok", "name": "Ok", "versions": []},
                      {"key": "ok", "name": "Twice"}],
         "tasks": [{"title": " "}, {"title": "x", "size": "XXL"},
-                  {"title": "y", "version": "1"}, {"title": "z", "project": "ghost"},
-                  {"title": "w", "project": "ok", "version": "9"}, {"title": "v", "bogus": 1}],
+                  {"title": "z", "project": "ghost"}, {"title": "w", "project": "ok", "version": "9"},
+                  {"title": "v", "bogus": 1}],
         "extra": 1,
     }
     with pytest.raises(importer.ImportInvalid) as raised:
         _apply(session, data)
     text = "\n".join(raised.value.errors)
-    for expected in ("key is reserved", "'dod' must be", "project declared twice", "'title' is required",
-                     "'size' must be one of", "'version' needs a 'project'", "project 'ghost' doesn't exist",
-                     "has no version '9'", "unknown field 'bogus'", "unknown field 'extra'"):
+    for expected in ("key is reserved", "unknown field 'versions'", "project declared twice",
+                     "'title' is required", "'size' must be one of", "project 'ghost' doesn't exist",
+                     "unknown field 'version'", "unknown field 'bogus'", "unknown field 'extra'"):
         assert expected in text
     assert projects.list(session) == [] and tasks.list(session) == []
 
@@ -139,23 +124,6 @@ def test_wrong_shapes_are_reported_not_raised(session, data):
     Then problems are returned instead of an unexpected exception
     """
     assert importer.validate(session, data)
-
-
-def test_released_version_refuses_new_tasks(session):
-    """
-    Given a released version
-    When importing tasks into it, nested or loose
-    Then both are refused
-    """
-    projects.create(session, "nx", "Nexus", "")
-    version = versions.create(session, "nx", "1.0", "First", ["Ships"])
-    versions.start(session, version.id)
-    versions.set_criterion_done(session, version.definition_of_done[0].id, True)
-    versions.release(session, version.id)
-    data = {"projects": [{"key": "nx", "versions": [{"number": "1.0", "tasks": [{"title": "a"}]}]}],
-            "tasks": [{"title": "b", "project": "nx", "version": "1.0"}]}
-    errors = importer.validate(session, data)
-    assert len(errors) == 2 and all("released" in e for e in errors)
 
 
 def test_failure_midway_rolls_everything_back(session, monkeypatch):

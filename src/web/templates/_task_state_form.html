@@ -1,4 +1,4 @@
-{% set next_states = {"PLANNED": ["DOING", "CANCELLED"], "DOING": ["WAITING", "DONE", "CANCELLED"], "WAITING": ["DOING", "CANCELLED"], "DONE": ["DOING"]}[task.state.name] %}
+{% set next_states = {"REFINED": ["DOING", "CANCELLED"], "DOING": ["WAITING", "DONE", "CANCELLED"], "WAITING": ["DOING", "CANCELLED"], "DONE": ["DOING"]}[task.state.name] %}
 {% if next_states %}
 <form class="form-inline state-form" method="post" action="{{ state_action }}">
     <select name="state" aria-label="State">

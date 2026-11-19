@@ -3,8 +3,7 @@ from dataclasses import dataclass, field
 from sqlalchemy.orm import Session
 
 from src.models.project import Project
-from src.models.version import VersionStatus
-from src.services import projects, tasks, versions
+from src.services import projects, tasks
 from src.services.errors import NotFoundError, ValidationError
 
 # Sizes a task may take.
@@ -12,10 +11,9 @@ _SIZES = ("XS", "S", "M", "L")
 
 # Fields each kind of entry accepts; anything else is reported as an error.
 _DOCUMENT_FIELDS = {"projects", "tasks"}
-_PROJECT_FIELDS = {"key", "name", "description", "versions"}
-_VERSION_FIELDS = {"number", "title", "goal", "dod", "tasks"}
+_PROJECT_FIELDS = {"key", "name", "description"}
 _TASK_FIELDS = {"title", "body", "context", "size"}
-_LOOSE_TASK_FIELDS = _TASK_FIELDS | {"project", "version"}
+_LOOSE_TASK_FIELDS = _TASK_FIELDS | {"project"}
 
 
 class ImportInvalid(ValidationError):
@@ -40,10 +38,8 @@ class ImportResult:
     dry_run: bool = False
     projects_created: int = 0
     projects_reused: int = 0
-    versions_created: int = 0
-    versions_reused: int = 0
     tasks_created: int = 0
-    # (kind, ref, title) for each version and task created, in creation
+    # (kind, ref, title) for each item created, in creation
     # order; ref is None on a dry run, since nothing is stored.
     created: list = field(default_factory=list)
 
@@ -155,58 +151,18 @@ def _check_task(entry : dict, where : str, errors : list, loose : bool = False) 
         errors.append(f"{where}: 'size' must be one of {', '.join(_SIZES)}")
 
 
-def _known_versions(session : Session, plan : dict, key : str) -> dict | None:
-    """Versions (number -> released?) a project will have, or None if it won't exist.
+def _project_exists(session : Session, key : str) -> bool:
+    """Tell whether a project key is already taken.
 
     Args:
         session: Database session to use.
-        plan: Cache of what validation has seen so far, by project key.
         key: Project key.
     """
-    if key not in plan:
-        try:
-            projects.get(session, key)
-        except NotFoundError:
-            return None
-        plan[key] = {v.number: v.status == VersionStatus.RELEASED
-                     for v in versions.list(session, key)}
-    return plan[key]
-
-
-def _check_version(entry : dict, where : str, known : dict, declared : set, errors : list) -> None:
-    """Check one version entry of a project.
-
-    Args:
-        entry: The version entry.
-        where: Label of the entry, for messages.
-        known: The project's versions (number -> released?), extended with
-            the version if it is new.
-        declared: Numbers already declared in this document for the project.
-        errors: List receiving the problems found.
-    """
-    _unknown_fields(entry, _VERSION_FIELDS, where, errors)
-    number = _text(entry, "number", where, errors, required=True)
-    if number is None:
-        return
-    where = f"{where} ('{number}')"
-    if number in declared:
-        errors.append(f"{where}: version declared twice")
-        return
-    declared.add(number)
-
-    if number not in known:
-        # New version: it needs what versions.create needs.
-        _text(entry, "title", where, errors, required=True)
-        _text(entry, "goal", where, errors)
-        dod = entry.get("dod")
-        if not isinstance(dod, list) or not dod or not all(isinstance(d, str) and d.strip() for d in dod):
-            errors.append(f"{where}: 'dod' must be a non-empty list of non-blank strings")
-        known[number] = False
-    elif known[number] and entry.get("tasks"):
-        errors.append(f"{where}: version is released, it accepts no new task")
-
-    for index, task in _entries(entry, "tasks", where, errors):
-        _check_task(task, f"{where} tasks[{index}]", errors)
+    try:
+        projects.get(session, key)
+    except NotFoundError:
+        return False
+    return True
 
 
 def validate(session : Session, data : object) -> list[str]:
@@ -227,7 +183,6 @@ def validate(session : Session, data : object) -> list[str]:
         return ["the document must be an object with 'projects' and/or 'tasks'"]
     _unknown_fields(data, _DOCUMENT_FIELDS, "document", errors)
 
-    plan = {}
     declared = set()
     for index, entry in _entries(data, "projects", "document", errors):
         where = f"projects[{index}]"
@@ -242,30 +197,16 @@ def validate(session : Session, data : object) -> list[str]:
             errors.append(f"{where}: project declared twice")
             continue
         declared.add(key)
-        known = _known_versions(session, plan, key)
-        if known is None:
+        if not _project_exists(session, key):
             _text(entry, "name", where, errors, required=True)
-            known = plan[key] = {}
         _text(entry, "description", where, errors)
-        declared_versions = set()
-        for v_index, version in _entries(entry, "versions", where, errors):
-            _check_version(version, f"{where} versions[{v_index}]", known, declared_versions, errors)
 
     for index, entry in _entries(data, "tasks", "document", errors):
         where = f"tasks[{index}]"
         _check_task(entry, where, errors, loose=True)
         key = _text(entry, "project", where, errors)
-        number = _text(entry, "version", where, errors)
-        if number and not key:
-            errors.append(f"{where}: 'version' needs a 'project'")
-        elif key:
-            known = _known_versions(session, plan, key)
-            if known is None:
-                errors.append(f"{where}: project '{key}' doesn't exist")
-            elif number and number not in known:
-                errors.append(f"{where}: project '{key}' has no version '{number}'")
-            elif number and known[number]:
-                errors.append(f"{where}: version '{number}' is released, it accepts no new task")
+        if key and key not in declared and not _project_exists(session, key):
+            errors.append(f"{where}: project '{key}' doesn't exist")
     return errors
 
 
@@ -274,10 +215,9 @@ def validate(session : Session, data : object) -> list[str]:
 # -----------------------------------------------------------------------------
 
 def apply(session : Session, data : object, actor : str, dry_run : bool = False) -> ImportResult:
-    """Import projects, versions and tasks from a document.
+    """Import projects and tasks from a document.
 
-    Projects and versions are matched by their natural keys (project key,
-    version number within its project): an existing one is reused and never
+    Projects are matched by their key: an existing one is reused and never
     overwritten, a missing one is created. Tasks are always created. Refs and
     ids in the document are not part of the format. The whole import is
     stored at once, or not at all.
@@ -285,9 +225,8 @@ def apply(session : Session, data : object, actor : str, dry_run : bool = False)
     Args:
         session: Database session to use.
         data: The parsed document: {"projects": [{"key", "name",
-            "description", "versions": [{"number", "title", "goal", "dod",
-            "tasks": [...]}]}], "tasks": [{"title", "body", "context",
-            "size", "project", "version"}]}.
+            "description"}], "tasks": [{"title", "body", "context", "size",
+            "project"}]}.
         actor: Who runs the import, recorded in the event log.
         dry_run: If True, run everything then discard it, so the result
             shows what would happen.
@@ -308,7 +247,7 @@ def apply(session : Session, data : object, actor : str, dry_run : bool = False)
     try:
         _create_projects(deferred, data, actor, result)
         for entry in data.get("tasks", []):
-            _create_task(deferred, entry, entry.get("project"), entry.get("version"), actor, result)
+            _create_task(deferred, entry, entry.get("project"), actor, result)
     except Exception:
         session.rollback()
         raise
@@ -321,7 +260,7 @@ def apply(session : Session, data : object, actor : str, dry_run : bool = False)
 
 
 def _create_projects(session : _DeferredCommit, data : dict, actor : str, result : ImportResult) -> None:
-    """Create or reuse each project, its versions and their tasks."""
+    """Create each missing project, reuse the existing ones."""
     for entry in data.get("projects", []):
         key = entry["key"].strip()
         if session.query(Project).filter_by(key=key).first() is None:
@@ -331,33 +270,15 @@ def _create_projects(session : _DeferredCommit, data : dict, actor : str, result
         else:
             result.projects_reused += 1
 
-        for item in entry.get("versions", []):
-            number = item["number"].strip()
-            try:
-                version = versions.get(session, key, number)
-                result.versions_reused += 1
-            except NotFoundError:
-                version = versions.create(session, key, number, item["title"].strip(),
-                                          [d.strip() for d in item["dod"]],
-                                          goal=(item.get("goal") or "").strip() or None, actor=actor)
-                result.versions_created += 1
-                result.created.append(("version", version.ref, f"{key} {number}"))
-            for task in item.get("tasks", []):
-                _create_task(session, task, key, number, actor, result)
-
 
 def _create_task(session : _DeferredCommit, entry : dict, project_key : str | None,
-                 number : str | None, actor : str, result : ImportResult) -> None:
-    """Create one task: planned if it names a version, else in the inbox."""
+                 actor : str, result : ImportResult) -> None:
+    """Create one task in the inbox, in its project if it names one."""
     fields = {"body": (entry.get("body") or "").strip() or None,
               "context": (entry.get("context") or "").strip() or None,
               "size": (entry.get("size") or "").strip() or None}
     title = entry["title"].strip()
-    if number:
-        version = versions.get(session, project_key.strip(), number.strip())
-        task = tasks.create_in_version(session, version.id, title, actor=actor, **fields)
-    else:
-        task = tasks.create(session, title, project_key=project_key.strip() if project_key else None,
-                            actor=actor, **fields)
+    task = tasks.create(session, title, project_key=project_key.strip() if project_key else None,
+                        actor=actor, **fields)
     result.tasks_created += 1
     result.created.append(("task", task.ref, title))

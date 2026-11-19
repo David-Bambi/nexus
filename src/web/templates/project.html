@@ -10,20 +10,24 @@
 <p class="lead">{{ project.description }}</p>
 {% endif %}
 
-<h2>Versions</h2>
+{% if project.parent %}
+<p>Subproject of <a href="{{ url_for('pages.project_detail', key=project.parent.key) }}">{{ project.parent.name }}</a></p>
+{% endif %}
+
+{% if project.subprojects %}
+<h2>Subprojects</h2>
 <ul class="list">
-    {% for progress in versions %}
-    {{ ui.version_row(progress) }}
-    {% else %}
-    {{ ui.empty("No versions yet.") }}
+    {% for sub in project.subprojects %}
+    <li><a href="{{ url_for('pages.project_detail', key=sub.key) }}">{{ sub.name }}</a> {{ ui.ref_chip(sub.ref) }}</li>
     {% endfor %}
 </ul>
-<p><a href="{{ url_for('pages.versions_list', key=project.key) }}">Manage versions →</a></p>
+{% endif %}
 
 <section class="danger-zone">
     <h2>Delete this project</h2>
+    {{ ui.error_message(error) }}
     <form method="post" action="{{ url_for('pages.project_delete', key=project.key) }}">
-        <p>Type <strong>{{ project.key }}</strong> to confirm deletion. Its versions are deleted too.</p>
+        <p>Type <strong>{{ project.key }}</strong> to confirm deletion. Only an empty project can be deleted.</p>
         <div class="form-inline">
             <input type="text" aria-label="Project key" data-confirm="{{ project.key }}">
             <button class="button-danger" type="submit" disabled>Delete project</button>

@@ -10,26 +10,20 @@ from src.cli.session import open_session
 from src.services.errors import DomainError
 
 # Shown when nexus runs with no arguments or a wrong command line.
-USAGE = """usage: nexus <command> | <reference> [<version>]
+USAGE = """usage: nexus <command> | <reference>
 
   nexus version            app version
-  nexus tasks              all tasks
-  nexus versions           all versions
+  nexus tasks              all features and tasks
   nexus projects           all projects
-  nexus <project>          project detail and its versions
-  nexus <project> <version>  version detail, tasks and definition of done
-  nexus <project> <version> check|uncheck <n>  check a definition-of-done criterion
-  nexus <project> <version> add-criterion <text>       add a criterion
-  nexus <project> <version> edit-criterion <n> <text>  reword a criterion
-  nexus <project> <version> remove-criterion <n>       delete a criterion
-  nexus <project> <version> start|release      change the version status
-  nexus <task>             task detail
-  nexus add task <project> [<version>] [--title T] [--body B] [--context C] [--size S]
+  nexus <project>          project detail and its subprojects
+  nexus <subproject>       subproject detail
+  nexus <feature|task>     feature or task detail
+  nexus add task <project> [--title T] [--body B] [--context C] [--size S]
   nexus "<description>"     capture a task into the inbox
   nexus import <file|->
 
-A reference is a project key, a task ref (t-4k2) or a version ref (v-9xa);
-a version ref can stand for <project> <version>."""
+A reference is a project key, a subproject ref (s-4k2), a feature ref
+(f-4k2) or a task ref (t-4k2)."""
 
 # Exit codes.
 EXIT_OK = 0

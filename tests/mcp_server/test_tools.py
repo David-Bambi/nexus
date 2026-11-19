@@ -5,8 +5,8 @@ import pytest
 
 from src.mcp_server import tools
 from src.models.event import Event
-from src.models.task import Task
-from src.services import events, projects, tasks, versions
+from src.models.task import Task, TaskKind
+from src.services import events, projects, tasks
 
 
 def call(session, name, **arguments):
@@ -30,14 +30,16 @@ def refused(session, name, **arguments):
 
 @pytest.fixture
 def world(session):
-    """A project with a version (two criteria), a planned task, a refined task and an inbox task."""
+    """A project with a subproject, a feature holding a refined task, a refined task and an inbox task."""
     projects.create(session, "nx", "Nexus", "The manager")
-    version = versions.create(session, "nx", "1.0", "First", ["Ships", "Documented"], goal="Ship it")
-    planned = tasks.create_in_version(session, version.id, "Planned task", size="S")
+    sub = projects.create(session, "v2", "Nexus 2", parent_key="nx")
+    feature = tasks.create(session, "Tree", "nx", kind=TaskKind.FEATURE)
+    planned = tasks.create(session, "Planned task", parent_ref=feature.ref, size="S")
+    tasks.clarify(session, planned.id, "Planned task", None, None, None, "S", parent_ref=feature.ref)
     refined = tasks.capture(session, "Refined task")
     tasks.clarify(session, refined.id, "Refined task", None, "nx", None, None)
     inbox = tasks.capture(session, "Inbox task")
-    return version, planned, refined, inbox
+    return sub, planned, refined, inbox
 
 
 def _id_keys(data):
@@ -65,10 +67,10 @@ def test_every_tool_is_described_with_a_strict_schema_and_annotations():
     Given the tool registry
     When listing the tools
     Then each has a description, an object schema with no extra properties, and hints matching its kind
-    (only delete_criterion removes data)
+    (none removes data)
     """
     listed = tools.list_tools()
-    assert len(listed) == len(tools.TOOLS) == 25
+    assert len(listed) == len(tools.TOOLS) == 15
     for item in listed:
         assert item["description"]
         assert item["inputSchema"]["type"] == "object" and item["inputSchema"]["additionalProperties"] is False
@@ -76,7 +78,7 @@ def test_every_tool_is_described_with_a_strict_schema_and_annotations():
         hints = item["annotations"]
         assert hints["readOnlyHint"] == tools.TOOLS[item["name"]].read_only
         assert ("destructiveHint" in hints) == (not hints["readOnlyHint"])
-        assert hints.get("destructiveHint", False) == (item["name"] == "delete_criterion")
+        assert hints.get("destructiveHint", False) is False
 
 
 def test_read_only_tools_are_exactly_the_read_ones():
@@ -86,13 +88,11 @@ def test_read_only_tools_are_exactly_the_read_ones():
     Then they are the listing and showing tools, and no writer among them
     """
     assert {n for n, t in tools.TOOLS.items() if t.read_only} == {
-        "list_projects", "list_versions", "list_tasks", "get_project", "get_version", "get_task",
-        "inbox", "search", "dashboard"}
+        "list_projects", "list_tasks", "get_project", "get_task", "inbox", "search", "dashboard"}
 
 
-READ_CALLS = [("list_projects", {}), ("list_versions", {}), ("list_versions", {"project": "nx"}),
-              ("list_tasks", {}), ("get_project", {"project": "nx"}), ("get_version", {"version": "1.0", "project": "nx"}),
-              ("inbox", {}), ("search", {"term": "task"}), ("dashboard", {})]
+READ_CALLS = [("list_projects", {}), ("list_tasks", {}), ("list_tasks", {"project": "nx"}),
+              ("get_project", {"project": "nx"}), ("inbox", {}), ("search", {"term": "task"}), ("dashboard", {})]
 
 
 @pytest.mark.parametrize("name,arguments", READ_CALLS)
@@ -176,39 +176,38 @@ def test_domain_errors_become_error_results(session, world):
     """
     assert "doesn't exist" in refused(session, "get_task", ref="t-zzz")
     assert "doesn't exist" in refused(session, "get_project", project="ghost")
-    assert "'project' is required" in refused(session, "get_version", version="1.0")
 
 
 # Reading -------------------------------------------------------------------------------------------
 
 def test_list_and_show_tools_return_refs_and_no_integer_ids(session, world):
     """
-    Given a project, a version and tasks
+    Given a project, a subproject, a feature and tasks
     When reading them through the tools
-    Then results identify things by key or ref, and never expose a raw id
+    Then results identify things by key or ref, with kind and parent, and never expose a raw id
     """
-    version, planned, _, _ = world
+    sub, planned, _, _ = world
     listed = ok(session, "list_tasks")
-    assert listed["count"] == 3 and listed["truncated"] is False
-    shown = ok(session, "get_version", version=version.ref)
-    assert shown["ref"] == version.ref and shown["project"] == "nx"
-    assert [t["ref"] for t in shown["tasks"]] == [planned.ref]
-    assert shown["definition_of_done"] == [{"index": 1, "description": "Ships", "done": False},
-                                           {"index": 2, "description": "Documented", "done": False}]
-    assert not _id_keys(ok(session, "get_project", project="nx"))
+    assert listed["count"] == 4 and listed["truncated"] is False
+    by_ref = {t["ref"]: t for t in listed["tasks"]}
+    assert by_ref[planned.ref]["kind"] == "TASK" and by_ref[planned.ref]["parent"] == planned.parent.ref
+    assert by_ref[planned.parent.ref]["kind"] == "FEATURE"
+    shown = ok(session, "get_project", project="nx")
+    assert shown["subprojects"] == [{"key": "v2", "ref": sub.ref, "parent": "nx", "name": "Nexus 2",
+                                     "description": None, "status": "ACTIVE"}]
     assert not _id_keys(shown) and not _id_keys(listed)
 
 
 def test_list_tasks_filters(session, world):
     """
-    Given tasks in several states
-    When filtering by state, project, version and limit
-    Then only matching tasks are returned
+    Given items in several states and projects
+    When filtering by state, project and limit
+    Then only matching items are returned
     """
-    version, planned, refined, inbox = world
-    assert [t["ref"] for t in ok(session, "list_tasks", state="INBOX")["tasks"]] == [inbox.ref]
-    assert [t["ref"] for t in ok(session, "list_tasks", version="1.0", project="nx")["tasks"]] == [planned.ref]
-    assert [t["ref"] for t in ok(session, "list_tasks", version=version.ref)["tasks"]] == [planned.ref]
+    _, planned, refined, inbox = world
+    assert [t["ref"] for t in ok(session, "list_tasks", state="INBOX")["tasks"]] == [planned.parent.ref, inbox.ref]
+    assert {t["ref"] for t in ok(session, "list_tasks", project="nx")["tasks"]} == {
+        planned.parent.ref, planned.ref, refined.ref}
     limited = ok(session, "list_tasks", limit=1)
     assert [t["ref"] for t in limited["tasks"]] == [inbox.ref] and limited["truncated"] is True
 
@@ -222,7 +221,7 @@ def test_get_task_includes_its_history(session, world):
     _, planned, _, _ = world
     tasks.start(session, planned.id)
     task = ok(session, "get_task", ref=planned.ref)
-    assert task["state"] == "DOING" and [e["action"] for e in task["history"]] == ["created", "started"]
+    assert task["state"] == "DOING" and [e["action"] for e in task["history"]] == ["created", "clarified", "started"]
 
 
 def test_search_inbox_and_dashboard(session, world):
@@ -233,9 +232,9 @@ def test_search_inbox_and_dashboard(session, world):
     """
     _, planned, _, inbox = world
     assert [t["ref"] for t in ok(session, "search", term="INBOX")["tasks"]] == [inbox.ref]
-    assert [t["ref"] for t in ok(session, "inbox")["tasks"]] == [inbox.ref]
+    assert [t["ref"] for t in ok(session, "inbox")["tasks"]] == [planned.parent.ref, inbox.ref]
     dashboard = ok(session, "dashboard")
-    assert dashboard["inbox_count"] == 1 and dashboard["refine_count"] == 1 and dashboard["in_progress"] == []
+    assert dashboard["inbox_count"] == 2 and dashboard["refine_count"] == 2 and "in_progress" not in dashboard
 
 
 # Writing -------------------------------------------------------------------------------------------
@@ -251,18 +250,17 @@ def test_capture_task_records_the_mcp_actor(session):
     assert _last_event(session).actor == events.ACTOR_MCP
 
 
-def test_add_task_to_project_or_version(session, world):
+def test_add_task_to_a_project(session, world):
     """
-    Given a project and a version
-    When adding tasks with and without a version
-    Then one lands in the inbox and one is planned in the version
+    Given a project
+    When adding a task to it, then to a missing one
+    Then the first lands in the project's inbox and the second is refused
     """
     inbox = ok(session, "add_task", project="nx", title="A", context="@ordi", size="M", body="Detail")
-    assert (inbox["state"], inbox["project"], inbox["version"]) == ("INBOX", "nx", None)
+    assert (inbox["state"], inbox["project"], inbox["parent"]) == ("INBOX", "nx", None)
     assert (inbox["context"], inbox["size"], inbox["body"]) == ("@ordi", "M", "Detail")
-    planned = ok(session, "add_task", project="nx", version="1.0", title="B")
-    assert (planned["state"], planned["version"]) == ("PLANNED", "1.0")
     assert "doesn't exist" in refused(session, "add_task", project="ghost", title="C")
+    assert "unknown argument(s): version" in refused(session, "add_task", project="nx", title="B", version="1.0")
 
 
 def test_import_data_dry_run_then_real(session):
@@ -317,103 +315,34 @@ def test_update_task_changes_and_clears_fields(session, world):
 
 def test_task_lifecycle_through_tools(session, world):
     """
-    Given a refined task and a version
-    When planning, starting, blocking, unblocking and completing it through the tools
+    Given a refined task
+    When starting, blocking, unblocking and completing it through the tools
     Then it follows the state machine, each step logged by mcp
     """
-    version, _, refined, _ = world
+    _, _, refined, _ = world
     states = [ok(session, name, **args)["state"] for name, args in [
-        ("plan_task", {"ref": refined.ref, "version": version.ref}),
         ("start_task", {"ref": refined.ref}),
         ("block_task", {"ref": refined.ref, "reason": "waiting on X"}),
         ("unblock_task", {"ref": refined.ref}),
         ("complete_task", {"ref": refined.ref}),
     ]]
-    assert states == ["PLANNED", "DOING", "WAITING", "DOING", "DONE"]
+    assert states == ["DOING", "WAITING", "DOING", "DONE"]
     assert {e.actor for e in events.history(session, "task", refined.id)[2:]} == {"mcp"}
 
 
-def test_unplan_task_and_transition_errors(session, world):
+def test_transition_errors(session, world):
     """
-    Given a planned task and an inbox task
-    When unplanning the first and starting the second
-    Then the first goes back to refined and the second is refused with a message
+    Given an inbox task, a refined one, and a feature whose child is open
+    When starting the inbox task, blocking without a reason, and completing the feature
+    Then each is refused with a message
     """
     _, planned, _, inbox = world
-    assert ok(session, "unplan_task", ref=planned.ref)["state"] == "REFINED"
-    assert "isn't planned" in refused(session, "start_task", ref=inbox.ref)
+    assert "isn't refined" in refused(session, "start_task", ref=inbox.ref)
     assert "'reason' is required" in refused(session, "block_task", ref=planned.ref)
-
-
-def test_set_criterion_done_by_index(session, world):
-    """
-    Given a version with two criteria
-    When checking the second one, then using an out-of-range index
-    Then it is checked, and the bad index is refused
-    """
-    version, _, _, _ = world
-    shown = ok(session, "set_criterion_done", version=version.ref, index=2, done=True)
-    assert [c["done"] for c in shown["definition_of_done"]] == [False, True]
-    assert "between 1 and 2" in refused(session, "set_criterion_done", version=version.ref, index=3, done=True)
-    assert _last_event(session).actor == events.ACTOR_MCP
-
-
-def test_add_update_and_delete_criteria_by_index(session, world):
-    """
-    Given a version with two criteria
-    When adding a third, rewording the first, then deleting the second
-    Then the checklist follows each change, by the mcp actor
-    """
-    version, _, _, _ = world
-    shown = ok(session, "add_criterion", version=version.ref, description="Tested")
-    assert [c["description"] for c in shown["definition_of_done"]] == ["Ships", "Documented", "Tested"]
-    shown = ok(session, "update_criterion", version="1.0", project="nx", index=1, description="Shipped")
-    assert [c["description"] for c in shown["definition_of_done"]] == ["Shipped", "Documented", "Tested"]
-    shown = ok(session, "delete_criterion", version=version.ref, index=2)
-    assert [c["description"] for c in shown["definition_of_done"]] == ["Shipped", "Tested"]
-    assert _last_event(session).actor == events.ACTOR_MCP
-
-
-def test_criterion_edits_are_refused_by_the_rules(session, world):
-    """
-    Given a version with two criteria, and a released one
-    When using an out-of-range index, a blank text, deleting the last criterion or editing the released version
-    Then each is refused and the checklist is unchanged
-    """
-    version, _, _, _ = world
-    assert "between 1 and 2" in refused(session, "update_criterion", version=version.ref, index=3, description="X")
-    assert "between 1 and 2" in refused(session, "delete_criterion", version=version.ref, index=0)
-    assert "blank" in refused(session, "add_criterion", version=version.ref, description="  ")
-    assert "blank" in refused(session, "update_criterion", version=version.ref, index=1, description="")
-    ok(session, "delete_criterion", version=version.ref, index=1)
-    assert "at least one" in refused(session, "delete_criterion", version=version.ref, index=1)
-    released = versions.create(session, "nx", "2.0", "Done", ["Ok"])
-    versions.start(session, released.id)
-    versions.set_criterion_done(session, released.definition_of_done[0].id, True)
-    versions.release(session, released.id)
-    assert refused(session, "add_criterion", version=released.ref, description="Late")
-    assert refused(session, "update_criterion", version=released.ref, index=1, description="Late")
-    assert [c.description for c in released.definition_of_done] == ["Ok"]
-    assert [c.description for c in version.definition_of_done] == ["Documented"]
-
-
-def test_version_goes_from_planned_to_released_through_tools(session, world):
-    """
-    Given a planned version with a planned task and two unchecked criteria
-    When starting it, then releasing it before and after finishing its work
-    Then it starts, the early release is refused, and the final one releases it
-    """
-    version, planned, _, _ = world
-    assert ok(session, "start_version", version="1.0", project="nx")["status"] == "IN_PROGRESS"
-    assert "already started" in refused(session, "start_version", version=version.ref)
-    assert "unfinished tasks" in refused(session, "release_version", version=version.ref)
-    tasks.start(session, planned.id)
-    tasks.complete(session, planned.id)
-    assert "unchecked" in refused(session, "release_version", version=version.ref)
-    for index in (1, 2):
-        ok(session, "set_criterion_done", version=version.ref, index=index, done=True)
-    assert ok(session, "release_version", version=version.ref)["status"] == "RELEASED"
-    assert _last_event(session).actor == events.ACTOR_MCP
+    feature = planned.parent
+    tasks.clarify(session, feature.id, feature.title, None, "nx", None, None)
+    tasks.start(session, feature.id)
+    assert "open children" in refused(session, "complete_task", ref=feature.ref)
 
 
 def test_a_refused_write_leaves_no_partial_change(session, world):
@@ -457,39 +386,13 @@ def test_update_task_refuses_a_blank_title_and_bad_size(session, world):
     assert tasks.get_by_ref(session, planned.ref).title == "Planned task"
 
 
-def test_versions_can_be_named_by_number_in_write_tools(session, world):
-    """
-    Given a version
-    When planning a task and adding one to it by number plus project
-    Then both land in that version
-    """
-    version, _, refined, _ = world
-    assert ok(session, "plan_task", ref=refined.ref, version="1.0", project="nx")["version_ref"] == version.ref
-    assert ok(session, "add_task", project="nx", version="1.0", title="Again")["version_ref"] == version.ref
-    assert "'project' is required" in refused(session, "plan_task", ref=refined.ref, version="1.0")
-
-
-def test_criterion_can_be_unchecked(session, world):
-    """
-    Given a checked criterion
-    When unchecking it through the tool
-    Then it is unchecked
-    """
-    version, _, _, _ = world
-    ok(session, "set_criterion_done", version=version.ref, index=1, done=True)
-    shown = ok(session, "set_criterion_done", version=version.ref, index=1, done=False)
-    assert shown["definition_of_done"][0]["done"] is False
-
-
 def test_list_filters_refuse_unknown_references(session, world):
     """
-    Given a project or version that doesn't exist
-    When filtering tasks or versions by it
+    Given a project that doesn't exist
+    When filtering tasks by it
     Then a readable error is returned
     """
     assert "doesn't exist" in refused(session, "list_tasks", project="ghost")
-    assert "doesn't exist" in refused(session, "list_tasks", version="v-zzz")
-    assert "doesn't exist" in refused(session, "list_versions", project="ghost")
 
 
 def test_search_reports_truncation_and_archived_projects_are_opt_in(session, world):
@@ -501,25 +404,22 @@ def test_search_reports_truncation_and_archived_projects_are_opt_in(session, wor
     assert ok(session, "search", term="task", limit=2)["truncated"] is True
     projects.create(session, "old", "Old", "")
     projects.archive(session, "old")
-    assert [p["key"] for p in ok(session, "list_projects")["projects"]] == ["nx"]
-    assert {p["key"] for p in ok(session, "list_projects", include_archived=True)["projects"]} == {"nx", "old"}
+    assert [p["key"] for p in ok(session, "list_projects")["projects"]] == ["nx", "v2"]
+    assert {p["key"] for p in ok(session, "list_projects", include_archived=True)["projects"]} == {"nx", "v2", "old"}
 
 
-def test_dashboard_lists_in_progress_versions_and_working_tasks(session, world):
+def test_dashboard_lists_working_tasks(session, world):
     """
-    Given a started version with a doing task and a waiting one
+    Given a doing task and a waiting one
     When reading the dashboard
-    Then progress, doing and waiting are reported
+    Then doing and waiting are reported
     """
-    version, planned, _, _ = world
-    versions.start(session, version.id)
-    other = tasks.create_in_version(session, version.id, "Other")
+    _, planned, refined, _ = world
     tasks.start(session, planned.id)
-    tasks.start(session, other.id)
-    tasks.block(session, other.id, "why")
+    tasks.start(session, refined.id)
+    tasks.block(session, refined.id, "why")
     board = ok(session, "dashboard")
-    assert [(v["ref"], v["tasks_total"], v["criteria_total"]) for v in board["in_progress"]] == [(version.ref, 2, 2)]
-    assert [t["ref"] for t in board["doing"]] == [planned.ref] and [t["ref"] for t in board["waiting"]] == [other.ref]
+    assert [t["ref"] for t in board["doing"]] == [planned.ref] and [t["ref"] for t in board["waiting"]] == [refined.ref]
 
 
 WRITE_CALLS = [
@@ -527,18 +427,10 @@ WRITE_CALLS = [
     ("add_task", lambda w: {"project": "nx", "title": "T"}),
     ("import_data", lambda w: {"text": "T"}),
     ("update_task", lambda w: {"ref": w.planned.ref, "title": "New"}),
-    ("plan_task", lambda w: {"ref": w.refined.ref, "version": w.version.ref}),
-    ("unplan_task", lambda w: {"ref": w.planned.ref}),
     ("start_task", lambda w: {"ref": w.planned.ref}),
     ("complete_task", lambda w: {"ref": w.doing.ref}),
     ("block_task", lambda w: {"ref": w.doing.ref, "reason": "why"}),
     ("unblock_task", lambda w: {"ref": w.waiting.ref}),
-    ("set_criterion_done", lambda w: {"version": w.version.ref, "index": 1, "done": True}),
-    ("add_criterion", lambda w: {"version": w.version.ref, "description": "New"}),
-    ("update_criterion", lambda w: {"version": w.version.ref, "index": 1, "description": "New"}),
-    ("delete_criterion", lambda w: {"version": w.version.ref, "index": 1}),
-    ("start_version", lambda w: {"version": w.version.ref}),
-    ("release_version", lambda w: {"version": w.ready.ref}),
 ]
 
 
@@ -549,17 +441,15 @@ def test_every_write_tool_logs_the_mcp_actor(session, world, name, arguments):
     When it runs
     Then every event it logged is attributed to mcp
     """
-    version, planned, refined, _ = world
-    doing = tasks.create_in_version(session, version.id, "Doing")
+    _, planned, refined, _ = world
+    doing = tasks.create(session, "Doing", "nx")
+    tasks.clarify(session, doing.id, "Doing", None, "nx", None, None)
     tasks.start(session, doing.id)
-    waiting = tasks.create_in_version(session, version.id, "Waiting")
+    waiting = tasks.create(session, "Waiting", "nx")
+    tasks.clarify(session, waiting.id, "Waiting", None, "nx", None, None)
     tasks.start(session, waiting.id)
     tasks.block(session, waiting.id, "why")
-    ready = versions.create(session, "nx", "2.0", "Ready", ["Done"])
-    versions.start(session, ready.id)
-    versions.set_criterion_done(session, ready.definition_of_done[0].id, True)
-    known = SimpleNamespace(version=version, planned=planned, refined=refined, doing=doing, waiting=waiting,
-                            ready=ready)
+    known = SimpleNamespace(planned=planned, refined=refined, doing=doing, waiting=waiting)
     before = session.query(Event).count()
     ok(session, name, **arguments(known))
     fresh = session.query(Event).order_by(Event.id).offset(before).all()

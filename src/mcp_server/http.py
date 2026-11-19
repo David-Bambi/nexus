@@ -25,9 +25,9 @@ MAX_BODY = 1_000_000
 
 # What the assistant is told about the server when it connects.
 INSTRUCTIONS = (
-    "Nexus is a GTD-style project manager: projects contain versions, versions contain tasks. "
-    "Identify projects by key, tasks by ref (t-…) and versions by ref (v-…) or by number within a project. "
-    "Tasks move inbox -> refined -> planned -> doing -> waiting/done. "
+    "Nexus is a GTD-style project manager: a project holds subprojects (one level), features and tasks; "
+    "a feature holds features and tasks. Identify projects by key, subprojects by ref (s-…), features by "
+    "ref (f-…) and tasks by ref (t-…). Items move inbox -> refined -> doing -> waiting/done. "
     "Use dry_run with import_data before importing for real."
 )
 

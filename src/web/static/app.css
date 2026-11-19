@@ -358,7 +358,7 @@ form {
     border-top: 1px solid var(--color-border);
 }
 
-/* A list inside a row (e.g. a project's versions): full width, lighter frame. */
+/* A list inside a row (e.g. a project's subprojects): full width, lighter frame. */
 .list-nested {
     flex-basis: 100%;
     margin-block: 0;
@@ -374,7 +374,7 @@ form {
     font-style: italic;
 }
 
-/* Progress figures of a version; pushed to the right end of its row. */
+/* Progress figures; pushed to the right end of their row. */
 .progress {
     display: inline-flex;
     flex-wrap: wrap;
@@ -547,7 +547,7 @@ progress {
     color: var(--color-warning);
 }
 
-/* Version page -------------------------------------------------------------------------------- */
+/* Detail pages -------------------------------------------------------------------------------- */
 
 .meta {
     display: flex;

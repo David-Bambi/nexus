@@ -4,8 +4,9 @@ import pytest
 
 from src.cli import commands, format as fmt
 from src.cli.main import EXIT_ERROR, EXIT_OK, EXIT_USAGE, main
-from src.services.resolve import resolve, resolve_version
-from src.services import projects, tasks, versions
+from src.models.task import TaskKind
+from src.services.resolve import resolve
+from src.services import projects, tasks
 from src.services.errors import NotFoundError, ValidationError
 
 
@@ -21,26 +22,27 @@ def run(session):
 
 @pytest.fixture
 def data(session):
-    """A project with a version and a task in it, and a loose task."""
+    """A project with a subproject, a feature and a task under it, and a loose task."""
     projects.create(session, "nx", "Nexus", "")
-    version = versions.create(session, "nx", "0.1.0", "First", ["Ships"])
-    planned = tasks.create_in_version(session, version.id, "Planned")
+    sub = projects.create(session, "v2", "Nexus 2", parent_key="nx")
+    feature = tasks.create(session, "Tree", "nx", kind=TaskKind.FEATURE)
+    planned = tasks.create(session, "Planned", parent_ref=feature.ref)
     loose = tasks.capture(session, "Loose")
-    return version, planned, loose
+    return sub, planned, loose
 
 
 # Resolution ----------------------------------------------------------------------------------------
 
-def test_resolve_project_key_task_ref_and_version_ref(session, data):
+def test_resolve_project_key_subproject_ref_and_task_ref(session, data):
     """
-    Given a project, a version and tasks
+    Given a project, a subproject and tasks
     When resolving their key and refs
     Then each resolves to its own kind
     """
-    version, planned, _ = data
+    sub, planned, _ = data
     assert resolve(session, "nx").kind == "project"
     assert resolve(session, planned.ref).entity is planned
-    assert resolve(session, version.ref.upper()).entity is version
+    assert resolve(session, sub.ref.upper()).entity is sub
 
 
 def test_resolve_unknown_raises(session):
@@ -49,37 +51,14 @@ def test_resolve_unknown_raises(session):
     When resolving unknown project key and refs
     Then a not-found error is raised each time
     """
-    for reference in ("nope", "t-zzz", "v-zzz"):
+    for reference in ("nope", "t-zzz", "f-zzz", "s-zzz"):
         with pytest.raises(NotFoundError):
             resolve(session, reference)
 
 
-def test_resolve_version_by_number_or_ref(session, data):
-    """
-    Given a version in a project
-    When resolved by number and by ref
-    Then both give the version
-    """
-    version, _, _ = data
-    assert resolve_version(session, "nx", "0.1.0") is version
-    assert resolve_version(session, "nx", version.ref) is version
-
-
-def test_resolve_version_of_another_project_raises(session, data):
-    """
-    Given a version ref and a second project
-    When resolving that ref within the second project
-    Then a not-found error is raised
-    """
-    version, _, _ = data
-    projects.create(session, "other", "Other", "")
-    with pytest.raises(NotFoundError):
-        resolve_version(session, "other", version.ref)
-
-
 # Reserved keys -------------------------------------------------------------------------------------
 
-@pytest.mark.parametrize("key", ["tasks", "Add", "import", "t-4k2", "v-abc"])
+@pytest.mark.parametrize("key", ["tasks", "Add", "import", "t-4k2", "f-abc", "s-abc"])
 def test_reserved_project_keys_are_refused(session, key):
     """
     Given a word the CLI reads as a command, or a ref-shaped string

@@ -48,7 +48,7 @@ def inbox_delete(task_id):
 
 @bp.route("/refine")
 def refine():
-    """List refined, unplanned tasks, filterable by context and project."""
+    """List refined items, ready to start, filterable by context and project."""
     session = _session()
     context = request.args.get("context") or None
     project_key = request.args.get("project_key") or None

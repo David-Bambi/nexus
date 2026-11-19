@@ -17,23 +17,27 @@ def is_reserved_key(key : str) -> bool:
     return key.strip().lower() in RESERVED_KEYS or refs.is_ref(key)
 
 def create(session : Session, key : str, name : str, description : str | None = None,
-           actor : str = events.ACTOR_WEB) -> Project:
-    """Create a project.
+           parent_key : str | None = None, actor : str = events.ACTOR_WEB) -> Project:
+    """Create a root project, or a subproject when a parent is given.
 
     Args:
         session: Database session to use.
         key: Unique slug identifying the project (used in URLs).
         name: Human-readable project name.
         description: Optional free-text description.
+        parent_key: Key of the root project to create a subproject under;
+            None for a root project.
         actor: Who made the change, recorded in the event log.
 
     Returns:
-        The newly created Project.
+        The newly created Project. A subproject gets an "s-…" ref.
 
     Raises:
         ConflictError: If a project with this key already exists.
+        NotFoundError: If the parent project doesn't exist.
         ValidationError: If the key is a reserved word or looks like a
-            task or version ref.
+            subproject, feature or task ref, or if the parent is itself a
+            subproject (only one level of subprojects).
     """
     if is_reserved_key(key):
         raise ValidationError(f"project key '{key}' is reserved.")
@@ -41,13 +45,25 @@ def create(session : Session, key : str, name : str, description : str | None = 
     if session.query(Project).filter_by(key=key).first() is not None:
         raise ConflictError(f"project key '{key}' already exists")
 
+    parent = None
+    if parent_key is not None:
+        parent = get(session, parent_key)
+        if parent.parent_id is not None:
+            raise ValidationError(
+                f"'{parent_key}' is a subproject; a subproject can't hold another one.")
+
     project = Project(key=key,
                       name=name,
-                      description=description)
+                      description=description,
+                      parent_id=parent.id if parent else None,
+                      ref=refs.generate(session, refs.SUBPROJECT) if parent else None)
     session.add(project)
     session.flush()
-    events.log(session, actor, "project", project.id, "created",
-               {"key": key, "name": name})
+
+    payload = {"key": key, "name": name}
+    if parent is not None:
+        payload.update(ref=project.ref, parent=parent.key)
+    events.log(session, actor, "project", project.id, "created", payload)
     session.commit()
     return project
 
@@ -69,6 +85,24 @@ def get(session : Session, key : str) -> Project:
         raise NotFoundError(f"Project '{key}' doesn't exist.")
     else:
         return project
+
+def get_by_ref(session : Session, ref : str) -> Project:
+    """Look up a subproject by its short ref.
+
+    Args:
+        session: Database session to use.
+        ref: Ref of the subproject (e.g. "s-4k2"), case-insensitive.
+
+    Returns:
+        The matching subproject.
+
+    Raises:
+        NotFoundError: If no subproject has this ref.
+    """
+    project = session.query(Project).filter_by(ref=refs.normalize(ref)).first()
+    if project is None:
+        raise NotFoundError(f"Subproject '{ref}' doesn't exist.")
+    return project
 
 def list(session : Session, include_archived : bool = False) -> list:
     """List projects.
@@ -108,7 +142,7 @@ def archive(session : Session, key : str, actor : str = events.ACTOR_WEB) -> Pro
     return project
 
 def delete(session : Session, key : str, actor : str = events.ACTOR_WEB) -> None:
-    """Delete a project.
+    """Delete an empty project or subproject.
 
     Args:
         session: Database session to use.
@@ -117,10 +151,17 @@ def delete(session : Session, key : str, actor : str = events.ACTOR_WEB) -> None
 
     Raises:
         NotFoundError: If no project has this key.
+        ConflictError: If the project still holds subprojects, features or
+            tasks: they must be deleted or moved first.
     """
     project = get(session, key)
-    events.log(session, actor, "project", project.id, "deleted",
-               {"key": key, "name": project.name})
+    if project.subprojects or project.tasks:
+        raise ConflictError(
+            f"project '{key}' isn't empty: delete or move its subprojects, features and tasks first.")
+
+    payload = {"key": key, "name": project.name}
+    if project.ref is not None:
+        payload["ref"] = project.ref
+    events.log(session, actor, "project", project.id, "deleted", payload)
     session.delete(project)
     session.commit()
-

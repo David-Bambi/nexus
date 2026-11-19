@@ -11,17 +11,6 @@
     {{ ui.stat(dashboard.refine_count, "To refine", url_for('pages.refine')) }}
 </div>
 
-<h2>Versions in progress</h2>
-{% if dashboard.versions %}
-<div class="cards">
-    {% for progress in dashboard.versions %}
-    {{ ui.version_card(progress) }}
-    {% endfor %}
-</div>
-{% else %}
-<p class="empty">No version in progress.</p>
-{% endif %}
-
 <h2>Doing</h2>
 <ul class="list">
     {% for task in dashboard.doing %}

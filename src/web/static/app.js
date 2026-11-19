@@ -28,35 +28,3 @@ document.addEventListener("change", function (event) {
         event.target.form.submit();
     }
 });
-
-// Definition-of-done rows of the version creation form: add, remove (keeping one), Enter adds a row.
-document.addEventListener("DOMContentLoaded", function () {
-    var rows = document.getElementById("dod-rows");
-    if (!rows) {
-        return;
-    }
-    var template = rows.firstElementChild.cloneNode(true);
-
-    // Append an empty criterion row and focus it.
-    function addRow() {
-        var row = template.cloneNode(true);
-        row.querySelector("input").value = "";
-        rows.appendChild(row);
-        row.querySelector("input").focus();
-    }
-
-    document.getElementById("dod-add").addEventListener("click", addRow);
-
-    rows.addEventListener("click", function (event) {
-        if (event.target.classList.contains("dod-remove") && rows.children.length > 1) {
-            event.target.closest(".dod-row").remove();
-        }
-    });
-
-    rows.addEventListener("keydown", function (event) {
-        if (event.key === "Enter" && event.target.name === "dod") {
-            event.preventDefault();
-            addRow();
-        }
-    });
-});

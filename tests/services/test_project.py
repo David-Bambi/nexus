@@ -2,7 +2,8 @@ import pytest
 
 from src.services import events, projects
 from src.models.project import ProjectStatus
-from src.services.errors import ConflictError, NotFoundError
+from src.models.task import Task
+from src.services.errors import ConflictError, NotFoundError, ValidationError
 
 # Create ------------------------------------------------------------------------------------------
 
@@ -130,6 +131,93 @@ def test_delete_project_not_found(session):
     """
     with pytest.raises(NotFoundError):
         projects.delete(session, "nexus")
+
+
+def test_delete_refuses_a_project_with_a_subproject(session):
+    """A project holding a subproject can't be deleted
+    Given a project 'metrique' with a subproject 'bilan'
+    When deleting 'metrique'
+    Then a conflict error is raised and both projects remain
+    """
+    projects.create(session, "metrique", "Métriques")
+    projects.create(session, "bilan", "Bilan", parent_key="metrique")
+    with pytest.raises(ConflictError):
+        projects.delete(session, "metrique")
+    assert projects.get(session, "metrique") and projects.get(session, "bilan")
+
+def test_delete_refuses_a_project_with_items(session):
+    """A project holding a feature or task can't be deleted
+    Given a project 'nexus' holding a task
+    When deleting 'nexus'
+    Then a conflict error is raised and no event is logged for it
+    """
+    project = projects.create(session, "nexus", "Nexus")
+    session.add(Task(ref="t-aaa", title="Work", project_id=project.id))
+    session.commit()
+    with pytest.raises(ConflictError):
+        projects.delete(session, "nexus")
+    assert [e.action for e in events.history(session, "project", project.id)] == ["created"]
+
+def test_delete_an_empty_subproject(session):
+    """An empty subproject can be deleted, then its parent too
+    Given a project 'metrique' with an empty subproject 'bilan'
+    When deleting 'bilan', then 'metrique'
+    Then both are gone
+    """
+    projects.create(session, "metrique", "Métriques")
+    projects.create(session, "bilan", "Bilan", parent_key="metrique")
+    projects.delete(session, "bilan")
+    projects.delete(session, "metrique")
+    assert projects.list(session, include_archived=True) == []
+
+
+# Subprojects -------------------------------------------------------------------------------------
+
+def test_create_subproject_under_a_root_project(session):
+    """A subproject hangs under a root project and gets an s- ref
+    Given a root project 'metrique'
+    When creating 'bilan' with 'metrique' as parent
+    Then 'bilan' has 'metrique' as parent, an s- ref, and shows in its subprojects
+    """
+    root = projects.create(session, "metrique", "Métriques")
+    sub = projects.create(session, "bilan", "Bilan", parent_key="metrique")
+    assert sub.parent is root
+    assert sub.ref.startswith("s-")
+    assert root.subprojects == [sub]
+    assert root.ref is None
+
+def test_create_subproject_under_a_subproject_is_refused(session):
+    """Only one level of subprojects
+    Given a subproject 'bilan' under 'metrique'
+    When creating a subproject under 'bilan'
+    Then a validation error is raised and nothing is created
+    """
+    projects.create(session, "metrique", "Métriques")
+    projects.create(session, "bilan", "Bilan", parent_key="metrique")
+    with pytest.raises(ValidationError):
+        projects.create(session, "deep", "Deep", parent_key="bilan")
+    with pytest.raises(NotFoundError):
+        projects.get(session, "deep")
+
+def test_create_subproject_under_a_missing_parent(session):
+    """The parent must exist
+    Given no project 'ghost'
+    When creating a subproject under 'ghost'
+    Then a not-found error is raised
+    """
+    with pytest.raises(NotFoundError):
+        projects.create(session, "bilan", "Bilan", parent_key="ghost")
+
+def test_create_subproject_logs_its_ref_and_parent(session):
+    """The created event of a subproject names its ref and parent
+    Given a root project 'metrique'
+    When creating the subproject 'bilan'
+    Then its created event carries key, name, ref and parent key
+    """
+    projects.create(session, "metrique", "Métriques")
+    sub = projects.create(session, "bilan", "Bilan", parent_key="metrique")
+    assert _history(session, sub.id) == [
+        ("created", {"key": "bilan", "name": "Bilan", "ref": sub.ref, "parent": "metrique"})]
 
 
 # Events ------------------------------------------------------------------------------------------

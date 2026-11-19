@@ -6,7 +6,6 @@ from sqlalchemy.orm import Session
 
 from src.cli import commands
 from src.cli.errors import UsageError, UsageParser
-from src.services.resolve import resolve_version
 from src.models.task import Task
 from src.services import events, tasks
 from src.services.errors import ValidationError
@@ -16,7 +15,6 @@ def _task_parser() -> argparse.ArgumentParser:
     """Build the parser of `nexus add task`."""
     parser = UsageParser(prog="nexus add task", add_help=False)
     parser.add_argument("project")
-    parser.add_argument("version", nargs="?")
     parser.add_argument("-t", "--title")
     parser.add_argument("-b", "--body")
     parser.add_argument("-c", "--context")
@@ -26,8 +24,7 @@ def _task_parser() -> argparse.ArgumentParser:
 
 def _report(task : Task, out : TextIO) -> None:
     """Tell the user which task was created."""
-    where = "inbox" if task.version_id is None else "planned"
-    print(f"Created task {task.ref} ({where}): {task.title}", file=out)
+    print(f"Created task {task.ref} (inbox): {task.title}", file=out)
 
 
 def _require_title(title : str | None) -> str:
@@ -53,10 +50,7 @@ def _require_title(title : str | None) -> str:
 
 
 def add(session : Session, args : list[str], out : TextIO) -> None:
-    """`nexus add task <project> [<version>]`: create a task.
-
-    Without a version the task lands in the project's inbox; with one it is
-    planned into that version straight away.
+    """`nexus add task <project>`: create a task in a project's inbox.
 
     Args:
         session: Database session to use.
@@ -68,17 +62,12 @@ def add(session : Session, args : list[str], out : TextIO) -> None:
         DomainError: If a service refuses the task.
     """
     if not args or args[0] != "task":
-        raise UsageError("usage: nexus add task <project> [<version>] [--title T]")
+        raise UsageError("usage: nexus add task <project> [--title T]")
     options = _task_parser().parse_args(args[1:])
     title = _require_title(options.title)
 
-    if options.version is None:
-        task = tasks.create(session, title, project_key=options.project, body=options.body,
-                            context=options.context, size=options.size, actor=events.ACTOR_CLI)
-    else:
-        version = resolve_version(session, options.project, options.version)
-        task = tasks.create_in_version(session, version.id, title, context=options.context,
-                                       size=options.size, body=options.body, actor=events.ACTOR_CLI)
+    task = tasks.create(session, title, project_key=options.project, body=options.body,
+                        context=options.context, size=options.size, actor=events.ACTOR_CLI)
     _report(task, out)
 
 
