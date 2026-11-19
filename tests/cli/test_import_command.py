@@ -34,7 +34,7 @@ def test_import_file_creates_and_lists_refs(run, session, document):
     """
     code, out, _ = run("import", document)
     (task,) = tasks.list(session)
-    assert code == EXIT_OK and "Created 1 project(s), 1 task(s)" in out and task.ref in out
+    assert code == EXIT_OK and "Created 1 project(s), 1 feature(s) and task(s)" in out and task.ref in out
     assert events.history(session, "task", task.id)[0].actor == events.ACTOR_CLI
 
 

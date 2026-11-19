@@ -252,10 +252,12 @@ def add_task(session : Session, args : dict) -> dict:
 
 
 @tool("import_data",
-      "Import projects and tasks. Give either 'document' (JSON: {\"projects\": [{\"key\", \"name\", \"description\"}], "
-      "\"tasks\": [{\"title\", \"body\", \"context\", \"size\", \"project\"}]}) or 'text' (one task title per line, "
-      "into the inbox). Existing projects are reused, never overwritten; tasks are always created. All or nothing. "
-      "Use dry_run first to check.",
+      "Import projects, subprojects, features and tasks. Give either 'document' (JSON: {\"projects\": [{\"key\", "
+      "\"name\", \"description\", \"items\": [ITEM], \"subprojects\": [{\"key\", \"name\", \"items\": [ITEM]}]}], "
+      "\"tasks\": [{\"title\", \"body\", \"context\", \"size\", \"project\"}]}, where ITEM is {\"kind\": \"feature\" or "
+      "\"task\" (default), \"title\", \"body\", \"context\", \"size\", \"children\": [ITEM] (features only)}) or 'text' "
+      "(one task title per line, into the inbox). Existing projects are reused, never overwritten; items are always "
+      "created, refined in their tree; loose tasks land in the inbox. All or nothing. Use dry_run first to check.",
       {"document": _object("The import document."), "text": _string("Plain list, one task title per line."),
        "dry_run": _boolean("Validate and report without writing anything.")})
 def import_data(session : Session, args : dict) -> dict:

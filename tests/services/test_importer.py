@@ -2,7 +2,7 @@ import copy
 
 import pytest
 
-from src.models.task import TaskState
+from src.models.task import TaskKind, TaskState
 from src.services import events, importer, projects, tasks
 from src.services.errors import ValidationError
 
@@ -165,3 +165,99 @@ def test_values_are_stripped(session):
     """
     _apply(session, {"projects": [{"key": " nx ", "name": " Nexus "}], "tasks": [{"title": " t ", "project": " nx "}]})
     assert projects.get(session, "nx").name == "Nexus" and _titles(session) == ["t"]
+
+
+# Tree --------------------------------------------------------------------------------------------
+
+TREE = {"projects": [{
+    "key": "metrique", "name": "Métriques",
+    "items": [{"title": "Top task", "size": "S"}],
+    "subprojects": [{
+        "key": "bilan", "name": "Bilan de version",
+        "items": [{"kind": "feature", "title": "Collect", "children": [
+            {"title": "Read Nexus", "context": "@ordi"},
+            {"kind": "feature", "title": "Sessions", "children": [{"title": "Parse JSONL"}]},
+        ]}],
+    }],
+}]}
+
+
+def test_import_tree_builds_subprojects_features_and_tasks(session):
+    """
+    Given a document with a project, a subproject and nested features
+    When importing it
+    Then the whole tree exists, each item refined, in the right place
+    """
+    result = _apply(session, TREE)
+    assert (result.projects_created, result.tasks_created) == (2, 5)
+    bilan = projects.get(session, "bilan")
+    assert bilan.parent.key == "metrique" and bilan.ref.startswith("s-")
+    by_title = {t.title: t for t in tasks.list(session)}
+    assert by_title["Top task"].project.key == "metrique" and by_title["Top task"].parent is None
+    collect, sessions = by_title["Collect"], by_title["Sessions"]
+    assert collect.kind is TaskKind.FEATURE and collect.project is bilan and collect.parent is None
+    assert by_title["Read Nexus"].parent is collect and by_title["Read Nexus"].context == "@ordi"
+    assert sessions.parent is collect and by_title["Parse JSONL"].parent is sessions
+    assert by_title["Parse JSONL"].project is bilan
+    assert {t.state for t in by_title.values()} == {TaskState.REFINED}
+    assert [kind for kind, _, _ in result.created].count("feature") == 2
+
+
+def test_import_tree_into_existing_projects(session):
+    """
+    Given the project and subproject already exist
+    When importing the tree
+    Then both are reused and only the items are created
+    """
+    projects.create(session, "metrique", "Original")
+    projects.create(session, "bilan", "Original sub", parent_key="metrique")
+    result = _apply(session, TREE)
+    assert (result.projects_created, result.projects_reused, result.tasks_created) == (0, 2, 5)
+    assert projects.get(session, "bilan").name == "Original sub"
+
+
+def test_import_tree_dry_run_writes_nothing(session):
+    """
+    Given the tree document
+    When importing with dry_run
+    Then counts are reported and nothing is stored
+    """
+    result = _apply(session, TREE, dry_run=True)
+    assert result.tasks_created == 5 and tasks.list(session) == [] and projects.list(session) == []
+
+
+def test_invalid_tree_reports_every_problem(session):
+    """
+    Given a tree with misplaced children, bad kinds and nested subprojects
+    When importing it
+    Then each problem is reported and nothing is stored
+    """
+    projects.create(session, "taken", "Taken")
+    data = {"projects": [{
+        "key": "p", "name": "P",
+        "items": [{"title": "Leaf", "children": [{"title": "x"}]},
+                  {"kind": "epic", "title": "Odd"},
+                  {"kind": "feature", "title": "F", "children": [{"title": ""}]}],
+        "subprojects": [{"key": "s", "name": "S", "subprojects": []},
+                        {"key": "taken"}],
+    }]}
+    with pytest.raises(importer.ImportInvalid) as raised:
+        _apply(session, data)
+    text = "\n".join(raised.value.errors)
+    for expected in ("only a feature can have 'children'", "'kind' must be one of",
+                     "children[0]: 'title' is required", "unknown field 'subprojects'",
+                     "already exists as a root project"):
+        assert expected in text
+    assert tasks.list(session) == []
+
+
+def test_existing_subproject_cant_be_imported_as_a_root_project(session):
+    """
+    Given a subproject 'bilan' of 'metrique'
+    When importing 'bilan' at the top of the document
+    Then the document is refused
+    """
+    projects.create(session, "metrique", "Métriques")
+    projects.create(session, "bilan", "Bilan", parent_key="metrique")
+    errors = importer.validate(session, {"projects": [{"key": "bilan"}]})
+    assert errors == ["projects[0] ('bilan'): already exists as a subproject of 'metrique'"]

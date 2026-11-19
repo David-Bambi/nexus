@@ -3,16 +3,22 @@ from dataclasses import dataclass, field
 from sqlalchemy.orm import Session
 
 from src.models.project import Project
+from src.models.task import TaskKind
 from src.services import projects, tasks
 from src.services.errors import NotFoundError, ValidationError
 
 # Sizes a task may take.
 _SIZES = ("XS", "S", "M", "L")
 
+# Item kinds as written in a document, mapped to the model's.
+_KINDS = {"feature": TaskKind.FEATURE, "task": TaskKind.TASK}
+
 # Fields each kind of entry accepts; anything else is reported as an error.
 _DOCUMENT_FIELDS = {"projects", "tasks"}
-_PROJECT_FIELDS = {"key", "name", "description"}
+_SUBPROJECT_FIELDS = {"key", "name", "description", "items"}
+_PROJECT_FIELDS = _SUBPROJECT_FIELDS | {"subprojects"}
 _TASK_FIELDS = {"title", "body", "context", "size"}
+_ITEM_FIELDS = _TASK_FIELDS | {"kind", "children"}
 _LOOSE_TASK_FIELDS = _TASK_FIELDS | {"project"}
 
 
@@ -38,6 +44,7 @@ class ImportResult:
     dry_run: bool = False
     projects_created: int = 0
     projects_reused: int = 0
+    # Features and tasks created (both count here).
     tasks_created: int = 0
     # (kind, ref, title) for each item created, in creation
     # order; ref is None on a dry run, since nothing is stored.
@@ -140,9 +147,16 @@ def _unknown_fields(entry : dict, allowed : set, where : str, errors : list) -> 
         errors.append(f"{where}: unknown field '{name}'")
 
 
-def _check_task(entry : dict, where : str, errors : list, loose : bool = False) -> None:
-    """Check one task entry's fields."""
-    _unknown_fields(entry, _LOOSE_TASK_FIELDS if loose else _TASK_FIELDS, where, errors)
+def _check_task(entry : dict, where : str, errors : list, fields : set = _TASK_FIELDS) -> None:
+    """Check one task entry's fields.
+
+    Args:
+        entry: The task, feature or loose-task entry.
+        where: Label of the entry, for messages.
+        errors: List receiving the problems found.
+        fields: The fields this kind of entry accepts.
+    """
+    _unknown_fields(entry, fields, where, errors)
     _text(entry, "title", where, errors, required=True)
     _text(entry, "body", where, errors)
     _text(entry, "context", where, errors)
@@ -151,18 +165,79 @@ def _check_task(entry : dict, where : str, errors : list, loose : bool = False) 
         errors.append(f"{where}: 'size' must be one of {', '.join(_SIZES)}")
 
 
-def _project_exists(session : Session, key : str) -> bool:
-    """Tell whether a project key is already taken.
+def _existing(session : Session, key : str) -> Project | None:
+    """Return the project with this key, or None.
 
     Args:
         session: Database session to use.
         key: Project key.
     """
     try:
-        projects.get(session, key)
+        return projects.get(session, key)
     except NotFoundError:
-        return False
-    return True
+        return None
+
+
+def _check_items(container : dict, field_name : str, where : str, errors : list) -> None:
+    """Check the "items" of a project, or the "children" of a feature, recursively.
+
+    Args:
+        container: The project or feature entry.
+        field_name: "items" or "children".
+        where: Label of the container, for messages.
+        errors: List receiving the problems found.
+    """
+    for index, item in _entries(container, field_name, where, errors):
+        item_where = f"{where} {field_name}[{index}]"
+        _check_task(item, item_where, errors, fields=_ITEM_FIELDS)
+        kind = item.get("kind", "task")
+        if not isinstance(kind, str) or kind not in _KINDS:
+            errors.append(f"{item_where}: 'kind' must be one of {', '.join(_KINDS)}")
+            continue
+        if "children" in item:
+            if kind != "feature":
+                errors.append(f"{item_where}: only a feature can have 'children'")
+            else:
+                _check_items(item, "children", item_where, errors)
+
+
+def _check_project(session : Session, entry : dict, where : str, parent_key : str | None,
+                   declared : set, errors : list) -> None:
+    """Check one project or subproject entry, its subprojects and its items.
+
+    Args:
+        session: Database session to use (read only).
+        entry: The project entry.
+        where: Label of the entry, for messages.
+        parent_key: Key of the root project it sits under; None at the top.
+        declared: Keys already declared in the document, extended with this one.
+        errors: List receiving the problems found.
+    """
+    _unknown_fields(entry, _PROJECT_FIELDS if parent_key is None else _SUBPROJECT_FIELDS, where, errors)
+    key = _text(entry, "key", where, errors, required=True)
+    if key is None:
+        return
+    where = f"{where} ('{key}')"
+    if projects.is_reserved_key(key):
+        errors.append(f"{where}: key is reserved")
+    if key in declared:
+        errors.append(f"{where}: project declared twice")
+        return
+    declared.add(key)
+
+    existing = _existing(session, key)
+    if existing is None:
+        _text(entry, "name", where, errors, required=True)
+    else:
+        existing_parent = existing.parent.key if existing.parent else None
+        if existing_parent != parent_key:
+            place = f"a subproject of '{existing_parent}'" if existing_parent else "a root project"
+            errors.append(f"{where}: already exists as {place}")
+    _text(entry, "description", where, errors)
+    _check_items(entry, "items", where, errors)
+
+    for index, sub in _entries(entry, "subprojects", where, errors):
+        _check_project(session, sub, f"{where} subprojects[{index}]", key, declared, errors)
 
 
 def validate(session : Session, data : object) -> list[str]:
@@ -185,27 +260,13 @@ def validate(session : Session, data : object) -> list[str]:
 
     declared = set()
     for index, entry in _entries(data, "projects", "document", errors):
-        where = f"projects[{index}]"
-        _unknown_fields(entry, _PROJECT_FIELDS, where, errors)
-        key = _text(entry, "key", where, errors, required=True)
-        if key is None:
-            continue
-        where = f"{where} ('{key}')"
-        if projects.is_reserved_key(key):
-            errors.append(f"{where}: key is reserved")
-        if key in declared:
-            errors.append(f"{where}: project declared twice")
-            continue
-        declared.add(key)
-        if not _project_exists(session, key):
-            _text(entry, "name", where, errors, required=True)
-        _text(entry, "description", where, errors)
+        _check_project(session, entry, f"projects[{index}]", None, declared, errors)
 
     for index, entry in _entries(data, "tasks", "document", errors):
         where = f"tasks[{index}]"
-        _check_task(entry, where, errors, loose=True)
+        _check_task(entry, where, errors, fields=_LOOSE_TASK_FIELDS)
         key = _text(entry, "project", where, errors)
-        if key and key not in declared and not _project_exists(session, key):
+        if key and key not in declared and _existing(session, key) is None:
             errors.append(f"{where}: project '{key}' doesn't exist")
     return errors
 
@@ -215,18 +276,23 @@ def validate(session : Session, data : object) -> list[str]:
 # -----------------------------------------------------------------------------
 
 def apply(session : Session, data : object, actor : str, dry_run : bool = False) -> ImportResult:
-    """Import projects and tasks from a document.
+    """Import projects, subprojects, features and tasks from a document.
 
-    Projects are matched by their key: an existing one is reused and never
-    overwritten, a missing one is created. Tasks are always created. Refs and
+    Projects and subprojects are matched by their key: an existing one is
+    reused and never overwritten, a missing one is created. Features and
+    tasks are always created: those placed in a project's tree are refined
+    (already triaged), loose ones land in the inbox. Tasks are always created. Refs and
     ids in the document are not part of the format. The whole import is
     stored at once, or not at all.
 
     Args:
         session: Database session to use.
         data: The parsed document: {"projects": [{"key", "name",
-            "description"}], "tasks": [{"title", "body", "context", "size",
-            "project"}]}.
+            "description", "items": [ITEM], "subprojects": [{"key", "name",
+            "description", "items": [ITEM]}]}], "tasks": [{"title", "body",
+            "context", "size", "project"}]}, where an ITEM is {"kind":
+            "feature" or "task" (default), "title", "body", "context",
+            "size", "children": [ITEM] (features only)}.
         actor: Who runs the import, recorded in the event log.
         dry_run: If True, run everything then discard it, so the result
             shows what would happen.
@@ -260,25 +326,55 @@ def apply(session : Session, data : object, actor : str, dry_run : bool = False)
 
 
 def _create_projects(session : _DeferredCommit, data : dict, actor : str, result : ImportResult) -> None:
-    """Create each missing project, reuse the existing ones."""
+    """Create or reuse each project, then its items and its subprojects."""
     for entry in data.get("projects", []):
-        key = entry["key"].strip()
-        if session.query(Project).filter_by(key=key).first() is None:
-            projects.create(session, key, entry["name"].strip(),
-                            (entry.get("description") or "").strip() or None, actor=actor)
-            result.projects_created += 1
-        else:
-            result.projects_reused += 1
+        _create_project(session, entry, None, actor, result)
+
+
+def _create_project(session : _DeferredCommit, entry : dict, parent_key : str | None,
+                    actor : str, result : ImportResult) -> None:
+    """Create or reuse one project or subproject, then fill its tree."""
+    key = entry["key"].strip()
+    if session.query(Project).filter_by(key=key).first() is None:
+        projects.create(session, key, entry["name"].strip(),
+                        (entry.get("description") or "").strip() or None,
+                        parent_key=parent_key, actor=actor)
+        result.projects_created += 1
+    else:
+        result.projects_reused += 1
+
+    for item in entry.get("items", []):
+        _create_item(session, item, key, None, actor, result)
+    for sub in entry.get("subprojects", []):
+        _create_project(session, sub, key, actor, result)
+
+
+def _fields(entry : dict) -> dict:
+    """The optional detail of a task entry, stripped, blanks as None."""
+    return {name: (entry.get(name) or "").strip() or None for name in ("body", "context", "size")}
+
+
+def _create_item(session : _DeferredCommit, entry : dict, project_key : str, parent_ref : str | None,
+                 actor : str, result : ImportResult) -> None:
+    """Create one feature or task in a project's tree, refined, then its children."""
+    kind = _KINDS[entry.get("kind", "task")]
+    title = entry["title"].strip()
+    fields = _fields(entry)
+    item = tasks.create(session, title, project_key=None if parent_ref else project_key,
+                        parent_ref=parent_ref, kind=kind, actor=actor, **fields)
+    tasks.clarify(session, item.id, title, fields["body"], project_key, fields["context"], fields["size"],
+                  parent_ref=parent_ref, actor=actor)
+    result.tasks_created += 1
+    result.created.append((kind.name.lower(), item.ref, title))
+    for child in entry.get("children", []):
+        _create_item(session, child, project_key, item.ref, actor, result)
 
 
 def _create_task(session : _DeferredCommit, entry : dict, project_key : str | None,
                  actor : str, result : ImportResult) -> None:
-    """Create one task in the inbox, in its project if it names one."""
-    fields = {"body": (entry.get("body") or "").strip() or None,
-              "context": (entry.get("context") or "").strip() or None,
-              "size": (entry.get("size") or "").strip() or None}
+    """Create one loose task in the inbox, in its project if it names one."""
     title = entry["title"].strip()
     task = tasks.create(session, title, project_key=project_key.strip() if project_key else None,
-                        actor=actor, **fields)
+                        actor=actor, **_fields(entry))
     result.tasks_created += 1
     result.created.append(("task", task.ref, title))
