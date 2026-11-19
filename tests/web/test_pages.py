@@ -631,3 +631,354 @@ def test_task_page_shows_kind_and_parent(app, client):
     response = client.get(f"/tasks/{task.id}")
     assert _shown_field(response, "kind") == "task"
     assert "Tree" in _shown_field(response, "parent")
+
+
+# Project tree --------------------------------------------------------------------------------------
+
+def _project_with_feature(client):
+    """Create project 'nexus' and add a feature to it through the web; return the feature's ref."""
+    from src.models.task import Task
+
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    client.post("/projects/nexus/items", data={"title": "Auth", "kind": "feature"})
+    session = client.application.extensions["db_session"]
+    return session.query(Task).filter_by(title="Auth").one().ref
+
+
+def test_add_items_builds_the_tree(client):
+    """
+    Given a project with a feature
+    When a task is added under the feature and another at the top
+    Then the project page shows them nested, each refined
+    """
+    feature_ref = _project_with_feature(client)
+    response = client.post("/projects/nexus/items",
+                           data={"title": "Login form", "kind": "task", "parent_ref": feature_ref})
+    assert response.status_code == 302
+    client.post("/projects/nexus/items", data={"title": "Readme"})
+
+    html = client.get("/projects/nexus").get_data(as_text=True)
+    assert html.index("Auth") < html.index("Login form") < html.index("Readme")
+    assert html.count("tree-feature") == 1 and html.count("tree-task") == 2
+    assert "REFINED" in html and "INBOX" not in html
+
+
+def test_add_item_with_empty_title_shows_the_error(client):
+    """An empty title is refused and the project page shows why."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    response = client.post("/projects/nexus/items", data={"title": " "})
+    assert response.status_code == 400
+    assert "The title must be specified." in response.get_data(as_text=True)
+
+
+def test_add_item_under_a_feature_of_another_project_is_refused(client):
+    """A parent ref from another project is refused, and nothing is created."""
+    feature_ref = _project_with_feature(client)
+    client.post("/projects", data={"key": "other", "name": "Other"})
+    response = client.post("/projects/other/items", data={"title": "Stray", "parent_ref": feature_ref})
+    assert response.status_code == 400
+    assert "Stray" not in client.get("/projects/nexus").get_data(as_text=True)
+    assert client.get("/inbox").get_data(as_text=True).count("Stray") == 0
+
+
+def test_add_item_to_a_missing_project_is_404(client):
+    """Adding to an unknown project answers 404."""
+    assert client.post("/projects/missing/items", data={"title": "X"}).status_code == 404
+
+
+def test_closed_items_are_hidden_unless_asked(client):
+    """A cancelled item is hidden from the tree, and shown with ?closed=1."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    client.post("/projects/nexus/items", data={"title": "Dropped idea"})
+    client.post("/tasks/1/cancel")
+
+    assert "Dropped idea" not in client.get("/projects/nexus").get_data(as_text=True)
+    shown = client.get("/projects/nexus?closed=1").get_data(as_text=True)
+    assert "Dropped idea" in shown and "Hide closed" in shown
+
+
+# Project management --------------------------------------------------------------------------------
+
+def test_create_subproject_from_the_project_page(client):
+    """A subproject created on its root project's page is listed there."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    response = client.post("/projects/nexus/subprojects", data={"key": "web", "name": "Web UI"})
+    assert response.status_code == 302
+
+    html = client.get("/projects/nexus").get_data(as_text=True)
+    assert "Web UI" in html
+    sub = client.get("/projects/web").get_data(as_text=True)
+    assert "Subproject of" in sub and "New subproject" not in sub
+
+
+def test_create_subproject_with_a_taken_key_shows_the_error(client):
+    """A duplicate key is refused on the project page."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    response = client.post("/projects/nexus/subprojects", data={"key": "nexus", "name": "Again"})
+    assert response.status_code == 400
+    assert "already exists" in response.get_data(as_text=True)
+
+
+def test_update_project_name_and_description(client):
+    """Saving the edit form changes the name and description."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    client.post("/projects/nexus/update", data={"name": "Nexus 2", "description": "Tree manager"})
+    html = client.get("/projects/nexus").get_data(as_text=True)
+    assert "Nexus 2" in html and "Tree manager" in html
+
+
+def test_update_project_with_empty_name_shows_the_error(client):
+    """An empty name is refused."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    response = client.post("/projects/nexus/update", data={"name": " "})
+    assert response.status_code == 400
+    assert "name must be specified" in response.get_data(as_text=True)
+
+
+def test_archive_then_restore_a_project(client):
+    """Archiving shows the restore button; restoring brings back the archive one."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    client.post("/projects/nexus/archive")
+    html = client.get("/projects/nexus").get_data(as_text=True)
+    assert "ARCHIVED" in html and "Restore project" in html
+
+    client.post("/projects/nexus/restore")
+    assert "Archive project" in client.get("/projects/nexus").get_data(as_text=True)
+
+
+def test_restore_an_active_project_shows_the_error(client):
+    """Restoring a project that isn't archived is refused."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    response = client.post("/projects/nexus/restore")
+    assert response.status_code == 409
+    assert "archived." in response.get_data(as_text=True)
+
+
+# Version block ---------------------------------------------------------------------------------------
+
+def test_project_page_shows_the_version(client):
+    """A new project shows v0.0 and a disabled release button."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    html = client.get("/projects/nexus").get_data(as_text=True)
+    assert "v0.0" in html
+    assert 'type="submit" disabled>Release 1.0' in html
+
+
+def test_criteria_then_major_release(client):
+    """
+    Given a project with one criterion
+    When it is edited and checked, then the project released
+    Then the button gets enabled, and the project goes to v1.0 with no criterion
+    """
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    client.post("/projects/nexus/criteria", data={"text": "Tests green"})
+    client.post("/projects/nexus/criteria/1/update", data={"text": "All tests green"})
+    client.post("/projects/nexus/criteria/1/check", data={"done": "1"})
+
+    html = client.get("/projects/nexus").get_data(as_text=True)
+    assert "All tests green" in html and 'type="submit">Release 1.0' in html
+
+    assert client.post("/projects/nexus/release").status_code == 302
+    html = client.get("/projects/nexus").get_data(as_text=True)
+    assert "v1.0" in html and "No criterion yet." in html and "Release 2.0" in html
+
+
+def test_release_with_an_unchecked_criterion_shows_the_error(client):
+    """The service refuses the release even if the form is sent."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    client.post("/projects/nexus/criteria", data={"text": "Docs built"})
+    response = client.post("/projects/nexus/release")
+    assert response.status_code == 409
+    assert "unchecked criteria" in response.get_data(as_text=True)
+
+
+def test_uncheck_and_delete_a_criterion(client):
+    """A criterion can be unchecked, then deleted."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    client.post("/projects/nexus/criteria", data={"text": "Docs built"})
+    client.post("/projects/nexus/criteria/1/check", data={"done": "1"})
+    client.post("/projects/nexus/criteria/1/check", data={"done": "0"})
+    assert 'aria-label="Check"' in client.get("/projects/nexus").get_data(as_text=True)
+
+    client.post("/projects/nexus/criteria/1/delete")
+    assert "Docs built" not in client.get("/projects/nexus").get_data(as_text=True)
+
+
+def test_criterion_of_another_project_is_404(client):
+    """A criterion can't be changed through another project's URL."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    client.post("/projects", data={"key": "other", "name": "Other"})
+    client.post("/projects/nexus/criteria", data={"text": "Docs built"})
+    assert client.post("/projects/other/criteria/1/delete").status_code == 404
+    assert client.post("/projects/nexus/criteria/99/delete").status_code == 404
+
+
+def test_completed_feature_raises_the_shown_version(client):
+    """Completing a feature from the web shows the new minor version."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    client.post("/projects/nexus/items", data={"title": "Auth", "kind": "feature"})
+    client.post("/tasks/1/start")
+    client.post("/tasks/1/complete")
+    assert "v0.1" in client.get("/projects/nexus").get_data(as_text=True)
+
+
+# Projects list ------------------------------------------------------------------------------------------
+
+def test_projects_list_nests_subprojects_with_versions(client):
+    """
+    Given two root projects, the first with a subproject at 0.1
+    When listing projects
+    Then the subproject is right under its root, indented, and each row shows its version
+    """
+    client.post("/projects", data={"key": "alpha", "name": "Alpha"})
+    client.post("/projects", data={"key": "beta", "name": "Beta"})
+    client.post("/projects/alpha/subprojects", data={"key": "sub", "name": "Sub"})
+    client.post("/projects/sub/items", data={"title": "Feat", "kind": "feature"})
+    client.post("/tasks/1/start")
+    client.post("/tasks/1/complete")
+
+    html = client.get("/projects").get_data(as_text=True)
+    assert html.index("Alpha") < html.index("Sub") < html.index("Beta")
+    assert html.count('class="subproject"') == 1
+    assert "v0.1" in html and html.count("v0.0") == 2
+
+
+def test_projects_list_hides_archived_subprojects(client):
+    """An archived subproject is left out, like an archived root project."""
+    client.post("/projects", data={"key": "alpha", "name": "Alpha"})
+    client.post("/projects/alpha/subprojects", data={"key": "sub", "name": "Old sub"})
+    client.post("/projects/sub/archive")
+    assert "Old sub" not in client.get("/projects").get_data(as_text=True)
+
+
+# Item page ----------------------------------------------------------------------------------------------
+
+def test_feature_page_adds_and_shows_children(client):
+    """
+    Given a feature
+    When a child is added from its page
+    Then the feature page lists it, refined, and shows the release field
+    """
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    client.post("/projects/nexus/items", data={"title": "Auth", "kind": "feature"})
+    response = client.post("/tasks/1/children", data={"title": "Login form", "kind": "task"})
+    assert response.status_code == 200
+
+    html = client.get("/tasks/1").get_data(as_text=True)
+    assert "Login form" in html and "REFINED" in html
+    assert 'data-field="released_in">—' in html
+
+
+def test_feature_page_shows_its_release(client):
+    """A completed feature shows the version it shipped in."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    client.post("/projects/nexus/items", data={"title": "Auth", "kind": "feature"})
+    client.post("/tasks/1/start")
+    client.post("/tasks/1/complete")
+    assert 'data-field="released_in">v0.1' in client.get("/tasks/1").get_data(as_text=True)
+
+
+def test_task_page_has_no_children_section(client):
+    """A task (a leaf) shows neither children nor a release field."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    client.post("/projects/nexus/items", data={"title": "Readme"})
+    html = client.get("/tasks/1").get_data(as_text=True)
+    assert "<h2>Children</h2>" not in html and "released_in" not in html
+
+
+def test_move_an_item_under_a_feature_then_to_another_project(client):
+    """An item moves under a feature, then to the top of another project."""
+    from src.services import tasks as task_service
+
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    client.post("/projects", data={"key": "other", "name": "Other"})
+    client.post("/projects/nexus/items", data={"title": "Auth", "kind": "feature"})
+    client.post("/projects/nexus/items", data={"title": "Readme"})
+    session = client.application.extensions["db_session"]
+    auth_ref = task_service.get(session, 1).ref
+
+    client.post("/tasks/2/move", data={"parent_ref": auth_ref})
+    assert task_service.get(session, 2).parent.ref == auth_ref
+
+    client.post("/tasks/2/move", data={"project_key": "other"})
+    moved = task_service.get(session, 2)
+    assert (moved.project.key, moved.parent) == ("other", None)
+
+
+def test_move_without_target_shows_the_error(client):
+    """A move with neither project nor parent is refused on the page."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    client.post("/projects/nexus/items", data={"title": "Readme"})
+    response = client.post("/tasks/1/move", data={})
+    assert response.status_code == 200
+    assert 'class="error"' in response.get_data(as_text=True)
+
+
+def test_change_kind_both_ways_and_refusal(client):
+    """A task becomes a feature and back; a feature with children can't become a task."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    client.post("/projects/nexus/items", data={"title": "Auth"})
+
+    client.post("/tasks/1/kind", data={"kind": "feature"})
+    assert 'data-field="kind">feature' in client.get("/tasks/1").get_data(as_text=True)
+
+    client.post("/tasks/1/children", data={"title": "Login"})
+    response = client.post("/tasks/1/kind", data={"kind": "task"})
+    assert "has children" in response.get_data(as_text=True)
+
+    client.post("/tasks/2/delete")
+    client.post("/tasks/1/kind", data={"kind": "task"})
+    assert 'data-field="kind">task' in client.get("/tasks/1").get_data(as_text=True)
+
+
+# Inbox triage in the tree ---------------------------------------------------------------------------------
+
+def test_inbox_triage_turns_a_capture_into_a_feature(client):
+    """
+    Given a captured task
+    When it is refined in the inbox as a feature of a project
+    Then it is a refined feature at the top of that project
+    """
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    client.post("/tasks", data={"title": "Auth"})
+    assert "Parent feature ref" in client.get("/inbox").get_data(as_text=True)
+
+    client.post("/inbox/1/clarify", data={"title": "Auth", "project_key": "nexus", "kind": "feature"})
+
+    html = client.get("/tasks/1").get_data(as_text=True)
+    assert 'data-field="kind">feature' in html and "REFINED" in html
+    assert "tree-feature" in client.get("/projects/nexus").get_data(as_text=True)
+
+
+def test_inbox_triage_places_a_capture_under_a_feature(client):
+    """A capture refined with only a parent ref goes under that feature, in its project."""
+    from src.services import tasks as task_service
+
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    client.post("/projects/nexus/items", data={"title": "Auth", "kind": "feature"})
+    client.post("/tasks", data={"title": "Login form"})
+    session = client.application.extensions["db_session"]
+    auth_ref = task_service.get(session, 1).ref
+
+    client.post("/inbox/2/clarify", data={"title": "Login form", "parent_ref": auth_ref, "kind": "task"})
+
+    item = task_service.get(session, 2)
+    assert (item.parent.ref, item.project.key) == (auth_ref, "nexus")
+
+
+def test_inbox_triage_with_a_bad_parent_shows_the_error(client):
+    """An unknown parent ref is refused and the item stays in the inbox."""
+    client.post("/tasks", data={"title": "Login form"})
+    response = client.post("/inbox/1/clarify", data={"title": "Login form", "parent_ref": "f-zzz"})
+    assert 'class="error"' in response.get_data(as_text=True)
+    assert "Login form" in client.get("/inbox").get_data(as_text=True)
+
+
+def test_item_page_links_back_to_its_project(client):
+    """An item in a project links back to that project; a loose capture to the tasks list."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    client.post("/projects/nexus/items", data={"title": "Readme"})
+    client.post("/tasks", data={"title": "Loose"})
+
+    assert '<a href="/projects/nexus">← Nexus</a>' in client.get("/tasks/1").get_data(as_text=True)
+    assert '<a href="/tasks">← Tasks</a>' in client.get("/tasks/2").get_data(as_text=True)

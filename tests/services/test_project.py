@@ -269,3 +269,67 @@ def test_delete_logs_deleted_and_keeps_history(session):
     projects.delete(session, "nexus")
 
     assert [action for action, _ in _history(session, project_id)] == ["created", "deleted"]
+
+
+# Update and restore ------------------------------------------------------------------------------
+
+def _actions(session, project):
+    """Return a project's logged (action, payload) pairs, oldest first."""
+    return [(e.action, e.payload) for e in events.history(session, "project", project.id)]
+
+
+def test_update_changes_name_and_description_and_logs_only_changes(session):
+    """
+    Given a project
+    When its name changes and its description stays the same
+    Then only the name is updated in the log, and the key is kept
+    """
+    project = projects.create(session, "nexus", "Nexus", "Manager")
+    projects.update(session, "nexus", " Nexus 2 ", "Manager")
+
+    assert (project.key, project.name, project.description) == ("nexus", "Nexus 2", "Manager")
+    assert _actions(session, project)[-1] == ("updated", {"name": {"from": "Nexus", "to": "Nexus 2"}})
+
+
+def test_update_blank_description_clears_it(session):
+    """A blank description is stored as none."""
+    project = projects.create(session, "nexus", "Nexus", "Manager")
+    projects.update(session, "nexus", "Nexus", "  ")
+    assert project.description is None
+
+
+def test_update_without_change_logs_nothing(session):
+    """Saving the same values records no event."""
+    project = projects.create(session, "nexus", "Nexus")
+    projects.update(session, "nexus", "Nexus", None)
+    assert [action for action, _ in _actions(session, project)] == ["created"]
+
+
+def test_update_refuses_an_empty_name_or_missing_project(session):
+    """An empty name or an unknown project is refused."""
+    projects.create(session, "nexus", "Nexus")
+    with pytest.raises(ValidationError):
+        projects.update(session, "nexus", " ", None)
+    with pytest.raises(NotFoundError):
+        projects.update(session, "missing", "Name", None)
+
+
+def test_restore_an_archived_project(session):
+    """
+    Given an archived project
+    When it is restored
+    Then it is active again and the change is logged
+    """
+    project = projects.create(session, "nexus", "Nexus")
+    projects.archive(session, "nexus")
+    projects.restore(session, "nexus")
+
+    assert project.status is ProjectStatus.ACTIVE
+    assert _actions(session, project)[-1] == ("restored", {"from": "ARCHIVED", "to": "ACTIVE"})
+
+
+def test_restore_an_active_project_is_refused(session):
+    """Only an archived project can be restored."""
+    projects.create(session, "nexus", "Nexus")
+    with pytest.raises(ConflictError):
+        projects.restore(session, "nexus")

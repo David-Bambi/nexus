@@ -5,7 +5,8 @@
 
 {% block content %}
 {{ ui.page_header(project.name, url_for('pages.projects_list'), "Projects") }}
-<p class="meta">{{ ui.ref_chip(project.key) }} {{ ui.badge(project.status.name) }}</p>
+<p class="meta">{{ ui.ref_chip(project.key) }} {{ ui.badge(project.status.name) }} <span class="version" data-field="version">v{{ project.version_major }}.{{ project.version_minor }}</span></p>
+{{ ui.error_message(error) }}
 {% if project.description %}
 <p class="lead">{{ project.description }}</p>
 {% endif %}
@@ -23,9 +24,83 @@
 </ul>
 {% endif %}
 
+{% set closed = "1" if include_closed else none %}
+<h2>Work</h2>
+<p class="hint">
+    {% if include_closed %}
+    Showing done and cancelled items. <a href="{{ url_for('pages.project_detail', key=project.key) }}">Hide closed</a>
+    {% else %}
+    Done and cancelled items are hidden. <a href="{{ url_for('pages.project_detail', key=project.key, closed='1') }}">Show closed</a>
+    {% endif %}
+</p>
+{% if tree %}
+{{ ui.work_tree(tree, project.key, closed) }}
+{% else %}
+<p class="empty">No work items yet.</p>
+{% endif %}
+{{ ui.add_item_form(project.key, none, closed) }}
+
+<h2>Next major version</h2>
+{% set next_major = project.version_major + 1 %}
+<p class="hint">Every completed feature raises the minor version. Check every criterion to move to {{ next_major }}.0.</p>
+<ul class="list criteria">
+    {% for criterion in project.criteria %}
+    <li>
+        <form method="post" action="{{ url_for('pages.criterion_check', key=project.key, criterion_id=criterion.id) }}">
+            <input type="hidden" name="done" value="{{ '0' if criterion.done else '1' }}">
+            <button type="submit" aria-label="{{ 'Uncheck' if criterion.done else 'Check' }}">{{ "☑" if criterion.done else "☐" }}</button>
+        </form>
+        <form class="form-inline" method="post" action="{{ url_for('pages.criterion_update', key=project.key, criterion_id=criterion.id) }}">
+            <input type="text" name="text" value="{{ criterion.text }}" aria-label="Criterion" required>
+            <button type="submit">Save</button>
+        </form>
+        <form method="post" action="{{ url_for('pages.criterion_delete', key=project.key, criterion_id=criterion.id) }}">
+            <button class="button-danger" type="submit">Delete</button>
+        </form>
+    </li>
+    {% else %}
+    {{ ui.empty("No criterion yet.") }}
+    {% endfor %}
+</ul>
+<form class="form-inline" method="post" action="{{ url_for('pages.criterion_add', key=project.key) }}">
+    <input type="text" name="text" placeholder="New criterion…" aria-label="New criterion" required>
+    <button type="submit">Add criterion</button>
+</form>
+{% set ready = project.criteria and project.criteria | rejectattr("done") | list | length == 0 %}
+<form method="post" action="{{ url_for('pages.project_release', key=project.key) }}">
+    <button class="button-primary" type="submit"{% if not ready %} disabled{% endif %}>Release {{ next_major }}.0</button>
+</form>
+
+<h2>Edit</h2>
+<form class="form-stacked" method="post" action="{{ url_for('pages.project_update', key=project.key) }}">
+    {{ ui.field("Name", "name", project.name, required=true) }}
+    {{ ui.field("Description", "description", project.description, kind="textarea") }}
+    <div class="form-actions"><button class="button-primary" type="submit">Save</button></div>
+</form>
+
+{% if not project.parent %}
+<h2>New subproject</h2>
+<form class="form-stacked" method="post" action="{{ url_for('pages.project_add_subproject', key=project.key) }}">
+    {{ ui.field("Key", "key", required=true) }}
+    {{ ui.field("Name", "name", required=true) }}
+    {{ ui.field("Description", "description", kind="textarea") }}
+    <div class="form-actions"><button class="button-primary" type="submit">Create subproject</button></div>
+</form>
+{% endif %}
+
+<h2>Status</h2>
+{% if project.status.name == "ARCHIVED" %}
+<form method="post" action="{{ url_for('pages.project_restore', key=project.key) }}">
+    <button class="button-primary" type="submit">Restore project</button>
+</form>
+{% else %}
+<form method="post" action="{{ url_for('pages.project_archive', key=project.key) }}">
+    <button type="submit">Archive project</button>
+</form>
+{% endif %}
+
 <section class="danger-zone">
     <h2>Delete this project</h2>
-    {{ ui.error_message(error) }}
     <form method="post" action="{{ url_for('pages.project_delete', key=project.key) }}">
         <p>Type <strong>{{ project.key }}</strong> to confirm deletion. Only an empty project can be deleted.</p>
         <div class="form-inline">

@@ -141,6 +141,66 @@ def archive(session : Session, key : str, actor : str = events.ACTOR_WEB) -> Pro
     session.commit()
     return project
 
+def update(session : Session, key : str, name : str, description : str | None,
+           actor : str = events.ACTOR_WEB) -> Project:
+    """Change a project's name and description; its key never changes.
+
+    Args:
+        session: Database session to use.
+        key: Unique slug identifying the project.
+        name: New display name.
+        description: New description; None or blank clears it.
+        actor: Who made the change, recorded in the event log.
+
+    Returns:
+        The updated Project. Only the fields that changed are logged, and
+        nothing is logged if none did.
+
+    Raises:
+        NotFoundError: If no project has this key.
+        ValidationError: If the name is empty.
+    """
+    if not name.strip():
+        raise ValidationError("The project name must be specified.")
+    project = get(session, key)
+
+    new_values = {"name": name.strip(), "description": (description or "").strip() or None}
+    changes = {}
+    for field, value in new_values.items():
+        previous = getattr(project, field)
+        if previous != value:
+            changes[field] = {"from": previous, "to": value}
+            setattr(project, field, value)
+
+    if changes:
+        events.log(session, actor, "project", project.id, "updated", changes)
+    session.commit()
+    return project
+
+def restore(session : Session, key : str, actor : str = events.ACTOR_WEB) -> Project:
+    """Bring an archived project back to active.
+
+    Args:
+        session: Database session to use.
+        key: Unique slug identifying the project.
+        actor: Who made the change, recorded in the event log.
+
+    Returns:
+        The active Project.
+
+    Raises:
+        NotFoundError: If no project has this key.
+        ConflictError: If the project isn't archived.
+    """
+    project = get(session, key)
+    if project.status != ProjectStatus.ARCHIVED:
+        raise ConflictError(f"project '{key}' isn't archived.")
+    project.status = ProjectStatus.ACTIVE
+    events.log(session, actor, "project", project.id, "restored",
+               {"from": ProjectStatus.ARCHIVED.name, "to": ProjectStatus.ACTIVE.name})
+    session.commit()
+    return project
+
 def delete(session : Session, key : str, actor : str = events.ACTOR_WEB) -> None:
     """Delete an empty project or subproject.
 

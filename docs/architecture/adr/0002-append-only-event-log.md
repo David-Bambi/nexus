@@ -44,7 +44,7 @@ leaves no event. The session runs with `autoflush=False`, so services
 |---|---|
 | task | `created`, `updated`, `clarified`, `planned`, `unplanned`, `started`, `blocked`, `unblocked`, `completed`, `reopened`, `deferred`, `cancelled`, `restored`, `moved`, `deleted` |
 | version | `created`, `started`, `released`, `deleted`, `dod_added`, `dod_updated`, `dod_deleted`, `dod_checked`, `dod_unchecked` |
-| project | `created`, `archived`, `deleted`, `versions_reordered`, `minor_bumped`, `major_released`, `version_set` |
+| project | `created`, `updated`, `archived`, `restored`, `deleted`, `versions_reordered`, `minor_bumped`, `major_released`, `version_set` |
 | criterion | `criterion_added`, `criterion_updated`, `criterion_checked`, `criterion_deleted` |
 
 `versions_reordered` is logged on the project, with payload `ordered_ids`.

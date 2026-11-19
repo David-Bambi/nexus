@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from sqlalchemy.orm import Session, joinedload
 
+from src.models.project import Project
 from src.models.task import Task, TaskState
 from src.services import projects
 from src.services.errors import NotFoundError
@@ -19,6 +20,64 @@ class DashboardView:
     inbox_count: int
     # Number of refined items, ready to be started.
     refine_count: int
+
+
+@dataclass
+class TreeNode:
+    """One feature or task of a project tree, with the nodes below it."""
+
+    # The feature or task.
+    item: Task
+    # Nodes of its children, in sibling order; always empty for a task.
+    children: list
+
+
+# States hidden from a project tree unless closed items are asked for.
+_CLOSED_STATES = (TaskState.DONE, TaskState.CANCELLED)
+
+
+def _nodes(items : list, include_closed : bool) -> list:
+    """Build the tree nodes of sibling items, recursively.
+
+    Args:
+        items: Sibling features and tasks.
+        include_closed: Whether done and cancelled items are kept; a
+            hidden feature hides its whole subtree.
+
+    Returns:
+        A TreeNode per kept item, in sibling order.
+    """
+    kept = [item for item in items if include_closed or item.state not in _CLOSED_STATES]
+    return [TreeNode(item, _nodes(item.children, include_closed))
+            for item in sorted(kept, key=lambda item: (item.position, item.id))]
+
+
+def project_tree(project : Project, include_closed : bool = False) -> list:
+    """Give a project's work tree, ready to render.
+
+    Args:
+        project: Project or subproject; its subprojects' trees aren't
+            included.
+        include_closed: Whether done and cancelled items are shown.
+
+    Returns:
+        A TreeNode per item at the top of the project, in sibling order.
+    """
+    top = [item for item in project.tasks if item.parent_id is None]
+    return _nodes(top, include_closed)
+
+
+def item_tree(item : Task, include_closed : bool = False) -> list:
+    """Give the tree below a feature, ready to render.
+
+    Args:
+        item: Feature (or task, whose tree is empty).
+        include_closed: Whether done and cancelled items are shown.
+
+    Returns:
+        A TreeNode per child, in sibling order.
+    """
+    return _nodes(item.children, include_closed)
 
 
 def inbox(session : Session) -> list:

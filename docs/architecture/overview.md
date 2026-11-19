@@ -138,12 +138,12 @@ log events with actor `mcp` (`events.ACTOR_MCP`). Usage:
 
 ## Web pages
 
-Besides the `/mcp` endpoint (see above), routes are unprefixed full-page adapters (package `web/pages/`, one `pages` blueprint defined in `_shared.py`; modules `projects`, `tasks`, `inbox`):
+Besides the `/mcp` endpoint (see above), routes are unprefixed full-page adapters (package `web/pages/`, one `pages` blueprint defined in `_shared.py`; modules `projects`, `versions`, `tasks`, `inbox`):
 
 Templates (`src/web/templates/`) extend `base.html` and import the shared
 macros of `_components.html` as `ui` (`page_header`, `field`,
 `size_select`, `error_message`, `empty`, `badge`, `ref_chip`, `task_link`, `task_place`,
-`stat`, `event_list`).
+`add_item_form`, `work_tree`, `stat`, `event_list`).
 Two includes remain: `_clarify_form.html` and `_task_state_form.html`.
 A Jinja global `size_guide` (`services/sizes.SIZE_GUIDE`, registered in
 `_shared.py` so imported macros see it) feeds `ui.size_select`, the size
@@ -159,12 +159,23 @@ inline style or script ([0012](adr/0012-plain-static-css-and-js.md),
 - `/sizes` (`sizes_guide`, `tasks.py`) shows the task-size guide: a
   Size / When / Example table and the rules (`SIZE_GUIDE`, `SIZE_RULES`);
   see [How to choose a task size](../guides/task-size.md).
-- `/projects` lists projects with key and status, and holds the creation
-  form.
-- `/projects/<key>` shows the project's key and status as chips, its parent
-  (for a subproject) and its subprojects. "Delete project" sits in a
-  "danger zone" at the bottom, enabled once the project key is typed; a
-  non-empty project is refused (409, reason shown).
+- `/projects` lists root projects with their subprojects indented below,
+  each with its computed version; archived ones are hidden. It holds the
+  creation form.
+- `/projects/<key>` (`projects.py`) shows key, status and version, the work
+  tree (`ui.work_tree`; closed items behind `?closed=1`) with add forms
+  (`POST /projects/<key>/items`, item created refined), the edit form
+  (`/update`), a "New subproject" form for root projects (`/subprojects`)
+  and Archive / Restore (`/archive`, `/restore`). The "Next major version"
+  block is served by `versions.py`: `/criteria`, `/criteria/<id>/update`,
+  `/criteria/<id>/check`, `/criteria/<id>/delete`, `/release`; a criterion
+  reached through another project's URL is a 404 ([0016](adr/0016-computed-version.md)).
+  "Delete project" sits in a "danger zone" at the bottom, enabled once the
+  project key is typed; a non-empty project is refused (409, reason shown).
+- The item page adds, for a feature, its children (`POST /tasks/<id>/children`,
+  child created refined) and its released version; for every item, "Move
+  to" (`/move`, project key and/or parent feature ref) and the kind switch
+  (`/kind`; a feature with children stays a feature).
 - The task page shows its History (`ui.event_list`, drawn as a timeline).
   It has two columns: actions, edit form and history, beside a sticky
   details panel (state, ref, kind, project, parent...); the panel goes on

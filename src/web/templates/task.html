@@ -7,6 +7,8 @@
 {% set state = task.state.name %}
 {% if next %}
 {{ ui.page_header(task.title, next, "Back") }}
+{% elif task.project %}
+{{ ui.page_header(task.title, url_for('pages.project_detail', key=task.project.key), task.project.name) }}
 {% else %}
 {{ ui.page_header(task.title, url_for('pages.tasks_list'), "Tasks") }}
 {% endif %}
@@ -82,6 +84,41 @@
         {% endif %}
     </div>
 
+    {% if task.kind.name == "FEATURE" %}
+    <h2>Children</h2>
+    {% if children %}
+    {{ ui.work_tree(children, task.project.key, "1") }}
+    {% else %}
+    <p class="empty">No children yet.</p>
+    {% endif %}
+    {% if task.project %}
+    <form class="form-inline add-item" method="post" action="{{ url_for('pages.task_add_child', task_id=task.id, next=next) }}">
+        <input type="text" name="title" placeholder="New item…" aria-label="Title" required>
+        <select name="kind" aria-label="Kind">
+            <option value="task">task</option>
+            <option value="feature">feature</option>
+        </select>
+        <button type="submit">Add</button>
+    </form>
+    {% endif %}
+    {% endif %}
+
+    <h2>Place</h2>
+    <form class="form-inline" method="post" action="{{ url_for('pages.task_move', task_id=task.id, next=next) }}">
+        <input type="text" name="project_key" placeholder="Project key" aria-label="Project key">
+        <input type="text" name="parent_ref" placeholder="Parent feature ref" aria-label="Parent feature ref">
+        <button type="submit">Move to</button>
+    </form>
+    <form method="post" action="{{ url_for('pages.task_change_kind', task_id=task.id, next=next) }}">
+        {% if task.kind.name == "FEATURE" %}
+        <input type="hidden" name="kind" value="task">
+        <button type="submit">Change to task</button>
+        {% else %}
+        <input type="hidden" name="kind" value="feature">
+        <button type="submit">Change to feature</button>
+        {% endif %}
+    </form>
+
     <h2>Edit</h2>
     <form class="form-stacked" method="post" action="{{ url_for('pages.task_update', task_id=task.id, next=next) }}">
         {{ ui.field("Title", "title", task.title, required=true) }}
@@ -114,6 +151,10 @@
         <dd data-field="kind">{{ task.kind.name | lower }}</dd>
         <dt>Parent</dt>
         <dd data-field="parent">{% if task.parent %}<a href="{{ url_for('pages.task_detail', task_id=task.parent.id) }}">{{ task.parent.title }}</a>{% else %}—{% endif %}</dd>
+        {% if task.kind.name == "FEATURE" %}
+        <dt>Released in</dt>
+        <dd data-field="released_in">{% if task.released_in %}v{{ task.released_in }}{% else %}—{% endif %}</dd>
+        {% endif %}
         <dt>Context</dt>
         <dd>{{ task.context or "—" }}</dd>
         <dt>Size</dt>

@@ -2,7 +2,19 @@
 <form class="form-stacked" method="post" action="{{ clarify_action }}">
     {{ ui.field("Title", "title", task.title, required=true) }}
     {{ ui.field("Body", "body", task.body, kind="textarea") }}
+    <label class="field">
+        <span class="field-label">Kind</span>
+        <select name="kind">
+            <option value="task"{% if task.kind.name == "TASK" %} selected{% endif %}>task</option>
+            <option value="feature"{% if task.kind.name == "FEATURE" %} selected{% endif %}>feature</option>
+        </select>
+    </label>
     {{ ui.field("Project key", "project_key", task.project.key if task.project else "") }}
+    <label class="field">
+        <span class="field-label">Parent feature ref</span>
+        <input type="text" name="parent_ref" value="{{ task.parent.ref if task.parent else "" }}">
+        <span class="hint">Optional: the feature it goes under; its project is used when the key is empty.</span>
+    </label>
     {{ ui.field("Context", "context", task.context) }}
     {{ ui.size_select(task.size) }}
     <div class="form-actions"><button class="button-primary" type="submit">{{ clarify_label }}</button></div>

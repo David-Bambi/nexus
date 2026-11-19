@@ -1,9 +1,13 @@
 from flask import abort, redirect, render_template, request, url_for
 
-from src.models.task import TaskState
-from src.services import events, sizes, tasks
+from src.models.task import TaskKind, TaskState
+from src.services import events, sizes, tasks, views
 from src.services.errors import ConflictError, InvalidTransitionError, NotFoundError, ValidationError
 from src.web.pages._shared import PAGE_LIMIT, _session, bp
+
+
+# Item kinds as the forms send them, mapped to the model's.
+_KINDS = {"task": TaskKind.TASK, "feature": TaskKind.FEATURE}
 
 
 @bp.route("/sizes")
@@ -69,6 +73,7 @@ def _render_task(task, error):
         "task.html",
         task=task,
         history=events.history(_session(), "task", task.id),
+        children=views.item_tree(task, include_closed=True),
         error=error,
         next=_local_path(request.values.get("next")),
     )
@@ -111,11 +116,33 @@ def _run_transition(session, task_id, fn):
 
 
 def _clarify_fields():
-    """Read the optional clarify fields from the current request's form."""
-    return {
-        name: request.form.get(name) or None
-        for name in ("body", "project_key", "context", "size")
+    """Read the optional clarify fields from the current request's form.
+
+    Returns:
+        body, project_key, context, size and parent_ref (None when blank),
+        and kind (a TaskKind, or None to keep the current one).
+    """
+    fields = {
+        name: (request.form.get(name) or "").strip() or None
+        for name in ("body", "project_key", "context", "size", "parent_ref")
     }
+    fields["kind"] = _KINDS.get(request.form.get("kind", ""))
+    return fields
+
+
+def _clarify(session, task_id, fields):
+    """Clarify a task from the form fields read by _clarify_fields().
+
+    Args:
+        session: Database session to use.
+        task_id: Id of the task.
+        fields: The clarify fields.
+    """
+    return tasks.clarify(
+        session, task_id, request.form["title"],
+        fields["body"], fields["project_key"], fields["context"], fields["size"],
+        parent_ref=fields["parent_ref"], kind=fields["kind"],
+    )
 
 
 def _apply_transition(task_id, fn):
@@ -144,13 +171,7 @@ def task_update(task_id):
 def task_clarify(task_id):
     """Clarify a captured or someday task into a refined one."""
     fields = _clarify_fields()
-    return _apply_transition(
-        task_id,
-        lambda s: tasks.clarify(
-            s, task_id, request.form["title"],
-            fields["body"], fields["project_key"], fields["context"], fields["size"],
-        ),
-    )
+    return _apply_transition(task_id, lambda s: _clarify(s, task_id, fields))
 
 
 @bp.route("/tasks/<int:task_id>/start", methods=["POST"])
@@ -214,6 +235,44 @@ def task_state(task_id):
         return tasks.change_state(session, task_id, target, request.form.get("reason", ""))
 
     return _apply_transition(task_id, move)
+
+
+@bp.route("/tasks/<int:task_id>/children", methods=["POST"])
+def task_add_child(task_id):
+    """Add a refined feature or task under a feature, then show the feature."""
+    def add(session):
+        feature = tasks.get(session, task_id)
+        if feature.project is None:
+            raise ValidationError(f"'{feature.ref}' has no project yet.")
+        key = feature.project.key
+        child = tasks.create(session, request.form.get("title", ""), project_key=key,
+                             parent_ref=feature.ref,
+                             kind=_KINDS.get(request.form.get("kind", "task"), TaskKind.TASK))
+        tasks.clarify(session, child.id, child.title, None, key, None, None, parent_ref=feature.ref)
+        return tasks.get(session, task_id)
+
+    return _apply_transition(task_id, add)
+
+
+@bp.route("/tasks/<int:task_id>/move", methods=["POST"])
+def task_move(task_id):
+    """Move an item to another project (top level) or under a feature."""
+    return _apply_transition(task_id, lambda s: tasks.move(
+        s, task_id,
+        project_key=(request.form.get("project_key") or "").strip() or None,
+        parent_ref=(request.form.get("parent_ref") or "").strip() or None))
+
+
+@bp.route("/tasks/<int:task_id>/kind", methods=["POST"])
+def task_change_kind(task_id):
+    """Turn a task into a feature, or an empty feature into a task."""
+    def change(session):
+        kind = _KINDS.get(request.form.get("kind", ""))
+        if kind is None:
+            raise ValidationError("unknown kind.")
+        return tasks.change_kind(session, task_id, kind)
+
+    return _apply_transition(task_id, change)
 
 
 def _delete_task(task_id, redirect_endpoint):

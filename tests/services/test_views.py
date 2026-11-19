@@ -313,3 +313,66 @@ def test_list_tasks_unknown_project_raises(session, board):
     """
     with pytest.raises(NotFoundError):
         views.list_tasks(session, project_key="ghost")
+
+
+# Project tree ------------------------------------------------------------------------------------
+
+def _refined(session, title, project_key=None, parent_ref=None, kind=TaskKind.TASK):
+    """Create a refined item in a project's tree; return it."""
+    item = tasks.create(session, title, project_key=None if parent_ref else project_key,
+                        parent_ref=parent_ref, kind=kind)
+    return tasks.clarify(session, item.id, title, None, project_key, None, None, parent_ref=parent_ref)
+
+
+def _shape(nodes):
+    """Turn tree nodes into nested (title, children) pairs."""
+    return [(node.item.title, _shape(node.children)) for node in nodes]
+
+
+@pytest.fixture
+def tree(session):
+    """A project 'nx' with a feature holding a sub-feature and a task, and a top task."""
+    project = projects.create(session, "nx", "Nexus")
+    auth = _refined(session, "Auth", "nx", kind=TaskKind.FEATURE)
+    login = _refined(session, "Login", "nx", parent_ref=auth.ref, kind=TaskKind.FEATURE)
+    _refined(session, "Form", "nx", parent_ref=login.ref)
+    _refined(session, "Hash", "nx", parent_ref=auth.ref)
+    _refined(session, "Readme", "nx")
+    return project
+
+
+def test_project_tree_nests_items_in_sibling_order(session, tree):
+    """The tree gives the top items, then each feature's children, in order."""
+    assert _shape(views.project_tree(tree)) == [
+        ("Auth", [("Login", [("Form", [])]), ("Hash", [])]),
+        ("Readme", []),
+    ]
+
+
+def test_project_tree_hides_closed_items_unless_asked(session, tree):
+    """
+    Given a cancelled task and a cancelled feature
+    When building the tree
+    Then both are hidden, with the feature's subtree, unless closed items are asked for
+    """
+    by_title = {t.title: t for t in tasks.list(session)}
+    tasks.cancel(session, by_title["Hash"].id)
+    tasks.cancel(session, by_title["Form"].id)
+    tasks.cancel(session, by_title["Login"].id)
+
+    assert _shape(views.project_tree(tree)) == [("Auth", []), ("Readme", [])]
+    assert _shape(views.project_tree(tree, include_closed=True))[0] == (
+        "Auth", [("Login", [("Form", [])]), ("Hash", [])])
+
+
+def test_project_tree_leaves_out_subprojects(session, tree):
+    """A subproject's items aren't part of its parent's tree."""
+    projects.create(session, "sub", "Sub", parent_key="nx")
+    _refined(session, "Sub task", "sub")
+    assert [title for title, _ in _shape(views.project_tree(tree))] == ["Auth", "Readme"]
+
+
+def test_item_tree_gives_a_feature_children(session, tree):
+    """The tree below a feature holds its children only."""
+    auth = next(t for t in tasks.list(session) if t.title == "Auth")
+    assert _shape(views.item_tree(auth)) == [("Login", [("Form", [])]), ("Hash", [])]

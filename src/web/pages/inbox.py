@@ -2,7 +2,7 @@ from flask import redirect, render_template, request, url_for
 
 from src.services import projects, tasks, views
 from src.web.pages._shared import PAGE_LIMIT, _session, bp
-from src.web.pages.tasks import _clarify_fields, _delete_task, _run_transition
+from src.web.pages.tasks import _clarify, _clarify_fields, _delete_task, _run_transition
 
 
 @bp.route("/inbox")
@@ -23,15 +23,9 @@ def _inbox_action(task_id, fn):
 
 @bp.route("/inbox/<int:task_id>/clarify", methods=["POST"])
 def inbox_clarify(task_id):
-    """Clarify an inbox item into a refined task."""
+    """Clarify an inbox item into a refined task or feature, placed in the tree."""
     fields = _clarify_fields()
-    return _inbox_action(
-        task_id,
-        lambda s: tasks.clarify(
-            s, task_id, request.form["title"],
-            fields["body"], fields["project_key"], fields["context"], fields["size"],
-        ),
-    )
+    return _inbox_action(task_id, lambda s: _clarify(s, task_id, fields))
 
 
 @bp.route("/inbox/<int:task_id>/defer", methods=["POST"])

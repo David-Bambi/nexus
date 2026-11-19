@@ -485,6 +485,44 @@ form {
     color: var(--color-warning);
 }
 
+/* A subproject row sits indented under its root project. */
+.list > li.subproject {
+    padding-left: var(--space-7);
+}
+
+/* A project's computed version, e.g. v1.4. */
+.version {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+}
+
+/* Work tree: nested features and tasks, each level indented under its feature. */
+.tree {
+    list-style: none;
+    padding-left: 0;
+    margin-block: var(--space-2);
+}
+
+.tree .tree {
+    padding-left: var(--space-5);
+    border-left: 1px solid var(--color-border);
+}
+
+.tree-item {
+    padding-block: var(--space-1);
+}
+
+.tree-item summary {
+    cursor: pointer;
+}
+
+/* The add form under a feature sits indented like its children. */
+.tree .add-item {
+    padding-left: var(--space-5);
+    margin-block: var(--space-1);
+}
+
 /* Detail pages -------------------------------------------------------------------------------- */
 
 .meta {

@@ -84,6 +84,48 @@
 </span>
 {% endmacro %}
 
+{#
+  Form adding a feature or task to a project's tree, under `parent_ref` when
+  given. `closed` keeps the "show closed" choice after the redirect.
+#}
+{% macro add_item_form(project_key, parent_ref=none, closed=none) %}
+<form class="form-inline add-item" method="post" action="{{ url_for('pages.project_add_item', key=project_key, closed=closed) }}">
+    {% if parent_ref %}<input type="hidden" name="parent_ref" value="{{ parent_ref }}">{% endif %}
+    <input type="text" name="title" placeholder="New item…" aria-label="Title" required>
+    <select name="kind" aria-label="Kind">
+        <option value="task">task</option>
+        <option value="feature">feature</option>
+    </select>
+    <button type="submit">Add</button>
+</form>
+{% endmacro %}
+
+{#
+  A work tree: nested lists of features (collapsible, with an add form) and
+  tasks. `nodes` come from views.project_tree() or views.item_tree().
+#}
+{% macro work_tree(nodes, project_key, closed=none) %}
+<ul class="tree">
+    {% for node in nodes %}
+    {% set item = node.item %}
+    <li class="tree-item tree-{{ item.kind.name | lower }}">
+        {% if item.kind.name == "FEATURE" %}
+        <details open>
+            <summary>
+                {{ task_link(item) }} {{ ref_chip(item.ref) }} {{ badge(item.state.name) }}
+                {% if item.released_in %}<span class="hint">v{{ item.released_in }}</span>{% endif %}
+            </summary>
+            {% if node.children %}{{ work_tree(node.children, project_key, closed) }}{% endif %}
+            {{ add_item_form(project_key, item.ref, closed) }}
+        </details>
+        {% else %}
+        {{ task_link(item) }} {{ ref_chip(item.ref) }} {{ badge(item.state.name) }}
+        {% endif %}
+    </li>
+    {% endfor %}
+</ul>
+{% endmacro %}
+
 {# Events, oldest first; with `show_entity`, each row names its entity and links tasks. #}
 {% macro event_list(events, show_entity=false) %}
 <ul class="events">
