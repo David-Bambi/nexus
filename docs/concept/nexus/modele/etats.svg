@@ -40,8 +40,8 @@
 
   <!-- Passages -->
   <g stroke="#5c4630" stroke-width="2" fill="none" marker-end="url(#fleche)">
-    <line x1="180" y1="85" x2="268" y2="85"/>
-    <line x1="400" y1="85" x2="488" y2="85"/>
+    <line x1="180" y1="76" x2="268" y2="76"/>
+    <line x1="400" y1="76" x2="488" y2="76"/>
     <line x1="620" y1="85" x2="758" y2="85"/>
     <line x1="540" y1="110" x2="540" y2="218"/>
     <line x1="570" y1="220" x2="570" y2="112"/>
@@ -51,8 +51,11 @@
     <line x1="660" y1="300" x2="758" y2="358"/>
   </g>
 
-  <!-- Retours : rouvrir, restaurer -->
+  <!-- Retours : désaffiner, défaire le démarrage, rouvrir, restaurer -->
   <g stroke="#c0392b" stroke-width="2" stroke-dasharray="5 4" fill="none" marker-end="url(#fleche-retour)">
+    <line x1="268" y1="96" x2="182" y2="96"/>
+    <line x1="488" y1="96" x2="402" y2="96"/>
+    <line x1="490" y1="232" x2="396" y2="113"/>
     <path d="M825,58 C825,8 555,8 555,58"/>
     <path d="M825,392 C825,450 380,450 380,112"/>
   </g>
