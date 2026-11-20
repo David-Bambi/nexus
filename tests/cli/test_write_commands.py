@@ -150,3 +150,35 @@ def test_words_after_a_project_are_usage_errors(run, project, argv):
     Then it is a usage error: versions are gone
     """
     assert run("nx", *argv)[0] == EXIT_USAGE
+
+
+# State -------------------------------------------------------------------------------------------
+
+def test_state_jumps_through_each_step_by_the_cli_actor(run, session, project):
+    """
+    Given an inbox task in a project
+    When running `nexus state <ref> done`
+    Then it is done, each step logged by the cli actor
+    """
+    task = tasks.add_to_tree(session, "Write docs", project_key="nx")
+    code, out, _ = run("state", task.ref, "done")
+    assert code == EXIT_OK and f"Task {task.ref} is now done: Write docs" in out
+    history = events.history(session, "task", task.id)
+    assert [e.action for e in history][-3:] == ["clarified", "started", "completed"]
+    assert {e.actor for e in history[1:]} == {events.ACTOR_CLI}
+
+
+def test_state_waiting_takes_a_reason(run, session, project):
+    """WAITING needs --reason: refused without, kept with."""
+    task = tasks.add_to_tree(session, "Write docs", project_key="nx", refined=True)
+    code, _, err = run("state", task.ref, "WAITING")
+    assert code == EXIT_ERROR and "reason" in err
+    code, _, _ = run("state", task.ref, "WAITING", "--reason", "Review")
+    assert code == EXIT_OK and tasks.get(session, task.id).blocked_reason == "Review"
+
+
+@pytest.mark.parametrize("argv", [["state"], ["state", "nx", "DONE"], ["state", "t-xxx", "SOMEDAY"]])
+def test_state_usage_errors(run, project, argv):
+    """A missing argument, a project reference or a state out of the list is a usage error."""
+    code, _, _ = run(*argv)
+    assert code == EXIT_USAGE

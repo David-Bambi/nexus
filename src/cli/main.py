@@ -3,7 +3,7 @@ from typing import Callable, TextIO
 
 from sqlalchemy.orm import Session
 
-from src.cli import add, commands, export_cmd, import_cmd, views  # noqa: F401  (register commands)
+from src.cli import add, commands, export_cmd, import_cmd, state, views  # noqa: F401  (register commands)
 from src.cli.errors import UsageError
 from src.services.resolve import resolve
 from src.cli.session import open_session
@@ -19,7 +19,10 @@ USAGE = """usage: nexus <command> | <reference>
   nexus <subproject> [--all]
   nexus <feature|task>     feature or task detail (a feature: its children)
   nexus add task|feature <project> [--parent f-ref] [--title T] [--body B]
-                           [--context C] [--size S]   add to the tree, refined
+                           [--context C] [--size S]   add to the tree, in inbox
+  nexus state <feature|task> <STATE> [--reason R]
+                           move to INBOX, REFINED, DOING, WAITING, DONE or
+                           CANCELLED, through each step on the way
   nexus "<description>"     capture a task into the inbox
   nexus import <file|->
   nexus export features [-o FILE]   feature export for metrique (JSON)

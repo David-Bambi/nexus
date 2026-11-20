@@ -32,6 +32,7 @@ INSTRUCTIONS = (
     "Items move inbox -> refined -> doing -> waiting/done (or someday, cancelled). capture_task puts a bare "
     "title in the global inbox (no project); add_task puts an item straight into a project's tree, in the "
     "inbox state, still to refine; clarify_task triages an inbox item into the tree and refines it. "
+    "set_state moves an item to any state but someday, chaining the lifecycle steps on the way. "
     "Each project and subproject has a computed version MAJOR.MINOR: completing a feature raises MINOR by "
     "itself; MAJOR goes up with release_major once every criterion (numbered from 1 in get_project) is "
     "checked. There are no planned versions. "

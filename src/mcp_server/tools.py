@@ -404,6 +404,26 @@ _transition("cancel_task", "Cancel an open item that won't be done. A feature on
             tasks.cancel)
 _transition("restore_task", "Bring a cancelled item back to refined.", tasks.restore)
 _transition("defer_task", "Defer an inbox or refined item to someday.", tasks.defer)
+_transition("unstart_task", "Put a doing or waiting item back to refined; a waiting one loses its reason.",
+            tasks.unstart)
+_transition("unrefine_task", "Put a refined item back to inbox, to refine again; it keeps its place.",
+            tasks.unrefine)
+
+# States set_state can reach.
+_SETTABLE_STATES = ["INBOX", "REFINED", "DOING", "WAITING", "DONE", "CANCELLED"]
+
+
+@tool("set_state",
+      "Move an item to any of these states, chaining the lifecycle steps on the way (e.g. inbox to done is "
+      "refined, started, then completed; each step is logged). WAITING needs a reason.",
+      {"ref": _REF, "state": _string("Target state.", _SETTABLE_STATES),
+       "reason": _string("What the item waits for; only for WAITING.")},
+      ["ref", "state"])
+def set_state(session : Session, args : dict) -> dict:
+    """Move an item to a target state, through as many steps as needed."""
+    task = _task_of(session, args)
+    return serialize.task(tasks.change_state(session, task.id, TaskState[args["state"]],
+                                             args.get("reason") or "", actor=ACTOR))
 
 
 # -----------------------------------------------------------------------------

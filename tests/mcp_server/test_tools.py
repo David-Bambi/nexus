@@ -70,7 +70,7 @@ def test_every_tool_is_described_with_a_strict_schema_and_annotations():
     (only delete_criterion removes data)
     """
     listed = tools.list_tools()
-    assert len(listed) == len(tools.TOOLS) == 30
+    assert len(listed) == len(tools.TOOLS) == 33
     for item in listed:
         assert item["description"]
         assert item["inputSchema"]["type"] == "object" and item["inputSchema"]["additionalProperties"] is False
@@ -464,6 +464,9 @@ WRITE_CALLS = [
     ("complete_task", lambda w: {"ref": w.doing.ref}),
     ("block_task", lambda w: {"ref": w.doing.ref, "reason": "why"}),
     ("unblock_task", lambda w: {"ref": w.waiting.ref}),
+    ("unstart_task", lambda w: {"ref": w.doing.ref}),
+    ("unrefine_task", lambda w: {"ref": w.refined.ref}),
+    ("set_state", lambda w: {"ref": w.refined.ref, "state": "DONE"}),
 ]
 
 
@@ -661,3 +664,31 @@ def test_update_task_as_a_correction(session, world):
     assert _last_event(session).action == "corrected"
     ok(session, "update_task", ref=planned.ref, size="M")
     assert _last_event(session).action == "updated"
+
+
+# New transitions --------------------------------------------------------------------------------
+
+def test_unstart_and_unrefine_tools(session, world):
+    """A doing task goes back to refined, then to inbox, keeping its project."""
+    _, _, refined, _ = world
+    tasks.start(session, refined.id)
+    assert ok(session, "unstart_task", ref=refined.ref)["state"] == "REFINED"
+    back = ok(session, "unrefine_task", ref=refined.ref)
+    assert (back["state"], back["project"]) == ("INBOX", "nx")
+
+
+def test_set_state_jumps_and_logs_each_step(session, world):
+    """set_state goes from refined to waiting through doing, each step in the history."""
+    _, _, refined, _ = world
+    moved = ok(session, "set_state", ref=refined.ref, state="WAITING", reason="Review")
+    assert (moved["state"], moved["blocked_reason"]) == ("WAITING", "Review")
+    history = [e["action"] for e in ok(session, "get_task", ref=refined.ref)["history"]]
+    assert history[-2:] == ["started", "blocked"]
+
+
+def test_set_state_refusals(session, world):
+    """A missing reason, an unknown state and the current state are refused."""
+    _, _, refined, _ = world
+    assert "reason" in refused(session, "set_state", ref=refined.ref, state="WAITING")
+    assert "must be one of" in refused(session, "set_state", ref=refined.ref, state="SOMEDAY")
+    assert "can't go from REFINED to REFINED" in refused(session, "set_state", ref=refined.ref, state="REFINED")
