@@ -109,9 +109,9 @@ format and details: `docs/concept/nexus/interfaces/cli/` and
 ## MCP server
 
 The running service also speaks the Model Context Protocol, so an AI
-assistant can read and update your projects (33 tools: list, get, search,
+assistant can read and update your projects (35 tools: list, get, search,
 dashboard, capture, add, clarify, move, reorder, change kind, update, state
-changes, project and criteria editing, major release, import). Register it
+changes, archiving, project and criteria editing, major release, import). Register it
 once in Claude Code:
 
 ```bash
@@ -120,7 +120,7 @@ claude mcp add --transport http nexus http://127.0.0.1:8765/mcp
 
 Read-only tools can be auto-allowed; write tools prompt for approval, and
 their events are logged with actor `mcp`. Deleting items or projects and
-archiving stay in the web UI. Security: the endpoint has no authentication
+archiving projects stay in the web UI. Security: the endpoint has no authentication
 and relies on the loopback binding plus a Host/Origin/Content-Type check; it
 is unavailable while the service is down. Tools and rules:
 `docs/concept/nexus/interfaces/mcp/`.

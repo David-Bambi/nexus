@@ -18,6 +18,9 @@
     {% if task.body %}
     <p class="lead">{{ task.body }}</p>
     {% endif %}
+    {% if task.archived_at %}
+    <p class="hint" data-field="archived">Archived on {{ task.archived_at.strftime("%Y-%m-%d") }}: hidden from the lists, kept in the Archived tab of its project.</p>
+    {% endif %}
     {% if state == "WAITING" %}
     <p class="blocked-reason"><strong>Blocked reason:</strong> {{ task.blocked_reason }}</p>
     {% endif %}
@@ -64,6 +67,16 @@
         {% if state == "CANCELLED" %}
         <form method="post" action="{{ url_for('pages.task_restore', task_id=task.id, next=next) }}">
             <button class="button-primary" type="submit">Restore to refined</button>
+        </form>
+        {% endif %}
+
+        {% if task.archived_at %}
+        <form method="post" action="{{ url_for('pages.task_unarchive', task_id=task.id, next=next) }}">
+            <button type="submit">Unarchive</button>
+        </form>
+        {% elif state in ("DONE", "CANCELLED") %}
+        <form method="post" action="{{ url_for('pages.task_archive', task_id=task.id, next=next) }}">
+            <button type="submit">Archive</button>
         </form>
         {% endif %}
 

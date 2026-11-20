@@ -4,7 +4,7 @@ from datetime import date
 from flask import abort, current_app, redirect, render_template, request, url_for
 
 from src.models.project import ProjectPriority
-from src.models.task import TaskKind
+from src.models.task import TaskKind, TaskState
 from src.services import ai_share, export, projects, tasks, views
 from src.services.errors import ConflictError, NotFoundError, ValidationError
 from src.web.pages._shared import _session, bp
@@ -178,6 +178,24 @@ def project_update(key):
     return _project_action(key, lambda s: projects.update(
         s, key, request.form.get("name", ""), request.form.get("description"),
         directory=request.form.get("directory", ""), priority=priority), form="edit-project")
+
+
+@bp.route("/projects/<key>/items/archive", methods=["POST"])
+def project_archive_closed(key):
+    """Archive every done or cancelled item of a project ("state" in the
+    form), then come back to that state's tab."""
+    state = {"DONE": TaskState.DONE, "CANCELLED": TaskState.CANCELLED}.get(request.form.get("state", ""))
+    view = state.name.lower() if state else "done"
+    session = _session()
+    project = _get_project(key)
+    try:
+        if state is None:
+            raise ValidationError("only done or cancelled items can be archived.")
+        tasks.archive_closed(session, project, state)
+    except ValidationError as e:
+        session.rollback()
+        return _render_project(project, str(e), 400)
+    return redirect(url_for("pages.project_detail", key=key, view=view))
 
 
 @bp.route("/projects/<key>/archive", methods=["POST"])

@@ -70,7 +70,7 @@ def test_every_tool_is_described_with_a_strict_schema_and_annotations():
     (only delete_criterion removes data)
     """
     listed = tools.list_tools()
-    assert len(listed) == len(tools.TOOLS) == 33
+    assert len(listed) == len(tools.TOOLS) == 35
     for item in listed:
         assert item["description"]
         assert item["inputSchema"]["type"] == "object" and item["inputSchema"]["additionalProperties"] is False
@@ -467,6 +467,8 @@ WRITE_CALLS = [
     ("unstart_task", lambda w: {"ref": w.doing.ref}),
     ("unrefine_task", lambda w: {"ref": w.refined.ref}),
     ("set_state", lambda w: {"ref": w.refined.ref, "state": "DONE"}),
+    ("archive_task", lambda w: {"ref": w.done.ref}),
+    ("unarchive_task", lambda w: {"ref": w.archived.ref}),
 ]
 
 
@@ -490,11 +492,14 @@ def test_every_write_tool_logs_the_mcp_actor(session, world, name, arguments):
     tasks.complete(session, done.id)
     cancelled = tasks.add_to_tree(session, "Cancelled", project_key="nx", refined=True)
     tasks.cancel(session, cancelled.id)
+    archived = tasks.add_to_tree(session, "Archived", project_key="nx")
+    tasks.cancel(session, archived.id)
+    tasks.archive(session, archived.id)
     from src.services import versioning
     criterion = versioning.add_criterion(session, "nx", "Ready")
     versioning.set_criterion_done(session, criterion.id, True)
     known = SimpleNamespace(planned=planned, refined=refined, doing=doing, waiting=waiting,
-                            inbox=inbox, done=done, cancelled=cancelled)
+                            inbox=inbox, done=done, cancelled=cancelled, archived=archived)
     before = session.query(Event).count()
     ok(session, name, **arguments(known))
     fresh = session.query(Event).order_by(Event.id).offset(before).all()
@@ -704,3 +709,15 @@ def test_update_project_priority_and_dashboard_projects(session, world):
     assert "must be one of" in refused(session, "update_project", project="nx", priority="URGENT")
     assert [(p["key"], p["priority"], p["features_done"], p["features_total"])
             for p in ok(session, "dashboard")["projects"]] == [("other", "HIGH", 0, 0), ("nx", "NORMAL", 0, 1)]
+
+
+# Archiving ---------------------------------------------------------------------------------------
+
+def test_archive_and_unarchive_tools(session, world):
+    """A cancelled item is archived then unarchived; an open one is refused."""
+    _, _, refined, _ = world
+    assert "isn't done or cancelled" in refused(session, "archive_task", ref=refined.ref)
+    tasks.cancel(session, refined.id)
+    archived = ok(session, "archive_task", ref=refined.ref)
+    assert archived["archived"] is True and archived["archived_at"] and archived["state"] == "CANCELLED"
+    assert ok(session, "unarchive_task", ref=refined.ref)["archived"] is False

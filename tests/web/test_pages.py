@@ -1575,3 +1575,46 @@ def test_empty_state_view_says_so(client):
     """A tab with nothing in its state says so."""
     client.post("/projects", data={"key": "nexus", "name": "Nexus"})
     assert "No someday items." in client.get("/projects/nexus?view=someday").get_data(as_text=True)
+
+
+# Archiving ---------------------------------------------------------------------------------------
+
+def test_archive_from_the_done_tab_moves_the_item_to_the_archived_tab(client):
+    """Archive on a Done row hides it there and shows it in Archived, whose Unarchive brings it back."""
+    _project_with_states(client)
+    response = client.post("/tasks/2/archive", data={"return_to": "/projects/nexus?view=done"})
+    assert response.headers["Location"] == "/projects/nexus?view=done"
+    assert "Shipped feature" not in client.get("/projects/nexus?view=done").get_data(as_text=True).split('class="view-tabs"')[1]
+
+    archived = client.get("/projects/nexus?view=archived").get_data(as_text=True).split('class="view-tabs"')[1]
+    assert "Shipped feature" in archived and ">Unarchive</button>" in archived and "badge-done" in archived
+    assert "Archive all" not in archived
+
+    client.post("/tasks/2/unarchive", data={"return_to": "/projects/nexus?view=archived"})
+    assert "Shipped feature" in client.get("/projects/nexus?view=done").get_data(as_text=True).split('class="view-tabs"')[1]
+
+
+def test_archive_all_archives_every_cancelled_item(client):
+    """Archive all in the Cancelled tab archives them all and comes back to the tab."""
+    _project_with_states(client)
+    response = client.post("/projects/nexus/items/archive", data={"state": "CANCELLED"})
+    assert response.headers["Location"] == "/projects/nexus?view=cancelled"
+    assert "No cancelled items." in client.get("/projects/nexus?view=cancelled").get_data(as_text=True)
+    assert client.post("/projects/nexus/items/archive", data={"state": "DOING"}).status_code == 400
+
+
+def test_archived_items_leave_the_tasks_page_and_the_task_page_says_so(client):
+    """An archived item isn't on the Tasks page; its own page says it is archived and offers Unarchive."""
+    _project_with_states(client)
+    client.post("/tasks/3/archive")
+    assert "Dropped idea" not in client.get("/tasks").get_data(as_text=True)
+    html = client.get("/tasks/3").get_data(as_text=True)
+    assert 'data-field="archived"' in html and ">Unarchive</button>" in html
+
+
+def test_an_open_item_cannot_be_archived(client):
+    """Archiving an open item is refused with the error on its page."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    client.post("/projects/nexus/items", data={"title": "Open"})
+    response = client.post("/tasks/1/archive")
+    assert response.status_code == 200 and "isn&#39;t done or cancelled" in response.get_data(as_text=True)

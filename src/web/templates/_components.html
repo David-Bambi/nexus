@@ -208,7 +208,7 @@
 {% macro view_tabs(project_key, view) %}
 <nav class="view-tabs" aria-label="Work views">
     <a href="{{ url_for('pages.project_detail', key=project_key) }}"{% if view == "backlog" %} aria-current="true"{% endif %}>Backlog</a>
-    {% for name in ("kanban", "someday", "done", "cancelled") %}
+    {% for name in ("kanban", "someday", "done", "cancelled", "archived") %}
     <a href="{{ url_for('pages.project_detail', key=project_key, view=name) }}"{% if view == name %} aria-current="true"{% endif %}>{{ name | capitalize }}</a>
     {% endfor %}
 </nav>
@@ -216,25 +216,43 @@
 
 {#
   The items of a project in one closed or set-aside state (someday, done,
-  cancelled), newest first: each with its place, its date, a feature's
-  release, and the button bringing it back (Refine, Reopen or Restore),
-  which comes back to this view.
+  cancelled), or archived, newest first: each with its place, its date, a
+  feature's release, and its buttons, which come back to this view. Someday,
+  done and cancelled items have the way back to work (Refine, Reopen or
+  Restore); done and cancelled ones also Archive, with an Archive all above;
+  archived ones have Unarchive.
 #}
-{% macro state_items(items, view) %}
+{% macro state_items(items, view, project_key) %}
 {% set back = request.full_path.rstrip("?") %}
-{% set action = {"someday": ("REFINED", "Refine"), "done": ("DOING", "Reopen"), "cancelled": ("REFINED", "Restore")}[view] %}
+{% set action = {"someday": ("REFINED", "Refine"), "done": ("DOING", "Reopen"), "cancelled": ("REFINED", "Restore"), "archived": none}[view] %}
+{% set archivable = view in ("done", "cancelled") %}
+{% if items and archivable %}
+<form class="form-inline archive-all" method="post" action="{{ url_for('pages.project_archive_closed', key=project_key) }}">
+    <input type="hidden" name="state" value="{{ view | upper }}">
+    <button type="submit">Archive all</button>
+</form>
+{% endif %}
 {% if items %}
 <ul class="list state-items">
     {% for item in items %}
     <li>
         {{ task_link(item, back) }} {{ ref_chip(item.ref) }} {{ task_place(item) }}
+        {% if view == "archived" %}{{ badge(item.state.name) }}{% endif %}
         {% if item.released_in %}<span class="version">v{{ item.released_in }}</span>{% endif %}
         <span class="hint">{{ (item.closed_at or item.updated_at).strftime("%Y-%m-%d") }}</span>
+        {% if action %}
         <form class="form-inline" method="post" action="{{ url_for('pages.task_state', task_id=item.id) }}">
             <input type="hidden" name="state" value="{{ action[0] }}">
             <input type="hidden" name="return_to" value="{{ back }}">
             <button type="submit">{{ action[1] }}</button>
         </form>
+        {% endif %}
+        {% if archivable or view == "archived" %}
+        <form class="form-inline" method="post" action="{{ url_for('pages.task_archive' if archivable else 'pages.task_unarchive', task_id=item.id) }}">
+            <input type="hidden" name="return_to" value="{{ back }}">
+            <button type="submit">{{ "Archive" if archivable else "Unarchive" }}</button>
+        </form>
+        {% endif %}
     </li>
     {% endfor %}
 </ul>

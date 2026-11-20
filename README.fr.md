@@ -115,9 +115,9 @@ d'import et détails : `docs/concept/nexus/interfaces/cli/` et
 ## Serveur MCP
 
 Le service en marche parle aussi le Model Context Protocol : un assistant IA
-peut lire et modifier tes projets (33 outils : lister, lire, chercher,
+peut lire et modifier tes projets (35 outils : lister, lire, chercher,
 tableau de bord, capturer, ajouter, clarifier, déplacer, réordonner, changer
-de nature, modifier, changements d'état, édition des projets et des critères,
+de nature, modifier, changements d'état, archivage, édition des projets et des critères,
 version majeure, import). Enregistre-le une fois dans Claude Code :
 
 ```bash
@@ -126,8 +126,8 @@ claude mcp add --transport http nexus http://127.0.0.1:8765/mcp
 
 Les outils en lecture peuvent être autorisés d'office ; les outils en
 écriture demandent une approbation, et leurs événements sont journalisés avec
-l'acteur `mcp`. Supprimer des éléments ou des projets et archiver restent
-dans l'interface web. Sécurité : le point d'accès n'a pas d'authentification
+l'acteur `mcp`. Supprimer des éléments ou des projets et archiver un projet
+restent dans l'interface web. Sécurité : le point d'accès n'a pas d'authentification
 et repose sur l'écoute en boucle locale plus une vérification
 Host/Origin/Content-Type ; il est indisponible quand le service est arrêté.
 Outils et règles : `docs/concept/nexus/interfaces/mcp/`.

@@ -102,7 +102,7 @@
 <p class="empty">No tasks to do.</p>
 {% endif %}
 {% elif view != "backlog" %}
-{{ ui.state_items(items, view) }}
+{{ ui.state_items(items, view, project.key) }}
 {% else %}
 {{ ui.add_item_form(project.key, none, "add-root", open_form) }}
 {% if tree %}

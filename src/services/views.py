@@ -149,22 +149,26 @@ def project_tree(project : Project, include_closed : bool = False) -> list:
 
 
 # States a project page lists in a tab of their own, by the view name.
-STATE_VIEWS = {"someday": TaskState.SOMEDAY, "done": TaskState.DONE, "cancelled": TaskState.CANCELLED}
+# "archived" lists the archived items, whatever their state.
+STATE_VIEWS = {"someday": TaskState.SOMEDAY, "done": TaskState.DONE, "cancelled": TaskState.CANCELLED,
+               "archived": None}
 
 
-def project_items(project : Project, state : TaskState) -> list:
-    """List a project's features and tasks in one state, newest first.
+def project_items(project : Project, state : TaskState | None) -> list:
+    """List a project's features and tasks in one state, or archived, newest first.
 
     Args:
         project: Project or subproject; a root project's subprojects'
             items are included.
-        state: The state to list.
+        state: The state to list, archived items left out; None to list
+            the archived items instead.
 
     Returns:
         The matching items, the most recently changed (or closed) first.
     """
     items = [item for scope in (project, *project.subprojects) for item in scope.tasks
-             if item.state is state]
+             if (item.archived_at is not None if state is None
+                 else item.state is state and item.archived_at is None)]
     return sorted(items, key=lambda item: item.closed_at or item.updated_at, reverse=True)
 
 

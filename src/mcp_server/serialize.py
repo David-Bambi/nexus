@@ -51,7 +51,8 @@ def task_brief(item : Task) -> dict:
             "parent": item.parent.ref if item.parent else None,
             "size": item.size,
             "context": item.context,
-            "released_in": item.released_in}
+            "released_in": item.released_in,
+            "archived": item.archived_at is not None}
 
 
 def task(item : Task) -> dict:
@@ -61,7 +62,8 @@ def task(item : Task) -> dict:
             "blocked_reason": item.blocked_reason,
             "created_at": _iso(item.created_at),
             "updated_at": _iso(item.updated_at),
-            "closed_at": _iso(item.closed_at)}
+            "closed_at": _iso(item.closed_at),
+            "archived_at": _iso(item.archived_at)}
 
 
 def event(item : Event) -> dict:

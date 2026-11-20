@@ -407,6 +407,9 @@ _transition("restore_task", "Bring a cancelled item back to refined.", tasks.res
 _transition("defer_task", "Defer an inbox or refined item to someday.", tasks.defer)
 _transition("unstart_task", "Put a doing or waiting item back to refined; a waiting one loses its reason.",
             tasks.unstart)
+_transition("archive_task", "Archive a done or cancelled item, with its descendants: it keeps its state but leaves "
+            "the lists (web Archived tab).", tasks.archive)
+_transition("unarchive_task", "Bring an archived item, with its descendants, back to the lists.", tasks.unarchive)
 _transition("unrefine_task", "Put a refined item back to inbox, to refine again; it keeps its place.",
             tasks.unrefine)
 

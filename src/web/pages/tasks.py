@@ -18,12 +18,12 @@ def sizes_guide():
 
 @bp.route("/tasks", methods=["GET", "POST"])
 def tasks_list():
-    """List all tasks; a plain HTML form on the same page captures one."""
+    """List all tasks but archived ones; a plain HTML form on the same page captures one."""
     session = _session()
     if request.method == "POST":
         tasks.capture(session, request.form["title"])
         return redirect(url_for("pages.tasks_list"))
-    recent = tasks.list(session, limit=PAGE_LIMIT)
+    recent = tasks.list(session, limit=PAGE_LIMIT, include_archived=False)
     return render_template("tasks.html", tasks=recent, truncated=len(recent) == PAGE_LIMIT, limit=PAGE_LIMIT)
 
 
@@ -245,11 +245,34 @@ def task_state(task_id):
             raise ValidationError("unknown state.")
         return tasks.change_state(session, task_id, target, request.form.get("reason", ""))
 
-    task, error = _run_transition(_session(), task_id, move)
+    return _transition_then_return(task_id, move)
+
+
+def _transition_then_return(task_id, fn):
+    """Apply a change to a task, then go back to the safe "return_to" page
+    when one is given; otherwise, and on a refusal, show the task page.
+
+    Args:
+        task_id: Id of the task.
+        fn: Callable taking the session and applying the change.
+    """
+    task, error = _run_transition(_session(), task_id, fn)
     target = _local_path(request.values.get("return_to"))
     if target and not error:
         return redirect(target)
     return _render_task(task, error)
+
+
+@bp.route("/tasks/<int:task_id>/archive", methods=["POST"])
+def task_archive(task_id):
+    """Archive a done or cancelled item (and its descendants)."""
+    return _transition_then_return(task_id, lambda s: tasks.archive(s, task_id))
+
+
+@bp.route("/tasks/<int:task_id>/unarchive", methods=["POST"])
+def task_unarchive(task_id):
+    """Bring an archived item (and its descendants) back to the lists."""
+    return _transition_then_return(task_id, lambda s: tasks.unarchive(s, task_id))
 
 
 @bp.route("/tasks/<int:task_id>/children", methods=["POST"])

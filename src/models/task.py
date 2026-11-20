@@ -96,6 +96,10 @@ class Task(Base):
     # Set on completion, cleared on reopen.
     closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
 
+    # Set when a done or cancelled item is archived (put away from the
+    # lists), cleared on unarchive, reopen or restore.
+    archived_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+
     # Version of the nearest project the feature first shipped in (e.g.
     # "1.4"); set on its first completion and kept on reopen. Always null
     # on a task.

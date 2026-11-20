@@ -875,3 +875,81 @@ def test_change_state_jumps_from_someday_through_refined(session, nexus):
     tasks.defer(session, task.id)
     tasks.change_state(session, task.id, TaskState.DONE)
     assert [a for a, _ in _history(session, task.id)][-3:] == ["clarified", "started", "completed"]
+
+
+# Archiving ---------------------------------------------------------------------------------------
+
+def _done_feature_with_child(session):
+    """A done feature with a done child task, in project nexus."""
+    feature = tasks.add_to_tree(session, "Auth", project_key="nexus", kind=TaskKind.FEATURE)
+    child = tasks.add_to_tree(session, "Login", parent_ref=feature.ref)
+    tasks.change_state(session, child.id, TaskState.DONE)
+    tasks.change_state(session, feature.id, TaskState.DONE)
+    return feature, child
+
+
+def test_archive_puts_a_closed_feature_away_with_its_children(session, nexus):
+    """
+    Given a done feature with a done child
+    When the feature is archived, then unarchived
+    Then both are archived, keeping their state, each logged; then both come back
+    """
+    feature, child = _done_feature_with_child(session)
+
+    tasks.archive(session, feature.id)
+    assert feature.archived_at and child.archived_at and child.state is TaskState.DONE
+    assert _history(session, child.id)[-1][0] == "archived"
+
+    tasks.unarchive(session, feature.id)
+    assert (feature.archived_at, child.archived_at) == (None, None)
+    assert _history(session, feature.id)[-1][0] == "unarchived"
+
+
+def test_archive_refuses_an_open_or_already_archived_item(session, nexus):
+    """An open item can't be archived, nor an archived one twice; unarchive needs an archived item."""
+    task = tasks.add_to_tree(session, "Login", project_key="nexus")
+    with pytest.raises(InvalidTransitionError):
+        tasks.archive(session, task.id)
+    with pytest.raises(InvalidTransitionError):
+        tasks.unarchive(session, task.id)
+    tasks.cancel(session, task.id)
+    tasks.archive(session, task.id)
+    with pytest.raises(InvalidTransitionError):
+        tasks.archive(session, task.id)
+
+
+@pytest.mark.parametrize("way_back", ["reopen", "restore"])
+def test_reopen_or_restore_lifts_the_archive(session, nexus, way_back):
+    """An archived item brought back to work is no longer archived."""
+    task = tasks.add_to_tree(session, "Login", project_key="nexus")
+    if way_back == "reopen":
+        tasks.change_state(session, task.id, TaskState.DONE)
+    else:
+        tasks.cancel(session, task.id)
+    tasks.archive(session, task.id)
+    getattr(tasks, way_back)(session, task.id)
+    assert task.archived_at is None
+
+
+def test_archive_closed_archives_one_state_of_a_project_and_its_subprojects(session, nexus):
+    """
+    Given done items in the project and its subproject, a done feature with a cancelled child, and a cancelled item
+    When archiving all done items
+    Then every done item and the feature's child are archived, the loose cancelled one stays
+    """
+    projects.create(session, "web", "Web", parent_key="nexus")
+    feature = tasks.add_to_tree(session, "Auth", project_key="nexus", kind=TaskKind.FEATURE)
+    dropped_child = tasks.add_to_tree(session, "Dropped child", parent_ref=feature.ref)
+    tasks.cancel(session, dropped_child.id)
+    tasks.change_state(session, feature.id, TaskState.DONE)
+    sub_done = tasks.add_to_tree(session, "Page", project_key="web")
+    tasks.change_state(session, sub_done.id, TaskState.DONE)
+    loose = tasks.add_to_tree(session, "Loose", project_key="nexus")
+    tasks.cancel(session, loose.id)
+
+    count = tasks.archive_closed(session, projects.get(session, "nexus"), TaskState.DONE)
+
+    assert count == 3 and all(t.archived_at for t in (feature, dropped_child, sub_done))
+    assert loose.archived_at is None
+    with pytest.raises(ValidationError):
+        tasks.archive_closed(session, projects.get(session, "nexus"), TaskState.DOING)

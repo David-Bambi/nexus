@@ -218,22 +218,24 @@ def get_by_ref(session : Session, ref : str) -> Task:
     else:
         return task
 
-def list(session : Session, limit : int | None = None) -> list:
+def list(session : Session, limit : int | None = None, include_archived : bool = True) -> list:
     """List work items (features and tasks).
 
     Args:
         session: Database session to use.
         limit: Optional maximum number of tasks to return.
+        include_archived: False to leave archived items out.
 
     Returns:
         All tasks, ordered by creation, oldest first. With a limit, only
         the `limit` most recently created ones (still oldest first).
     """
+    query = session.query(Task)
+    if not include_archived:
+        query = query.filter(Task.archived_at.is_(None))
     if limit is None:
-        return session.query(Task).order_by(Task.created_at, Task.id).all()
-
-
-    recent = session.query(Task).order_by(Task.created_at.desc(), Task.id.desc()).limit(limit).all()
+        return query.order_by(Task.created_at, Task.id).all()
+    recent = query.order_by(Task.created_at.desc(), Task.id.desc()).limit(limit).all()
     return recent[::-1]
 
 # -----------------------------------------------------------------------------
@@ -667,6 +669,8 @@ def reopen(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -> 
 
     task.state = TaskState.DOING
     task.closed_at = None
+    # Open again, so no longer put away.
+    task.archived_at = None
 
     _log_transition(session, task, "reopened", TaskState.DONE, actor=actor)
     session.commit()
@@ -928,6 +932,8 @@ def restore(session : Session, task_id : int, actor : str = events.ACTOR_WEB) ->
 
     task.state = TaskState.REFINED
     task.closed_at = None
+    # Open again, so no longer put away.
+    task.archived_at = None
 
     _log_transition(session, task, "restored", TaskState.CANCELLED, actor=actor)
     session.commit()
@@ -1051,6 +1057,113 @@ def change_state(session : Session, task_id : int, target : TaskState, reason : 
     for state in path:
         task = _step(session, task, state, reason, actor)
     return task
+
+# -----------------------------------------------------------------------------
+# Archiving
+# -----------------------------------------------------------------------------
+
+def _archive_tree(session : Session, task : Task, now : datetime, actor : str) -> int:
+    """Mark an item and its descendants archived, each logged.
+
+    A closed feature's descendants are all closed too.
+
+    Args:
+        session: Database session to use.
+        task: The closed item.
+        now: Archive time to record.
+        actor: Who made the change, recorded in the event log.
+
+    Returns:
+        How many items were newly archived.
+    """
+    count = 0
+    for item in (task, *_descendants(task)):
+        if item.archived_at is None:
+            item.archived_at = now
+            _log(session, actor, item, "archived")
+            count += 1
+    return count
+
+def archive(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -> Task:
+    """Put a done or cancelled item away from the lists, with its descendants.
+
+    The item keeps its state: archiving only hides it. Each item archived is
+    logged as "archived".
+
+    Args:
+        session: Database session to use.
+        task_id: Id of the task.
+        actor: Who made the change, recorded in the event log.
+
+    Returns:
+        The archived Task.
+
+    Raises:
+        NotFoundError: If no task has this id.
+        InvalidTransitionError: If the item isn't done or cancelled, or is
+            already archived.
+    """
+    task = get(session, task_id)
+    if task.state not in _CLOSED_STATES:
+        raise InvalidTransitionError(f"'{task.ref}' isn't done or cancelled.")
+    if task.archived_at is not None:
+        raise InvalidTransitionError(f"'{task.ref}' is already archived.")
+    _archive_tree(session, task, datetime.utcnow(), actor)
+    session.commit()
+    return task
+
+def unarchive(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -> Task:
+    """Bring an archived item back to the lists, with its descendants.
+
+    Args:
+        session: Database session to use.
+        task_id: Id of the task.
+        actor: Who made the change, recorded in the event log.
+
+    Returns:
+        The unarchived Task.
+
+    Raises:
+        NotFoundError: If no task has this id.
+        InvalidTransitionError: If the item isn't archived.
+    """
+    task = get(session, task_id)
+    if task.archived_at is None:
+        raise InvalidTransitionError(f"'{task.ref}' isn't archived.")
+    for item in (task, *_descendants(task)):
+        if item.archived_at is not None:
+            item.archived_at = None
+            _log(session, actor, item, "unarchived")
+    session.commit()
+    return task
+
+def archive_closed(session : Session, project : Project, state : TaskState,
+                   actor : str = events.ACTOR_WEB) -> int:
+    """Archive every done (or cancelled) item of a project at once.
+
+    Args:
+        session: Database session to use.
+        project: Project or subproject; a root project's subprojects'
+            items are archived too.
+        state: TaskState.DONE or TaskState.CANCELLED.
+        actor: Who made the change, recorded in the event log.
+
+    Returns:
+        How many items were archived, descendants included.
+
+    Raises:
+        ValidationError: If the state isn't done or cancelled.
+    """
+    if state not in _CLOSED_STATES:
+        raise ValidationError("only done or cancelled items can be archived.")
+    now = datetime.utcnow()
+    count = 0
+    for scope in (project, *project.subprojects):
+        for item in scope.tasks:
+            if item.state is state and item.archived_at is None:
+                count += _archive_tree(session, item, now, actor)
+    session.commit()
+    return count
 
 # -----------------------------------------------------------------------------
 # Deletion
