@@ -1,0 +1,22 @@
+---
+title: Onglets d'état d'un projet
+summary: "Les onglets Someday, Done et Cancelled de la page projet : ce qui est mis de côté ou fermé, et le bouton pour le ressortir"
+icon: lucide:archive-restore
+image: onglets-etat.png
+links: []
+related:
+  - 
+---
+
+__Adresse__ : `/projects/<clé>?view=someday`, `done` ou `cancelled`, trois onglets de la page [Projet](projet.cpt).
+
+__Ce qu'on y voit__
+- Les fonctionnalités et tâches du projet dans cet état, sous-projets compris pour un projet racine, les plus récentes d'abord (date de clôture, sinon de dernière modification).
+- Par ligne : titre, référence, place (projet, fonctionnalité parente), version de livraison d'une fonctionnalité terminée, date.
+- Onglet vide : « No someday items. » (etc.).
+
+__Ce qu'on y fait__
+- Ressortir un élément : __Refine__ (someday → refined), __Reopen__ (done → doing), __Restore__ (cancelled → refined). Le bouton passe par le [changement d'état](../../../modele/etats.cpt) et revient à l'onglet.
+- Rien d'autre, comme au [Kanban](kanban.cpt) : créer et gérer restent dans __Backlog__.
+
+Pourquoi : voir et ressortir ce qui est mis de côté ou fermé, projet par projet, sans quitter sa page ; un seul mécanisme pour les trois états.

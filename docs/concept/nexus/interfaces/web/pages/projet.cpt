@@ -8,7 +8,7 @@ related:
   -
 ---
 
-__Adresse__ : `/projects/<clé>`. Onglets __Backlog__ (ici) et [Kanban](kanban.cpt).
+__Adresse__ : `/projects/<clé>`. Onglets __Backlog__ (ici), [Kanban](kanban.cpt), [états](onglets-etat.cpt).
 
 __Ce qu'on y voit__
 - En tête : clé, statut, badge de [priorité](../../../modele/arbre.cpt), version, répertoire (ou celui du parent), __Subprojects__ (projet racine).

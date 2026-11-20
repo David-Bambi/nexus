@@ -12,7 +12,7 @@ __Adresse__ : `/projects/<clé>?view=kanban`, l'onglet __Kanban__ de la page [Pr
 
 __Ce qu'on y voit__
 - Un __couloir__ par fonctionnalité de premier niveau, puis __No feature__ pour les tâches posées sur le projet ; ensuite ceux des sous-projets, titrés « Sous-projet / Fonctionnalité ». Les sous-fonctionnalités se fondent dans leur couloir ; un couloir vide est masqué.
-- Quatre __colonnes__ teintées, avec leur compte : INBOX, REFINED, DOING, WAITING. Les tâches done, someday et cancelled n'y sont pas.
+- Quatre __colonnes__ teintées, avec leur compte : INBOX, REFINED, DOING, WAITING. Done, someday, cancelled : voir les [onglets d'état](onglets-etat.cpt).
 - Une __carte__ par tâche, dans l'ordre de l'arbre : titre, référence, taille, raison d'attente.
 
 __Ce qu'on y fait__

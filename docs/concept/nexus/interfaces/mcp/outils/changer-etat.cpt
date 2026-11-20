@@ -8,7 +8,7 @@ related:
   - 
 ---
 
-__Rôle__ : dix outils font passer un élément d'un [état](../../../modele/etats.cpt) à un autre, un passage chacun.
+__Rôle__ : dix outils font chacun un passage d'[état](../../../modele/etats.cpt).
 - `start_task` : refined → doing ; `unstart_task` : doing ou waiting → refined.
 - `unrefine_task` : refined → inbox, à sa place.
 - `complete_task` : doing → done ; `reopen_task` : done → doing.
@@ -16,13 +16,14 @@ __Rôle__ : dix outils font passer un élément d'un [état](../../../modele/eta
 - `cancel_task` : tout état ouvert → cancelled ; `restore_task` : cancelled → refined.
 - `defer_task` : inbox ou refined → someday.
 
-`set_state` amène l'élément à un état visé (sauf someday) en enchaînant ces passages, chacun au journal : inbox → done donne `clarified`, `started`, `completed`.
+`set_state` amène l'élément à un état visé (sauf someday) en enchaînant ces passages, journalisés : inbox → done donne `clarified`, `started`, `completed`.
 
 __Arguments__ : `ref` ; `reason` pour `block_task`, et pour `set_state` vers waiting ; `state` pour `set_state`.
 
 __Règles__
-- Un mauvais état de départ, ou l'état actuel, est refusé avant toute étape.
+- Un mauvais départ, ou l'état actuel, est refusé d'emblée.
 - Terminer ou annuler une fonctionnalité est refusé tant qu'un enfant est ouvert.
+- Depuis someday, la première étape raffine (`clarified`).
 - Une tâche qui quitte waiting perd sa raison.
 - Terminer une fonctionnalité la première fois fait monter la [version mineure](../../../modele/version/mineure.cpt).
 
