@@ -1,6 +1,6 @@
 ---
 title: Projet
-summary: "Un projet : arbre de travail, critères de majeure, modification et zone dangereuse"
+summary: "Un projet, vue Backlog : arbre de travail, critères de majeure, modification et zone dangereuse"
 icon: lucide:folder-kanban
 image: projet.png
 links: []
@@ -8,7 +8,7 @@ related:
   - 
 ---
 
-__Adresse__ : `/projects/<clé>`.
+__Adresse__ : `/projects/<clé>`. Deux onglets : __Backlog__, par défaut, ici, et [Kanban](kanban.cpt).
 
 __Ce qu'on y voit__
 - En tête : clé, statut, version, répertoire (ou celui du parent, « (from … ) »), sous-projets.

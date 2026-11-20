@@ -7,6 +7,7 @@ gabarit: tableau-de-bord.cpt
 links: [tableau-de-bord.cpt,
         projets.cpt,
         projet.cpt,
+        kanban.cpt,
         element.cpt,
         taches.cpt,
         inbox.cpt,
@@ -18,4 +19,4 @@ related:
   - 
 ---
 
-Les écrans de l'application web : chacun a son adresse et affiche une page complète. 10 entrées.
+Les écrans de l'application web : chacun a son adresse et affiche une page complète. 11 entrées.

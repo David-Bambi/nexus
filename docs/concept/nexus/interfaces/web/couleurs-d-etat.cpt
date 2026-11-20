@@ -1,0 +1,19 @@
+---
+title: Couleurs d'état
+summary: "Une couleur par état, partagée par les badges, les colonnes et les pastilles du Kanban"
+icon: lucide:swatch-book
+links: []
+related:
+  - 
+---
+
+Chaque [état](../../modele/etats.cpt) a sa couleur, tirée des jetons de `app.css`, pour qu'on le reconnaisse d'un coup d'œil.
+
+- __inbox__ : gris (`--color-text-muted`).
+- __refined__ : violet (`--color-info`).
+- __doing__ : bleu (`--color-accent`).
+- __waiting__ : orange (`--color-warning`).
+- __done__ : vert (`--color-success`).
+- __cancelled__ : rouge (`--color-danger`).
+
+Un élément marqué `data-state="<ÉTAT>"` reçoit la couleur dans la variable `--state-color`. Les colonnes du [Kanban](pages/kanban.cpt) la prennent en fond léger ; chaque pastille d'une carte prend celle de l'état visé. Le badge __refined__ utilise aussi `--color-info`, contrôlé par le test de contraste comme les autres.

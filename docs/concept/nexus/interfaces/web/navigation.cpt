@@ -14,6 +14,6 @@ Chaque page porte le même __en-tête__.
 - La __barre de capture__ : un titre tapé part dans l'inbox, et l'on reste sur la page. La touche `c` y met le curseur.
 - Un lien « Skip to content », pour le clavier.
 
-__Retour à la page d'origine__ : un lien vers un élément peut porter `next`, le chemin de la page d'où l'on vient. La page de l'élément le garde dans ses formulaires, et « ← Back » y ramène. `next` n'est accepté que s'il reste dans l'application (il commence par `/`, pas par `//`) : pas de renvoi vers un autre site.
+__Retour à la page d'origine__ : un lien vers un élément peut porter `next`, le chemin de la page d'où l'on vient. La page de l'élément le garde dans ses formulaires, et « ← Back » y ramène. Un changement d'état réussi revient à `return_to` (le [Kanban](pages/kanban.cpt)) : un autre nom, car `next` sert déjà aux formulaires de l'élément. Les deux restent dans l'application (`/`, pas `//`).
 
 __Listes longues__ : `/tasks`, `/refine` et `/search` s'arrêtent à 100 lignes, avec une note.

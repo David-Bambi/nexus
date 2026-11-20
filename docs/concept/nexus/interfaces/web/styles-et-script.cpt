@@ -10,7 +10,7 @@ related:
 Le style tient dans une feuille, `app.css`, le comportement dans un petit script, `app.js` ; les gabarits ne gardent que la structure.
 
 - `app.css` commence par des __jetons__ (couleurs, espacements, tailles de texte) et un __thème sombre__ qui redéfinit les mêmes couleurs. Ailleurs, jamais de couleur ou de taille en dur.
-- `app.js` : la touche `c` met le curseur dans la barre de capture ; `data-confirm` n'active un bouton que si la valeur exacte est tapée.
+- `app.js` : la touche `c` met le curseur dans la barre de capture ; `data-confirm` n'active un bouton que si la valeur exacte est tapée ; `data-reveal` ouvre un champ caché.
 - Aucun `style=`, `<script>` ni `onclick` dans les gabarits : un test le vérifie.
 - Texte et badges respectent le contraste WCAG AA dans les deux thèmes, vérifié par un autre test.
 
