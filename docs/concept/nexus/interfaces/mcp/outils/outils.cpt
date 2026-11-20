@@ -1,6 +1,6 @@
 ---
 title: Outils MCP
-summary: "Les 30 outils qu'un assistant peut appeler ; les 8 changements d'état partagent une fiche"
+summary: "Les 33 outils qu'un assistant peut appeler ; les 11 changements d'état partagent une fiche"
 icon: lucide:toolbox
 type: liste
 gabarit: add-task.cpt
@@ -35,6 +35,6 @@ related:
   - 
 ---
 
-Les outils qu'un assistant peut appeler par le serveur MCP. Chacun a un schéma JSON strict, appelle les services et écrit au journal avec l'acteur `mcp`. 30 outils, 7 de lecture et 23 d'écriture ; les 8 changements d'état partagent une fiche. 23 entrées.
+Les outils qu'un assistant peut appeler par le serveur MCP. Chacun a un schéma JSON strict, appelle les services et écrit au journal avec l'acteur `mcp`. 33 outils, 7 de lecture et 26 d'écriture ; les 11 changements d'état partagent une fiche. 23 entrées.
 
-Pas exposés, à faire depuis le web : supprimer un élément ou un projet, archiver ou restaurer un projet, changer d'état sans passer par un outil de transition.
+Pas exposés, à faire depuis le web : supprimer un élément ou un projet, archiver ou restaurer un projet.

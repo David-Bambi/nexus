@@ -1,6 +1,6 @@
 ---
 title: Changer l'état d'un élément
-summary: "Les 8 outils qui font avancer un élément : démarrer, terminer, bloquer, débloquer, rouvrir, annuler, restaurer, reporter"
+summary: "Les 11 outils qui changent l'état d'un élément : un passage chacun, ou set_state vers n'importe quel état"
 icon: lucide:wrench
 tags: [element]
 links: []
@@ -8,24 +8,22 @@ related:
   - 
 ---
 
-__Rôle__ : huit outils font passer un élément d'un [état](../../../modele/etats.cpt) à un autre, un passage chacun.
-- `start_task` : refined → doing.
-- `complete_task` : doing → done.
-- `block_task` : doing → waiting.
-- `unblock_task` : waiting → doing.
-- `reopen_task` : done → doing ; une fonctionnalité garde sa version de sortie.
-- `cancel_task` : tout état ouvert → cancelled.
-- `restore_task` : cancelled → refined.
+__Rôle__ : dix outils font passer un élément d'un [état](../../../modele/etats.cpt) à un autre, un passage chacun.
+- `start_task` : refined → doing ; `unstart_task` : doing ou waiting → refined.
+- `unrefine_task` : refined → inbox, à sa place.
+- `complete_task` : doing → done ; `reopen_task` : done → doing.
+- `block_task` : doing → waiting ; `unblock_task` : waiting → doing.
+- `cancel_task` : tout état ouvert → cancelled ; `restore_task` : cancelled → refined.
 - `defer_task` : inbox ou refined → someday.
 
-__Arguments__
-- Obligatoire pour tous : `ref`.
-- `block_task` exige aussi `reason`, ce qu'on attend.
+`set_state` amène l'élément à un état visé (sauf someday) en enchaînant ces passages, chacun au journal : inbox → done donne `clarified`, `started`, `completed`.
+
+__Arguments__ : `ref` ; `reason` pour `block_task`, et pour `set_state` vers waiting ; `state` pour `set_state`.
 
 __Règles__
-- Un mauvais état de départ est refusé.
+- Un mauvais état de départ, ou l'état actuel, est refusé avant toute étape.
 - Terminer ou annuler une fonctionnalité est refusé tant qu'un enfant est ouvert.
-- Terminer une fonctionnalité pour la première fois fait monter la [version mineure](../../../modele/version/mineure.cpt).
-- Écriture, non destructifs. Pas de passage arbitraire d'un état à un autre.
+- Une tâche qui quitte waiting perd sa raison.
+- Terminer une fonctionnalité la première fois fait monter la [version mineure](../../../modele/version/mineure.cpt).
 
 __Résultat__ : l'élément, dans son nouvel état.

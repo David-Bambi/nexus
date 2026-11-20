@@ -1,0 +1,29 @@
+---
+title: nexus state
+summary: "Amener une tâche ou une fonctionnalité à un état, étape par étape"
+icon: lucide:square-terminal
+tags: [ecriture]
+links: []
+related:
+  - 
+---
+
+__Syntaxe__
+
+```
+nexus state <f-…|t-…> <ÉTAT> [--reason R]
+```
+
+__Résultat__
+- `ÉTAT` : inbox, refined, doing, waiting, done ou cancelled, sans souci de casse.
+- Enchaîne les étapes du [cycle de vie](../../../modele/etats.cpt), chacune au journal avec l'acteur `cli`, comme l'outil MCP `set_state`.
+- Code 2 : argument manquant, clé de projet au lieu d'une référence, état hors liste.
+- Code 1 : refus du service avant toute étape, par exemple waiting sans `--reason`.
+- Une ligne confirme le nouvel état.
+
+__Exemple__
+
+```
+nexus state t-… done
+# Task t-… is now done: Écrire la page CLI
+```

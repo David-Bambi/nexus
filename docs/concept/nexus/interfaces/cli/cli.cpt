@@ -1,6 +1,6 @@
 ---
 title: Ligne de commande
-summary: "La commande nexus : lire, ajouter, capturer, importer et exporter depuis le terminal"
+summary: "La commande nexus : lire, ajouter, capturer, changer d'état, importer et exporter depuis le terminal"
 icon: lucide:terminal
 type: carte
 links: [meme-base.cpt,

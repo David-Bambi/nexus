@@ -1,15 +1,15 @@
 ---
 title: Ce que la CLI ne fait pas
-summary: "Modifier, clarifier, déplacer, changer d'état ou gérer les critères : par le web ou le MCP"
+summary: "Modifier, clarifier, déplacer ou gérer les critères : par le web ou le MCP"
 icon: lucide:ban
 links: []
 related:
   - 
 ---
 
-La CLI lit, capture, ajoute, importe et exporte. Elle ne fait pas le reste :
+La CLI lit, capture, ajoute, change l'état, importe et exporte. Elle ne fait pas le reste :
 
-- modifier, clarifier, déplacer ou réordonner un élément, changer son type ou son état ;
+- modifier, clarifier, déplacer ou réordonner un élément, changer son type ;
 - créer un projet, sauf par l'import ;
 - supprimer quoi que ce soit, archiver un projet ;
 - modifier les critères ou passer à la version majeure : elle montre la version et les critères, sans les modifier.

@@ -10,6 +10,7 @@ links: [add.cpt,
         projects.cpt,
         detail-projet.cpt,
         detail-element.cpt,
+        state.cpt,
         import.cpt,
         export-features.cpt,
         version.cpt]
@@ -20,4 +21,4 @@ related:
   - 
 ---
 
-Les commandes de `nexus`, toutes sur le même plan : syntaxe, résultat, exemple. 9 entrées.
+Les commandes de `nexus`, toutes sur le même plan : syntaxe, résultat, exemple. 10 entrées.
