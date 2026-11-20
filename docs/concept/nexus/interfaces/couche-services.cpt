@@ -7,12 +7,13 @@ related:
   - 
 ---
 
-Toutes les règles du métier vivent dans `src/services/` : des fonctions Python qui prennent des arguments simples et renvoient des objets du modèle, ou lèvent une erreur du domaine (`ValidationError`, `ConflictError`, `NotFoundError`, `InvalidTransitionError`).
+Toutes les règles du métier vivent dans `src/services/` : des fonctions Python aux arguments simples, qui renvoient des objets du modèle ou lèvent une erreur du domaine (`ValidationError`, `NotFoundError`…).
 
-- `services/` n'importe jamais Flask, ni rien qui touche à la requête ou aux gabarits.
-- Les pages web, la CLI et le serveur MCP ne font qu'__adapter__ : lire l'entrée, appeler un service, afficher le résultat.
-- Deux sortes de modules : les commandes par élément (`tasks`, `projects`, `versioning`) et les lectures en forme de page (`views` : inbox, à affiner, recherche, tableau de bord, liste).
+- `services/` n'importe ni Flask, ni la requête, ni les gabarits.
+- Le web, la CLI et le MCP ne font qu'__adapter__ : lire l'entrée, appeler un service, afficher le résultat.
+- Ni sous-processus : `src/git_history.py` lit git à part, pour tester la [part de l'IA](../mesure/part-ia.cpt) sans git.
+- Deux sortes de modules : les commandes par élément (`tasks`, `projects`, `versioning`) et les lectures en forme de page (`views` : inbox, recherche, tableau de bord…).
 
-Pourquoi : un assistant ne peut pas contourner une règle que le navigateur respecte. Sans cette séparation, chaque interface recopierait la logique, et les règles finiraient par diverger.
+Pourquoi : un assistant ne peut pas contourner une règle que le navigateur respecte. Et aucune interface ne recopie la logique, donc les règles ne divergent pas.
 
-Contrôle : `tests/test_architecture.py` vérifie que `services/` n'importe ni Flask ni le web, et la même chose pour la couche des outils MCP.
+Contrôle : `tests/test_architecture.py` vérifie que `services/` et la couche des outils MCP n'importent ni Flask ni le web.

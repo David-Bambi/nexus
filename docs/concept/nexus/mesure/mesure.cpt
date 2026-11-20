@@ -8,7 +8,8 @@ links: [export-fonctionnalites.cpt,
         repertoire.cpt,
         correction.cpt,
         plan-fige.cpt,
-        parent-des-evenements.cpt]
+        parent-des-evenements.cpt,
+        part-ia.cpt]
 related:
   - /home/david/projets/13_metrics/docs/metrics/metric-list/bilan-version/derive-du-plan.cpt
   - /home/david/projets/13_metrics/docs/metrics/metric-list/bilan-version/architecture/collecte/nexus-json.cpt
@@ -24,3 +25,4 @@ metrique lit un __export stable__ plutôt que les tables SQL, qui changent avec 
 - [Correction](correction.cpt) : signaler une faute plutôt qu'un changement.
 - [Plan figé](plan-fige.cpt) : les enfants au premier démarrage.
 - [Parent dans chaque événement](parent-des-evenements.cpt) : la fonctionnalité au-dessus, à chaque instant.
+- [Part de l'IA](part-ia.cpt) : un fait affiché, lu dans git, que metrique ne reçoit pas.
