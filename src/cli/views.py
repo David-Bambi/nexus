@@ -49,21 +49,21 @@ def list_tasks(session : Session, args : list[str], out : TextIO) -> None:
 
 
 def list_projects(session : Session, args : list[str], out : TextIO) -> None:
-    """`nexus projects`: every active project, each followed by its active
-    subprojects, indented."""
+    """`nexus projects`: every active project by priority, each followed by
+    its active subprojects, indented."""
     _no_arguments(args, "projects")
     listed = projects.list(session)
     shown = {p.id for p in listed}
 
     def row(project, indent=""):
         return [indent + project.key, project.ref or "-", versioning.label(project),
-                project.status.name, project.name]
+                project.status.name, project.effective_priority.name, project.name]
 
     rows = []
     for root in (p for p in listed if p.parent_id is None):
         rows.append(row(root))
         rows.extend(row(sub, "  ") for sub in root.subprojects if sub.id in shown)
-    print(fmt.table(["KEY", "REF", "VERSION", "STATUS", "NAME"], rows), file=out)
+    print(fmt.table(["KEY", "REF", "VERSION", "STATUS", "PRIORITY", "NAME"], rows), file=out)
 
 
 # -----------------------------------------------------------------------------
@@ -92,6 +92,7 @@ def _view_project(session : Session, target : Target, args : list[str], out : Te
                       ("Name", project.name),
                       ("Parent", project.parent.key if project.parent else None),
                       ("Status", project.status.name),
+                      ("Priority", project.effective_priority.name),
                       ("Version", versioning.label(project)),
                       ("Directory", _directory_label(project)),
                       ("Description", project.description)]), file=out)

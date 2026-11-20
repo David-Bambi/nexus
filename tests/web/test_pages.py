@@ -1471,3 +1471,27 @@ def test_features_export_is_served_as_json(client):
     assert response.status_code == 200 and response.mimetype == "application/json"
     data = response.get_json()
     assert data["schema"] == "nexus.features/1" and [f["title"] for f in data["features"]] == ["Auth"]
+
+
+# Project priority --------------------------------------------------------------------------------
+
+def test_project_priority_is_set_from_the_edit_form_and_shown(client):
+    """A root project's edit form sets its priority; the page, the list and the dashboard show it."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    client.post("/projects", data={"key": "other", "name": "Other"})
+    client.post("/projects/other/update", data={"name": "Other", "priority": "HIGH"})
+
+    assert 'data-field="priority" title="Priority">High</span>' in client.get("/projects/other").get_data(as_text=True)
+    listing = client.get("/projects").get_data(as_text=True).split('<ul class="list">')[1]
+    assert listing.index(">Other</a>") < listing.index(">Nexus</a>")
+    dashboard = client.get("/").get_data(as_text=True).split("<h2>Projects</h2>")[1].split("<h2>Doing</h2>")[0]
+    assert dashboard.index(">Other</a>") < dashboard.index(">Nexus</a>") and "badge-priority-high" in dashboard
+
+
+def test_subproject_edit_form_has_no_priority(client):
+    """A subproject follows its root's priority: no select in its edit form, the root's badge shown."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    client.post("/projects/nexus/update", data={"name": "Nexus", "priority": "LOW"})
+    client.post("/projects/nexus/subprojects", data={"key": "web", "name": "Web"})
+    html = client.get("/projects/web").get_data(as_text=True)
+    assert 'name="priority"' not in html and "badge-priority-low" in html

@@ -64,6 +64,12 @@
 <span class="badge badge-{{ name | lower }}">{{ name }}</span>
 {% endmacro %}
 
+{# A project's priority badge: its root's for a subproject. #}
+{% macro priority(project) %}
+{% set level = project.effective_priority.name %}
+<span class="badge badge-priority-{{ level | lower }}" data-field="priority" title="Priority">{{ level | capitalize }}</span>
+{% endmacro %}
+
 {# A short reference such as t-4k2, f-4k2 or s-4k2. #}
 {% macro ref_chip(ref) %}
 <code class="ref">{{ ref }}</code>

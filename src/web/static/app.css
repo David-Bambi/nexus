@@ -422,6 +422,18 @@ form {
     --badge-color: var(--color-success);
 }
 
+.badge-priority-high {
+    --badge-color: var(--color-danger);
+}
+
+.badge-priority-normal {
+    --badge-color: var(--color-info);
+}
+
+.badge-priority-low {
+    --badge-color: var(--color-text-muted);
+}
+
 .badge-cancelled {
     --badge-color: var(--color-danger);
 }

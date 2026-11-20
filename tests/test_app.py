@@ -141,3 +141,14 @@ def test_restarting_on_a_2_0_database_is_accepted(tmp_path):
     database = tmp_path / "data.db"
     create_app(_config_for(database))
     create_app(_config_for(database))
+
+
+def test_migrated_projects_get_normal_priority(tmp_path):
+    """A project inserted without a priority, as before its migration, reads NORMAL."""
+    database = tmp_path / "data.db"
+    create_app(_config_for(database))
+    with closing(sqlite3.connect(database)) as connection:
+        connection.execute("INSERT INTO project (key, name, status, version_major, version_minor, created_at) "
+                           "VALUES ('nx', 'Nexus', 'ACTIVE', 0, 0, '2026-11-20')")
+        priority = connection.execute("SELECT priority FROM project").fetchone()[0]
+    assert priority == "NORMAL"

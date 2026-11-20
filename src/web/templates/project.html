@@ -19,6 +19,16 @@
         <input type="text" name="directory" value="{{ project.directory or "" }}" placeholder="~/projets/my-project">
         <span class="hint">Absolute path of the project's folder on this machine; ~ is expanded. Blank: none.</span>
     </label>
+    {% if not project.parent %}
+    <label class="field">
+        <span class="field-label">Priority</span>
+        <select name="priority">
+            {% for level in ("HIGH", "NORMAL", "LOW") %}
+            <option value="{{ level }}"{% if project.priority.name == level %} selected{% endif %}>{{ level | capitalize }}</option>
+            {% endfor %}
+        </select>
+    </label>
+    {% endif %}
     <div class="form-actions"><button class="button-primary" type="submit">Save</button></div>
 </form>
 <section id="delete-project" class="danger-zone"{% if open_form != "delete-project" %} hidden{% endif %}>
@@ -32,7 +42,7 @@
     </form>
 </section>
 {% endif %}
-<p class="meta">{{ ui.ref_chip(project.key) }} {{ ui.badge(project.status.name) }} <span class="version" data-field="version">v{{ project.version_major }}.{{ project.version_minor }}</span></p>
+<p class="meta">{{ ui.ref_chip(project.key) }} {{ ui.badge(project.status.name) }} {{ ui.priority(project) }} <span class="version" data-field="version">v{{ project.version_major }}.{{ project.version_minor }}</span></p>
 {{ ui.error_message(error) }}
 {% if project.description %}
 <p class="lead">{{ project.description }}</p>

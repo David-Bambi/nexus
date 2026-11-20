@@ -143,7 +143,7 @@ def test_projects_nests_subprojects_with_versions(run, tree_data):
     """The subproject row follows its root, indented, and each row shows its version."""
     _, out, _ = run("projects")
     lines = out.splitlines()
-    assert lines[0].split() == ["KEY", "REF", "VERSION", "STATUS", "NAME"]
+    assert lines[0].split() == ["KEY", "REF", "VERSION", "STATUS", "PRIORITY", "NAME"]
     assert lines[1].split()[:3] == ["nx", "-", "1.2"]
     assert lines[2].startswith("  web") and lines[2].split()[2] == "0.0"
 

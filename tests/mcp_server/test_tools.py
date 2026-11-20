@@ -194,7 +194,7 @@ def test_list_and_show_tools_return_refs_and_no_integer_ids(session, world):
     assert by_ref[planned.parent.ref]["kind"] == "FEATURE"
     shown = ok(session, "get_project", project="nx")
     assert shown["subprojects"] == [{"key": "v2", "ref": sub.ref, "parent": "nx", "name": "Nexus 2",
-                                     "description": None, "status": "ACTIVE", "version": "0.0",
+                                     "description": None, "status": "ACTIVE", "priority": "NORMAL", "version": "0.0",
                                      "directory": None, "effective_directory": None}]
     assert not _id_keys(shown) and not _id_keys(listed)
 
@@ -692,3 +692,15 @@ def test_set_state_refusals(session, world):
     assert "reason" in refused(session, "set_state", ref=refined.ref, state="WAITING")
     assert "must be one of" in refused(session, "set_state", ref=refined.ref, state="SOMEDAY")
     assert "can't go from REFINED to REFINED" in refused(session, "set_state", ref=refined.ref, state="REFINED")
+
+
+# Project priority --------------------------------------------------------------------------------
+
+def test_update_project_priority_and_dashboard_projects(session, world):
+    """update_project sets a root's priority, refuses a subproject's; the dashboard lists roots by priority."""
+    projects.create(session, "other", "Other")
+    assert ok(session, "update_project", project="other", priority="HIGH")["priority"] == "HIGH"
+    assert "follows its root" in refused(session, "update_project", project="v2", priority="LOW")
+    assert "must be one of" in refused(session, "update_project", project="nx", priority="URGENT")
+    assert [(p["key"], p["priority"]) for p in ok(session, "dashboard")["projects"]] == [
+        ("other", "HIGH"), ("nx", "NORMAL")]

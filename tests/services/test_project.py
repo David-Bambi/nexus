@@ -1,7 +1,7 @@
 import pytest
 
 from src.services import events, projects
-from src.models.project import ProjectStatus
+from src.models.project import ProjectPriority, ProjectStatus
 from src.models.task import Task
 from src.services.errors import ConflictError, NotFoundError, ValidationError
 
@@ -382,3 +382,45 @@ def test_directory_of_falls_back_to_the_parent(session):
     projects.update(session, "web", "Web", None, directory="/srv/nexus-web")
     assert projects.directory_of(sub) == "/srv/nexus-web"
     assert projects.directory_of(None) is None
+
+
+# Priority ----------------------------------------------------------------------------------------
+
+def test_a_new_project_is_normal_priority_and_its_subprojects_follow_it(session):
+    """A new root is NORMAL; a subproject shows its root's priority."""
+    root = projects.create(session, "nexus", "Nexus")
+    sub = projects.create(session, "web", "Web", parent_key="nexus")
+    projects.update(session, "nexus", "Nexus", None, priority=ProjectPriority.HIGH)
+
+    assert (root.priority, sub.effective_priority) == (ProjectPriority.HIGH, ProjectPriority.HIGH)
+    assert _actions(session, root)[-1] == ("updated", {"priority": {"from": "NORMAL", "to": "HIGH"}})
+
+
+def test_update_refuses_a_priority_for_a_subproject(session):
+    """A subproject's priority can't be set; leaving it as is stays allowed."""
+    projects.create(session, "nexus", "Nexus")
+    projects.create(session, "web", "Web", parent_key="nexus")
+    with pytest.raises(ValidationError, match="follows its root"):
+        projects.update(session, "web", "Web", None, priority=ProjectPriority.LOW)
+    projects.update(session, "web", "Web 2", None, priority=ProjectPriority.NORMAL)
+
+
+def test_list_sorts_by_priority_then_creation_with_subprojects_after_their_root(session):
+    """
+    Given a normal, a low and a high project, the low one with a subproject
+    When listing projects
+    Then they come high, normal, low, the subproject right after its root
+    """
+    for key in ("normal", "low", "high"):
+        projects.create(session, key, key.capitalize())
+    projects.create(session, "lowsub", "Low sub", parent_key="low")
+    projects.update(session, "low", "Low", None, priority=ProjectPriority.LOW)
+    projects.update(session, "high", "High", None, priority=ProjectPriority.HIGH)
+
+    assert [p.key for p in projects.list(session)] == ["high", "normal", "low", "lowsub"]
+
+
+def test_state_is_a_reserved_key(session):
+    """`state` is a CLI command, so no project can take it as key."""
+    with pytest.raises(ValidationError):
+        projects.create(session, "state", "State")

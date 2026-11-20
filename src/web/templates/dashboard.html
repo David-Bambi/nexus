@@ -11,6 +11,18 @@
     {{ ui.stat(dashboard.refine_count, "To refine", url_for('pages.refine')) }}
 </div>
 
+<h2>Projects</h2>
+<ul class="list">
+    {% for project in dashboard.projects %}
+    <li>
+        <a class="row-title" href="{{ url_for('pages.project_detail', key=project.key) }}">{{ project.name }}</a>
+        {{ ui.priority(project) }} <span class="version">v{{ project.version_major }}.{{ project.version_minor }}</span>
+    </li>
+    {% else %}
+    {{ ui.empty("No active projects.") }}
+    {% endfor %}
+</ul>
+
 <h2>Doing</h2>
 <ul class="list">
     {% for task in dashboard.doing %}

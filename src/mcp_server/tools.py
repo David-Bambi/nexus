@@ -5,6 +5,7 @@ from typing import Callable
 from sqlalchemy.orm import Session
 
 from src.mcp_server import serialize
+from src.models.project import ProjectPriority
 from src.models.task import TaskKind, TaskState
 from src.services import events, importer, projects, tasks, versioning, views
 from src.services.errors import DomainError, ValidationError
@@ -446,22 +447,25 @@ def create_project(session : Session, args : dict) -> dict:
 
 
 @tool("update_project",
-      "Change a project's name, description and/or directory. A blank description or directory clears it.",
+      "Change a project's name, description, directory and/or priority. A blank description or directory clears "
+      "it. Only a root project has a priority; a subproject follows its root's.",
       {"project": _PROJECT, "name": _string("New display name."), "description": _string("New description."),
-       "directory": _string("New absolute folder path (~ is expanded).")},
+       "directory": _string("New absolute folder path (~ is expanded)."),
+       "priority": _string("New priority of a root project.", [p.name for p in ProjectPriority])},
       ["project"], idempotent=True)
 def update_project(session : Session, args : dict) -> dict:
-    """Change a project's name, description or directory."""
+    """Change a project's name, description, directory or priority."""
     project = projects.get(session, args["project"])
-    if not {"name", "description", "directory"} & set(args):
+    if not {"name", "description", "directory", "priority"} & set(args):
         raise ValidationError("give at least one field to change")
     if "name" in args and args["name"] is None:
         raise ValidationError("'name' must not be blank")
     name = args.get("name") or project.name
     description = args["description"] if "description" in args else project.description
     directory = args["directory"] if "directory" in args else projects.KEEP
+    priority = ProjectPriority[args["priority"]] if args.get("priority") else None
     return serialize.project(projects.update(session, project.key, name, description, directory=directory,
-                                             actor=ACTOR))
+                                             priority=priority, actor=ACTOR))
 
 
 # Schema of the argument numbering a criterion.

@@ -15,6 +15,14 @@ class ProjectStatus(Enum):
     ARCHIVED = auto()
 
 
+class ProjectPriority(Enum):
+    """How much a root project matters right now; a subproject follows its root."""
+
+    HIGH = auto()
+    NORMAL = auto()
+    LOW = auto()
+
+
 class Project(Base):
     """Top of the work tree: a root project, or a subproject of one.
 
@@ -53,6 +61,15 @@ class Project(Base):
         default=ProjectStatus.ACTIVE,
     )
 
+    # Priority of a root project; a subproject keeps NORMAL and is shown
+    # with its root's (see effective_priority).
+    priority: Mapped[ProjectPriority] = mapped_column(
+        SAEnum(ProjectPriority, name="project_priority", create_constraint=True),
+        nullable=False,
+        default=ProjectPriority.NORMAL,
+        server_default=ProjectPriority.NORMAL.name,
+    )
+
     # Absolute path of the project's folder on this machine (e.g.
     # "/home/me/projets/nexus"), normalised by services/projects; null when
     # not set. Ties Claude Code sessions to the project.
@@ -88,3 +105,8 @@ class Project(Base):
         order_by="MajorCriterion.position",
         cascade="all, delete-orphan",
     )
+
+    @property
+    def effective_priority(self) -> ProjectPriority:
+        """The priority that applies: a root's own, a subproject's root's."""
+        return self.parent.priority if self.parent is not None else self.priority

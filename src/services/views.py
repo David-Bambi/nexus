@@ -22,6 +22,8 @@ class DashboardView:
     inbox_count: int
     # Number of refined items, ready to be started.
     refine_count: int
+    # Active root projects, by priority (high first), then creation order.
+    projects: list
 
 
 @dataclass
@@ -374,8 +376,8 @@ def dashboard(session : Session) -> DashboardView:
 
     Returns:
         A DashboardView with the doing and waiting items (oldest first),
-        and the inbox and refine counters (same definitions as inbox() and
-        to_refine()).
+        the inbox and refine counters (same definitions as inbox() and
+        to_refine()), and the active root projects by priority.
     """
     def in_state(state : TaskState) -> list:
         """List the tasks in the given state, oldest first."""
@@ -393,4 +395,5 @@ def dashboard(session : Session) -> DashboardView:
         inbox_count=session.query(Task).filter(Task.state == TaskState.INBOX,
                                                Task.project_id.is_(None)).count(),
         refine_count=session.query(Task).filter(Task.state == TaskState.REFINED).count(),
+        projects=[p for p in projects.list(session) if p.parent_id is None],
     )

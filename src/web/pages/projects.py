@@ -3,6 +3,7 @@ from datetime import date
 
 from flask import abort, current_app, redirect, render_template, request, url_for
 
+from src.models.project import ProjectPriority
 from src.models.task import TaskKind
 from src.services import export, projects, tasks, views
 from src.services.errors import ConflictError, NotFoundError, ValidationError
@@ -166,10 +167,12 @@ def project_add_subproject(key):
 
 @bp.route("/projects/<key>/update", methods=["POST"])
 def project_update(key):
-    """Change a project's name, description and directory (blank clears it)."""
+    """Change a project's name, description, directory (blank clears it) and,
+    for a root project, its priority (absent or unknown: unchanged)."""
+    priority = ProjectPriority.__members__.get(request.form.get("priority", ""))
     return _project_action(key, lambda s: projects.update(
         s, key, request.form.get("name", ""), request.form.get("description"),
-        directory=request.form.get("directory", "")), form="edit-project")
+        directory=request.form.get("directory", ""), priority=priority), form="edit-project")
 
 
 @bp.route("/projects/<key>/archive", methods=["POST"])

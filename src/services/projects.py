@@ -2,16 +2,19 @@ import os
 
 from sqlalchemy.orm import Session
 
-from src.models.project import Project, ProjectStatus
+from src.models.project import Project, ProjectPriority, ProjectStatus
 from src.services import events, refs
 from src.services.errors import ConflictError, NotFoundError, ValidationError
 
 # Keys a project may not take: the command line reads them as commands, not
 # as project keys.
-RESERVED_KEYS = frozenset({"add", "export", "help", "import", "projects", "tasks", "version"})
+RESERVED_KEYS = frozenset({"add", "export", "help", "import", "projects", "state", "tasks", "version"})
 
 # Default of update()'s directory argument: leave the directory as it is.
 KEEP = object()
+
+# Priorities from the most to the least pressing, the order projects are listed in.
+PRIORITY_ORDER = (ProjectPriority.HIGH, ProjectPriority.NORMAL, ProjectPriority.LOW)
 
 def normalize_directory(directory : str | None) -> str | None:
     """Turn a typed folder path into the stored form.
@@ -159,12 +162,14 @@ def list(session : Session, include_archived : bool = False) -> list:
         include_archived: If False (default), archived projects are excluded.
 
     Returns:
-        All matching projects.
+        All matching projects, by priority (high first), then in creation
+        order; a subproject sorts with its root.
     """
     query = session.query(Project)
     if not include_archived:
         query = query.filter(Project.status != ProjectStatus.ARCHIVED)
-    return query.all()
+    return sorted(query.all(), key=lambda p: (PRIORITY_ORDER.index(p.effective_priority),
+                                              p.parent_id or p.id, p.parent_id is not None, p.id))
 
 def archive(session : Session, key : str, actor : str = events.ACTOR_WEB) -> Project:
     """Archive a project.
@@ -189,8 +194,9 @@ def archive(session : Session, key : str, actor : str = events.ACTOR_WEB) -> Pro
     return project
 
 def update(session : Session, key : str, name : str, description : str | None,
-           directory : str | None | object = KEEP, actor : str = events.ACTOR_WEB) -> Project:
-    """Change a project's name, description and directory; its key never changes.
+           directory : str | None | object = KEEP, priority : ProjectPriority | None = None,
+           actor : str = events.ACTOR_WEB) -> Project:
+    """Change a project's name, description, directory and priority; its key never changes.
 
     Args:
         session: Database session to use.
@@ -199,6 +205,7 @@ def update(session : Session, key : str, name : str, description : str | None,
         description: New description; None or blank clears it.
         directory: New folder (see normalize_directory); None or blank
             clears it; KEEP (the default) leaves it unchanged.
+        priority: New priority, root projects only; None leaves it unchanged.
         actor: Who made the change, recorded in the event log.
 
     Returns:
@@ -207,20 +214,26 @@ def update(session : Session, key : str, name : str, description : str | None,
 
     Raises:
         NotFoundError: If no project has this key.
-        ValidationError: If the name is empty or the directory relative.
+        ValidationError: If the name is empty, the directory relative, or a
+            priority is given for a subproject (it follows its root's).
     """
     if not name.strip():
         raise ValidationError("The project name must be specified.")
     project = get(session, key)
+    if priority is not None and project.parent is not None and priority is not project.priority:
+        raise ValidationError(f"subproject '{key}' follows its root project's priority.")
 
     new_values = {"name": name.strip(), "description": (description or "").strip() or None}
     if directory is not KEEP:
         new_values["directory"] = normalize_directory(directory)
+    if priority is not None:
+        new_values["priority"] = priority
     changes = {}
     for field, value in new_values.items():
         previous = getattr(project, field)
         if previous != value:
-            changes[field] = {"from": previous, "to": value}
+            # An enum is logged by its name, to stay readable JSON.
+            changes[field] = {"from": getattr(previous, "name", previous), "to": getattr(value, "name", value)}
             setattr(project, field, value)
 
     if changes:
