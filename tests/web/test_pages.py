@@ -1508,3 +1508,24 @@ def test_dashboard_shows_each_project_progress(client):
     section = client.get("/").get_data(as_text=True).split("<h2>Projects</h2>")[1].split("<h2>Doing</h2>")[0]
     assert '<progress value="1" max="2"' in section and ">1/2</span>" in section
     assert "No features" in section
+
+
+# AI share ----------------------------------------------------------------------------------------
+
+def test_project_page_shows_the_ai_share_per_category(client, monkeypatch):
+    """A project whose repository can be read shows each category's share, with its lines in a tooltip."""
+    from src.services import ai_share
+    monkeypatch.setattr(ai_share, "of_project", lambda project: [
+        ai_share.CategoryShare("code", 75, 100), ai_share.CategoryShare("tests", 1, 1),
+        ai_share.CategoryShare("docs", 0, 0)])
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    html = client.get("/projects/nexus").get_data(as_text=True)
+    line = html.split('data-field="ai_share">')[1].split("</p>")[0]
+    assert "Code 75 %" in line and "Tests 100 %" in line and "Docs —" in line
+    assert 'title="75 of 100 lines added with Claude"' in line
+
+
+def test_project_page_without_a_repository_has_no_ai_share(client):
+    """No directory: no AI share line."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    assert 'data-field="ai_share"' not in client.get("/projects/nexus").get_data(as_text=True)

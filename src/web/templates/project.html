@@ -53,6 +53,12 @@
 {% elif project.parent and project.parent.directory %}
 <p class="meta">Directory <code data-field="directory">{{ project.parent.directory }}</code> (from {{ project.parent.name }})</p>
 {% endif %}
+{# The share of lines added in commits co-signed by Claude, per category, read from the project's git history. #}
+{% if ai_shares %}
+<p class="meta" data-field="ai_share">AI share
+    {% for share in ai_shares %}{% if not loop.first %} · {% endif %}<span title="{{ share.ai_lines }} of {{ share.total_lines }} lines added with Claude">{{ share.category | capitalize }} {% if share.total_lines %}{{ share.percent }} %{% else %}—{% endif %}</span>{% endfor %}
+</p>
+{% endif %}
 
 {% if project.parent %}
 <p>Subproject of <a href="{{ url_for('pages.project_detail', key=project.parent.key) }}">{{ project.parent.name }}</a></p>

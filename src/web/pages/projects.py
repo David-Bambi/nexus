@@ -5,7 +5,7 @@ from flask import abort, current_app, redirect, render_template, request, url_fo
 
 from src.models.project import ProjectPriority
 from src.models.task import TaskKind
-from src.services import export, projects, tasks, views
+from src.services import ai_share, export, projects, tasks, views
 from src.services.errors import ConflictError, NotFoundError, ValidationError
 from src.web.pages._shared import _session, bp
 
@@ -84,7 +84,7 @@ def _render_project(project, error=None, status=200, open_form=None):
     else:
         tree = views.project_tree(project)
     return render_template("project.html", project=project, tree=tree, board=board,
-                           columns=views.BOARD_COLUMNS, view=view,
+                           columns=views.BOARD_COLUMNS, view=view, ai_shares=ai_share.of_project(project),
                            open_form=open_form, error=error), status
 
 
