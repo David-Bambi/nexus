@@ -10,7 +10,7 @@ related:
 
 __Adresse__ : `/inbox`.
 
-__Ce qu'on y voit__ : la capture la plus ancienne, seule, sur une carte, avec sa référence et son formulaire de clarification. « Inbox is empty. » quand il n'y a plus rien.
+__Ce qu'on y voit__ : les captures seulement, sans projet. Un élément __inbox__ placé reste dans son projet ([Kanban](kanban.cpt), colonne INBOX). La capture la plus ancienne, seule, sur une carte, avec sa référence et son formulaire de clarification. « Inbox is empty. » quand il n'y a plus rien.
 
 __Ce qu'on y fait__ : trier __une capture à la fois__, à la manière de GTD.
 - __Refine__ : titre, corps, type (tâche ou fonctionnalité), clé du projet, référence de la fonctionnalité parente, contexte, taille. Sans clé, le projet du parent est pris.

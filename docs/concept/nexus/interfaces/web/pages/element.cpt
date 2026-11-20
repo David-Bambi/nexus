@@ -15,11 +15,11 @@ __Ce qu'on y voit__
 - À droite, un panneau fixe : état, référence, type, projet, parent, version de sortie. Sur un écran étroit, il passe en haut.
 
 __Ce qu'on y fait__
-- __Clarify__ une capture ou un élément someday.
-- Changer d'état : un bouton par passage (Start, Complete, Block avec sa raison…), ou le menu __State__, qui ne propose que les passages permis.
+- __Clarify__ un élément inbox ou someday.
+- Changer d'état : un bouton par passage (Start, Complete, Block…), ou le menu __State__ des passages permis (inbox placé : REFINED, CANCELLED).
 - Pour une fonctionnalité : ses __Children__ (tout le sous-arbre, fermés compris, avec ↑ / ↓ et un + par sous-fonctionnalité) ; un + près du titre ouvre l'ajout, qui revient à `#children` (projet requis).
 - __Place__ : déplacer (clé et référence parente), changer en tâche ou en fonctionnalité.
 - __Edit__ : titre, corps, contexte, taille, et la case [Correction](../../../mesure/correction.cpt).
 - Supprimer.
 
-Un refus réaffiche la page avec sa raison, formulaire rouvert.
+Un refus réaffiche la page, formulaire rouvert.

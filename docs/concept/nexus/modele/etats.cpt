@@ -10,7 +10,7 @@ related:
 
 Un élément avance dans __sept états__ inspirés de GTD, les mêmes pour une fonctionnalité et une tâche.
 
-- __inbox__ : capturé, pas encore trié.
+- __inbox__ : à clarifier ; sans projet, c'est une capture à trier ; placé, il reste à raffiner.
 - __refined__ : clarifié, prêt à démarrer.
 - __doing__ : en cours.
 - __waiting__ : bloqué ; exige une __raison__ non vide.
@@ -18,7 +18,7 @@ Un élément avance dans __sept états__ inspirés de GTD, les mêmes pour une f
 - __someday__ : reporté, sans date.
 - __cancelled__ : abandonné. Distinct de __done__ : le travail n'a pas été fait.
 
-Le schéma montre les passages permis. Tout élément ouvert peut être annulé ; un élément annulé revient en __refined__. Tout autre passage est refusé.
+Le schéma montre les passages permis. Un élément inbox passe en __refined__ en étant clarifié (ou raffiné tel quel s'il est placé). Tout élément ouvert peut être annulé ; un élément annulé revient en __refined__. Tout autre passage est refusé.
 
 Il n'y a pas d'état « planifié » : on ne range pas le travail par version.
 

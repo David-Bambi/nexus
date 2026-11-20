@@ -11,7 +11,7 @@ related:
 __Adresse__ : `/`, la page d'accueil.
 
 __Ce qu'on y voit__
-- Deux tuiles : le nombre de captures dans l'__Inbox__, et le nombre d'éléments __To refine__ (clarifiés, prêts à démarrer). Chacune mène à sa file.
+- Deux tuiles : le nombre de captures sans projet dans l'__Inbox__, et le nombre d'éléments __To refine__ (clarifiés, prêts à démarrer). Chacune mène à sa file.
 - __Doing__ : les éléments en cours, avec leur place (clé du projet, fonctionnalité parente).
 - __Waiting__ : les éléments bloqués, avec leur raison.
 

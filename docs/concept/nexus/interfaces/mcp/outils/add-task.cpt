@@ -1,6 +1,6 @@
 ---
 title: add_task
-summary: "Ajoute une tâche ou une fonctionnalité dans l'arbre d'un projet, déjà clarifiée"
+summary: "Ajoute une tâche ou une fonctionnalité dans l'arbre d'un projet, à raffiner"
 icon: lucide:wrench
 tags: [element]
 links: []
@@ -8,7 +8,7 @@ related:
   - 
 ---
 
-__Rôle__ : ajoute une fonctionnalité ou une tâche dans l'arbre d'un projet, déjà __refined__. Pour l'inbox, c'est [capture_task](capture-task.cpt).
+__Rôle__ : ajoute une fonctionnalité ou une tâche dans l'arbre d'un projet, en __inbox__ : placée, à raffiner avec [clarify_task](clarify-task.cpt). Pour une capture sans projet, c'est [capture_task](capture-task.cpt).
 
 __Arguments__
 - Obligatoire : `title`.

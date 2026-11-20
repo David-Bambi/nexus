@@ -23,7 +23,7 @@ ITEM = {"kind": "feature" | "task",            # task par défaut
 ```
 
 - Un nouveau projet exige `name`.
-- Les éléments d'un arbre sont créés __refined__ ; les tâches libres vont dans l'__inbox__, dans leur `project` s'il est donné.
+- Les éléments d'un arbre sont créés __refined__ (`created` puis `clarified`), au contraire d'un ajout à la main ; les tâches libres vont dans l'__inbox__, dans leur `project` s'il est donné.
 - `version` (`"1.4"`) et `criteria` (textes, ou `{text, done}`) ne valent que pour un projet que l'import crée.
 - Un champ inconnu, ou `children` sur une tâche, est une erreur.
 

@@ -30,6 +30,7 @@ deleted        {title, kind, ref}
 
 __Particularités__
 - Une modification qui ne change rien n'écrit rien.
-- Ajouter dans l'arbre écrit `created` puis `clarified`.
+- Ajouter dans l'arbre écrit seulement `created` ; l'import écrit `created` puis `clarified`.
+- Raffiner un élément placé écrit `clarified`, comme toute clarification.
 - Clarifier en changeant de type écrit aussi `kind_changed`.
 - Terminer une fonctionnalité peut écrire `minor_bumped` sur son projet.

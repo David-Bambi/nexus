@@ -14,7 +14,7 @@ Nexus range le travail en __arbre__ : un projet se découpe en parties, les part
 - __Sous-projet__ : une partie d'un projet racine, sur __un seul niveau__. Il a son propre arbre et sa propre version.
 - __Fonctionnalité__ : contient des fonctionnalités et des tâches, __sans limite de profondeur__.
 - __Tâche__ : une feuille, jamais d'enfant.
-- __Capture__ : une tâche pas encore rangée, sans projet (l'inbox de GTD).
+- __Capture__ : une tâche pas encore rangée, sans projet (l'inbox de GTD). Un élément __inbox__ placé n'en est pas une.
 
 Fonctionnalités et tâches partagent la table `task`, distinguées par `kind`. Chaque élément a une place parmi ses voisins.
 

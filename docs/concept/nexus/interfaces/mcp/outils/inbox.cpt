@@ -8,7 +8,7 @@ related:
   - 
 ---
 
-__Rôle__ : liste les captures qui attendent d'être triées, la plus ancienne d'abord.
+__Rôle__ : liste les captures qui attendent d'être triées, la plus ancienne d'abord. Seulement celles sans projet : un élément __inbox__ placé reste dans son projet.
 
 __Arguments__
 - Aucun obligatoire.

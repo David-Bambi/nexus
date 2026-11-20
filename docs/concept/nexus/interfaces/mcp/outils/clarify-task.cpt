@@ -8,11 +8,11 @@ related:
   - 
 ---
 
-__Rôle__ : trie une capture (ou un élément __someday__) et la passe en __refined__, rangée dans l'arbre d'un projet.
+__Rôle__ : trie une capture, raffine un élément __inbox__ placé (ou reprend un élément __someday__) et le passe en __refined__, rangé dans l'arbre d'un projet.
 
 __Arguments__
 - Obligatoire : `ref`.
-- Facultatifs : `title`, `project`, `parent`, `kind` (`feature` pour en faire une fonctionnalité), `body`, `context`, `size`. Un champ absent garde sa valeur ; sans `project` ni `parent`, l'élément reste dans son projet.
+- Facultatifs : `title`, `project`, `parent`, `kind` (`feature` pour en faire une fonctionnalité), `body`, `context`, `size`. Un champ absent garde sa valeur ; sans `project` ni `parent`, l'élément garde sa place, fonctionnalité parente comprise.
 
 __Règles__
 - Seulement depuis `INBOX` ou `SOMEDAY`.
