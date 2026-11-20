@@ -6,14 +6,16 @@ type: carte
 links: [claude-md.cpt,
         agents/agents.cpt,
         skill-revision.cpt,
+        outils-globaux/outils-globaux.cpt,
         conventions.cpt]
 related:
   - 
 ---
 
-Claude Code est réglé pour travailler dans ce dépôt par des instructions, des agents et un skill.
+Claude Code est réglé pour travailler dans ce dépôt par des instructions, des agents et un skill ; il sert aussi des outils globaux aux autres projets.
 
 - [Fichiers CLAUDE.md](claude-md.cpt) : les instructions chargées d'office.
 - [Sous-agents](agents/agents.cpt) : documentation et git.
 - [Skill revision](skill-revision.cpt) : corriger un artefact sans le réécrire.
+- [Outils globaux](outils-globaux/outils-globaux.cpt) : l'agent `nexus_agt` et son déploiement dans `~/.claude`.
 - [Conventions](conventions.cpt) : ce qui fait foi, ce qui est généré.

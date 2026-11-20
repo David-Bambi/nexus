@@ -1,0 +1,17 @@
+---
+title: Outils globaux
+summary: "Les outils IA de Nexus servis à tous les projets, rangés dans outils_ai/ et déployés dans ~/.claude"
+icon: lucide:globe
+type: carte
+links: [nexus-agt.cpt,
+        deploiement.cpt]
+related:
+  - 
+---
+
+Le dossier `outils_ai/`, à la racine du dépôt, garde les outils IA __globaux__ de Nexus : ceux qu'on utilise depuis n'importe quel projet de David, pas seulement dans ce dépôt. Il suit le modèle du projet Concept.
+
+- [Agent nexus_agt](nexus-agt.cpt) : gérer ses projets par le serveur MCP Nexus.
+- [Déploiement](deploiement.cpt) : brancher ces outils dans `~/.claude`.
+
+Les outils propres au dépôt (`docs-manager`, `git-manager`, le skill `revision`) restent dans `.claude/`.

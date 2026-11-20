@@ -25,6 +25,26 @@ Instructions that load automatically into context, scoped by directory:
 - `revision` — corrects an error or outdated statement in an artifact
   under `artifacts/` (spec, plan).
 
+## Global tools shipped by Nexus (`outils_ai/`)
+
+Tools meant for all of David's projects, deployed into `~/.claude`
+(same layout as the Concept project).
+
+- `agents/nexus_agt.md` — French project-management agent working through
+  the Nexus MCP server. Triages the inbox, splits a request into a feature
+  and sized tasks, tracks progress (states, closing a feature, proposing
+  archiving) and reports status (version, remaining criteria, DOING/WAITING,
+  INBOX, next task). It reads and writes items only; criteria, projects,
+  deletion, import and major releases stay with David. It proposes a list of
+  changes and writes only when the prompt says « applique », so it can be
+  used anywhere without surprise writes.
+- `deployer.sh [--essai]` — symlinks `skills/<name>` to
+  `~/.claude/skills/<name>` and `agents/<name>.md` to
+  `~/.claude/agents/<name>.md`. Never replaces anything that is not a link
+  to the repository; removes dead links to it. `--essai` is a dry run;
+  `CLAUDE_DIR` overrides `~/.claude` for testing. Rerun only for a new or
+  removed agent/skill; an agent loads when a Claude Code session starts.
+
 ## Global tools used for the Concept map
 
 The Concept skills (`ecrire-fiche`, `dessiner-schema`, `verifier-fiches`,
