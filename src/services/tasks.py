@@ -933,12 +933,90 @@ def restore(session : Session, task_id : int, actor : str = events.ACTOR_WEB) ->
     session.commit()
     return task
 
-def change_state(session : Session, task_id : int, target : TaskState, reason : str = "", actor : str = events.ACTOR_WEB) -> Task:
-    """Move a task to a target state through the matching lifecycle transition.
+# One-step state changes, as (from, to) pairs, in the order a path search
+# tries them. Any longer move chains these steps.
+_STEPS = (
+    (TaskState.INBOX, TaskState.REFINED),
+    (TaskState.REFINED, TaskState.INBOX),
+    (TaskState.REFINED, TaskState.DOING),
+    (TaskState.DOING, TaskState.WAITING),
+    (TaskState.DOING, TaskState.DONE),
+    (TaskState.DOING, TaskState.REFINED),
+    (TaskState.WAITING, TaskState.DOING),
+    (TaskState.WAITING, TaskState.REFINED),
+    (TaskState.DONE, TaskState.DOING),
+    (TaskState.CANCELLED, TaskState.REFINED),
+    (TaskState.INBOX, TaskState.CANCELLED),
+    (TaskState.REFINED, TaskState.CANCELLED),
+    (TaskState.DOING, TaskState.CANCELLED),
+    (TaskState.WAITING, TaskState.CANCELLED),
+)
 
-    Covers the working states and cancelling: inbox to refined and back,
-    refined to doing, doing to waiting or done, waiting or done back to doing, doing or
-    waiting back to refined, any open task to cancelled.
+def _state_path(start : TaskState, target : TaskState) -> tuple | None:
+    """Find the shortest chain of one-step changes from one state to another.
+
+    Args:
+        start: The state the task is in.
+        target: The state to reach.
+
+    Returns:
+        The states to go through, target included (empty when start is the
+        target); None if the target can't be reached.
+    """
+    paths = {start: ()}
+    queue = [start]
+    while queue:
+        state = queue.pop(0)
+        if state == target:
+            return paths[state]
+        for origin, following in _STEPS:
+            if origin == state and following not in paths:
+                paths[following] = paths[state] + (following,)
+                queue.append(following)
+    return None
+
+def _step(session : Session, task : Task, target : TaskState, reason : str, actor : str) -> Task:
+    """Apply one one-step change from _STEPS to a task.
+
+    Args:
+        session: Database session to use.
+        task: The task, in the state the step starts from.
+        target: The state the step leads to.
+        reason: Why the task is blocked; only used when the target is waiting.
+        actor: Who made the change, recorded in the event log.
+
+    Returns:
+        The updated Task.
+    """
+    if target == TaskState.CANCELLED:
+        return cancel(session, task.id, actor=actor)
+    if target == TaskState.WAITING:
+        return block(session, task.id, reason, actor=actor)
+    if target == TaskState.DONE:
+        return complete(session, task.id, actor=actor)
+    if target == TaskState.INBOX:
+        return unrefine(session, task.id, actor=actor)
+    if target == TaskState.REFINED:
+        if task.state == TaskState.INBOX:
+            return refine(session, task.id, actor=actor)
+        if task.state == TaskState.CANCELLED:
+            return restore(session, task.id, actor=actor)
+        return unstart(session, task.id, actor=actor)
+    # Target DOING.
+    if task.state == TaskState.REFINED:
+        return start(session, task.id, actor=actor)
+    if task.state == TaskState.WAITING:
+        return unblock(session, task.id, actor=actor)
+    return reopen(session, task.id, actor=actor)
+
+def change_state(session : Session, task_id : int, target : TaskState, reason : str = "", actor : str = events.ACTOR_WEB) -> Task:
+    """Move a task to a target state, through as many lifecycle steps as needed.
+
+    The steps are the one-step changes (refine, unrefine, start, unstart,
+    block, unblock, complete, reopen, cancel, restore), chained along the
+    shortest path; each is logged as its own event, e.g. inbox to done is
+    refined, started, then completed. Someday isn't reached this way.
+    What could stop the chain halfway is checked before the first step.
 
     Args:
         session: Database session to use.
@@ -952,34 +1030,25 @@ def change_state(session : Session, task_id : int, target : TaskState, reason : 
 
     Raises:
         NotFoundError: If no task has this id.
-        InvalidTransitionError: If the task can't go from its state to the target.
+        InvalidTransitionError: If the task can't reach the target, or is
+            already in it.
         ValidationError: If the target is waiting and the reason is empty.
         ConflictError: If a feature with open children would be closed.
     """
     task = get(session, task_id)
 
-    if target == TaskState.CANCELLED:
-        return cancel(session, task_id, actor=actor)
-    if target == TaskState.WAITING:
-        return block(session, task_id, reason, actor=actor)
-    if target == TaskState.DONE:
-        return complete(session, task_id, actor=actor)
-    if target == TaskState.INBOX and task.state == TaskState.REFINED:
-        return unrefine(session, task_id, actor=actor)
-    if target == TaskState.REFINED:
-        if task.state == TaskState.INBOX:
-            return refine(session, task_id, actor=actor)
-        if task.state in (TaskState.DOING, TaskState.WAITING):
-            return unstart(session, task_id, actor=actor)
-    if target == TaskState.DOING:
-        if task.state == TaskState.REFINED:
-            return start(session, task_id, actor=actor)
-        if task.state == TaskState.WAITING:
-            return unblock(session, task_id, actor=actor)
-        if task.state == TaskState.DONE:
-            return reopen(session, task_id, actor=actor)
-    raise InvalidTransitionError(
-        f"task '{task_id}' can't go from {task.state.name} to {target.name}.")
+    path = _state_path(task.state, target)
+    if not path:
+        raise InvalidTransitionError(
+            f"task '{task_id}' can't go from {task.state.name} to {target.name}.")
+    if target == TaskState.WAITING and not reason:
+        raise ValidationError("a blocked task requires a non-empty reason.")
+    if target in _CLOSED_STATES:
+        _require_closed_children(task)
+
+    for state in path:
+        task = _step(session, task, state, reason, actor)
+    return task
 
 # -----------------------------------------------------------------------------
 # Deletion

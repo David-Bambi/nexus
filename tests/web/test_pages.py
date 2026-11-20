@@ -447,7 +447,7 @@ def test_task_state_select_moves_task(client):
 
 @pytest.mark.parametrize("data, message", [
     ({"state": "NOPE"}, b"unknown state"),
-    ({"state": "DONE"}, b"isn&#39;t doing"),
+    ({"state": "SOMEDAY"}, b"can&#39;t go from REFINED to SOMEDAY"),
     ({"state": "PLANNED"}, b"unknown state"),
 ])
 def test_task_state_invalid_shows_error(client, data, message):

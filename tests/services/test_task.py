@@ -333,17 +333,60 @@ def test_change_state_walks_the_working_states(session):
                            (TaskState.DOING, ""), (TaskState.DONE, ""), (TaskState.DOING, "")):
         assert tasks.change_state(session, task.id, target, reason).state is target
 
-@pytest.mark.parametrize("target", [TaskState.SOMEDAY, TaskState.DONE, TaskState.WAITING])
+@pytest.mark.parametrize("target", [TaskState.SOMEDAY, TaskState.REFINED])
 def test_change_state_not_allowed(session, target):
-    """Change state refuses a move the lifecycle doesn't allow
+    """Change state refuses a state it can't reach or the one the task is in
     Given a refined task
-    When moving it to someday, done or waiting
+    When moving it to someday or refined
     Then an invalid transition error is raised
     """
     task = _refined_task(session)
     with pytest.raises(InvalidTransitionError):
         tasks.change_state(session, task.id, target, "Reason")
     assert task.state is TaskState.REFINED
+
+
+@pytest.mark.parametrize("start, target, actions", [
+    ("inbox", TaskState.DONE, ["clarified", "started", "completed"]),
+    ("inbox", TaskState.WAITING, ["clarified", "started", "blocked"]),
+    ("done", TaskState.INBOX, ["reopened", "unstarted", "unrefined"]),
+    ("cancelled", TaskState.DOING, ["restored", "started"]),
+    ("done", TaskState.CANCELLED, ["reopened", "cancelled"]),
+])
+def test_change_state_jumps_through_each_step(session, nexus, start, target, actions):
+    """
+    Given a placed task in some state
+    When moving it to a state more than one step away
+    Then it lands there, each step logged in order on the shortest path
+    """
+    task = tasks.add_to_tree(session, "Login", project_key="nexus")
+    if start == "done":
+        tasks.change_state(session, task.id, TaskState.DONE)
+    if start == "cancelled":
+        tasks.cancel(session, task.id)
+    before = len(_history(session, task.id))
+
+    tasks.change_state(session, task.id, target, "Review")
+
+    assert task.state is target
+    assert [action for action, _ in _history(session, task.id)[before:]] == actions
+
+
+def test_change_state_jump_to_waiting_needs_a_reason_before_any_step(session, nexus):
+    """A jump to waiting without a reason is refused, the task left untouched."""
+    task = tasks.add_to_tree(session, "Login", project_key="nexus")
+    with pytest.raises(ValidationError):
+        tasks.change_state(session, task.id, TaskState.WAITING, "")
+    assert task.state is TaskState.INBOX and len(_history(session, task.id)) == 1
+
+
+def test_change_state_jump_to_done_refuses_a_feature_with_open_children_before_any_step(session, nexus):
+    """A feature with an open child can't jump to done, and isn't even started."""
+    feature = tasks.add_to_tree(session, "Auth", project_key="nexus", kind=TaskKind.FEATURE, refined=True)
+    tasks.add_to_tree(session, "Login", parent_ref=feature.ref)
+    with pytest.raises(ConflictError):
+        tasks.change_state(session, feature.id, TaskState.DONE)
+    assert feature.state is TaskState.REFINED
 
 def test_planned_state_is_gone():
     """Without versions, nothing is planned any more
