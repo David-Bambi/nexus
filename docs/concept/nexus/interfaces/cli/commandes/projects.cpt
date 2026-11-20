@@ -15,15 +15,15 @@ nexus projects
 ```
 
 __Résultat__
-- Un tableau des projets actifs : `KEY`, `REF`, `VERSION`, `STATUS`, `NAME`.
-- Chaque sous-projet actif suit son projet racine, la clé en retrait ; un projet racine n'a pas de référence (tiret).
+- Un tableau des projets actifs : `KEY`, `REF`, `VERSION`, `STATUS`, `PRIORITY`, `NAME`, par [priorité](../../../modele/arbre.cpt) (`HIGH` d'abord).
+- Chaque sous-projet actif suit son projet racine, la clé en retrait ; un projet racine n'a pas de référence (tiret). Un sous-projet montre la priorité de sa racine.
 - Les projets archivés sont cachés.
 
 __Exemple__
 
 ```
 nexus projects
-# KEY      REF  VERSION  STATUS  NAME
-# NX       -    2.3      ACTIVE  Nexus
-#   NX-WEB s-…  0.4      ACTIVE  Web UI
+# KEY      REF  VERSION  STATUS  PRIORITY  NAME
+# NX       -    2.3      ACTIVE  HIGH      Nexus
+#   NX-WEB s-…  0.4      ACTIVE  HIGH      Web UI
 ```

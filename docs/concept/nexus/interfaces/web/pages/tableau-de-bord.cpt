@@ -1,6 +1,6 @@
 ---
 title: Tableau de bord
-summary: "La page d'accueil : compteurs inbox et à affiner, éléments en cours et en attente"
+summary: "La page d'accueil : compteurs inbox et à affiner, projets par priorité, éléments en cours et en attente"
 icon: lucide:gauge
 image: tableau-de-bord.png
 links: []
@@ -12,7 +12,8 @@ __Adresse__ : `/`, la page d'accueil.
 
 __Ce qu'on y voit__
 - Deux tuiles : le nombre de captures sans projet dans l'__Inbox__, et le nombre d'éléments __To refine__ (clarifiés, prêts à démarrer). Chacune mène à sa file.
+- __Projects__ : les projets racines actifs par [priorité](../../../modele/arbre.cpt), avec nom, badge de priorité et version.
 - __Doing__ : les éléments en cours, avec leur place (clé du projet, fonctionnalité parente).
 - __Waiting__ : les éléments bloqués, avec leur raison.
 
-__Ce qu'on y fait__ : voir où on en est, puis ouvrir un élément ou une file. Rien ne s'y modifie, à part capturer depuis l'en-tête.
+__Ce qu'on y fait__ : voir où on en est, puis ouvrir un projet, un élément ou une file. Rien ne s'y modifie, à part capturer depuis l'en-tête.

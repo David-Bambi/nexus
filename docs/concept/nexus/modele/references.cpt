@@ -14,6 +14,6 @@ On désigne un projet racine par sa __clé__ et tout le reste par une __référe
 - __Collision__ : code déjà pris, on en tire un autre ; toutes les 5 tentatives, il s'allonge d'un caractère.
 - __Codes partagés__ : une tâche devenue fonctionnalité garde son code, seule la lettre change ; les deux écritures la retrouvent.
 
-__Clés refusées__ : une clé qui ressemble à une référence, et les mots de commande `add`, `export`, `help`, `import`, `projects`, `tasks`, `version`. Ainsi la [CLI](../interfaces/cli/cli.cpt) sait toujours lire un argument.
+__Clés refusées__ : une clé qui ressemble à une référence, et les mots de commande `add`, `export`, `help`, `import`, `projects`, `state`, `tasks`, `version`. Ainsi la [CLI](../interfaces/cli/cli.cpt) sait toujours lire un argument.
 
 Pourquoi : un identifiant assez court pour être tapé ; les numéros internes ne sortent jamais.

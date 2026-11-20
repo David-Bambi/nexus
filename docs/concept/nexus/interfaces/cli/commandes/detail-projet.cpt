@@ -16,7 +16,7 @@ nexus s-… [--all]
 ```
 
 __Résultat__
-- Les champs du projet : clé, référence, nom, parent, statut, version, répertoire (suivi de « (from … ) » s'il vient du parent), description.
+- Les champs du projet : clé, référence, nom, parent, statut, [priorité](../../../modele/arbre.cpt) (celle de la racine pour un sous-projet), version, répertoire (suivi de « (from … ) » s'il vient du parent), description.
 - « Criteria for N+1.0 » : les critères de la [version majeure](../../../modele/version/majeure.cpt), `[x] 1. texte`, s'il y en a.
 - Le tableau des sous-projets, avec leur version.
 - « Work » : l'arbre, deux espaces de retrait par niveau, une ligne `réf ÉTAT titre` par élément, `(vX.Y)` après une fonctionnalité sortie.

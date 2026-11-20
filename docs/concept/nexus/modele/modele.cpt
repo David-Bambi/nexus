@@ -16,7 +16,7 @@ related:
 
 Nexus range le travail d'un projet dans un __arbre__ : des fonctionnalités et des tâches, qui avancent d'état en état. Chaque projet en tire sa version.
 
-- [Arbre de travail](arbre.cpt) : projets, sous-projets, fonctionnalités, tâches.
+- [Arbre de travail](arbre.cpt) : projets, sous-projets, fonctionnalités, tâches ; priorité d'un projet.
 - [Clés et références](references.cpt) : comment on désigne chacun.
 - [États](etats.cpt) : les sept états et les passages permis.
 - [Capturer, clarifier, ajouter](capturer-et-clarifier.cpt) : comment le travail entre.

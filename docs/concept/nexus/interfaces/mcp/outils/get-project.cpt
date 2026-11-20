@@ -18,4 +18,4 @@ __Règles__
 - Lecture seule.
 - Sans `include_closed`, les éléments terminés et annulés sont cachés, avec tout ce qu'il y a sous eux.
 
-__Résultat__ : les champs du projet, plus `criteria` (`{number, text, done}`), `subprojects` (avec leur version) et `tree` : les éléments en bref, chacun avec ses `children` imbriqués.
+__Résultat__ : les champs du projet (dont `priority`, effective), plus `criteria` (`{number, text, done}`), `subprojects` (avec leur version) et `tree` : les éléments en bref, chacun avec ses `children` imbriqués.

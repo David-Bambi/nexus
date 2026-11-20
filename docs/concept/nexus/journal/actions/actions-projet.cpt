@@ -15,7 +15,7 @@ __Contenu__
 
 ```
 created         {key, name, directory, ref, parent}   # ref et parent : sous-projet seulement
-updated         {champ: {from, to}}                    # name, description, directory
+updated         {champ: {from, to}}                    # name, description, directory, priority
 archived        {from, to}                             # ACTIVE, ARCHIVED
 restored        {from, to}
 deleted         {key, name, ref}                       # ref : sous-projet seulement

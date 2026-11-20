@@ -1,6 +1,6 @@
 ---
 title: dashboard
-summary: "Les éléments en cours et en attente, et les compteurs inbox et à affiner"
+summary: "Les projets par priorité, les éléments en cours et en attente, et les compteurs inbox et à affiner"
 icon: lucide:wrench
 tags: [lecture]
 links: []
@@ -17,4 +17,4 @@ __Arguments__
 __Règles__
 - Lecture seule.
 
-__Résultat__ : `doing` et `waiting` (les éléments en cours et en attente, en bref), `inbox_count` (captures sans projet, à trier) et `refine_count` (éléments clarifiés, prêts à démarrer).
+__Résultat__ : `projects` (les projets racines actifs par priorité, `{key, name, priority, version}`), `doing` et `waiting` (les éléments en cours et en attente, en bref), `inbox_count` (captures sans projet, à trier) et `refine_count` (éléments clarifiés, prêts à démarrer).
