@@ -207,9 +207,40 @@
 #}
 {% macro view_tabs(project_key, view) %}
 <nav class="view-tabs" aria-label="Work views">
-    <a href="{{ url_for('pages.project_detail', key=project_key) }}"{% if view != "kanban" %} aria-current="true"{% endif %}>Backlog</a>
-    <a href="{{ url_for('pages.project_detail', key=project_key, view='kanban') }}"{% if view == "kanban" %} aria-current="true"{% endif %}>Kanban</a>
+    <a href="{{ url_for('pages.project_detail', key=project_key) }}"{% if view == "backlog" %} aria-current="true"{% endif %}>Backlog</a>
+    {% for name in ("kanban", "someday", "done", "cancelled") %}
+    <a href="{{ url_for('pages.project_detail', key=project_key, view=name) }}"{% if view == name %} aria-current="true"{% endif %}>{{ name | capitalize }}</a>
+    {% endfor %}
 </nav>
+{% endmacro %}
+
+{#
+  The items of a project in one closed or set-aside state (someday, done,
+  cancelled), newest first: each with its place, its date, a feature's
+  release, and the button bringing it back (Refine, Reopen or Restore),
+  which comes back to this view.
+#}
+{% macro state_items(items, view) %}
+{% set back = request.full_path.rstrip("?") %}
+{% set action = {"someday": ("REFINED", "Refine"), "done": ("DOING", "Reopen"), "cancelled": ("REFINED", "Restore")}[view] %}
+{% if items %}
+<ul class="list state-items">
+    {% for item in items %}
+    <li>
+        {{ task_link(item, back) }} {{ ref_chip(item.ref) }} {{ task_place(item) }}
+        {% if item.released_in %}<span class="version">v{{ item.released_in }}</span>{% endif %}
+        <span class="hint">{{ (item.closed_at or item.updated_at).strftime("%Y-%m-%d") }}</span>
+        <form class="form-inline" method="post" action="{{ url_for('pages.task_state', task_id=item.id) }}">
+            <input type="hidden" name="state" value="{{ action[0] }}">
+            <input type="hidden" name="return_to" value="{{ back }}">
+            <button type="submit">{{ action[1] }}</button>
+        </form>
+    </li>
+    {% endfor %}
+</ul>
+{% else %}
+<p class="empty">No {{ view }} items.</p>
+{% endif %}
 {% endmacro %}
 
 {#

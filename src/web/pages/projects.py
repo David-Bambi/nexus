@@ -78,12 +78,14 @@ def _render_project(project, error=None, status=200, open_form=None):
             action was refused; None to keep every form closed.
     """
     view = _view()
-    tree = board = None
+    tree = board = items = None
     if view == "kanban":
         board = views.project_board(project)
+    elif view in views.STATE_VIEWS:
+        items = views.project_items(project, views.STATE_VIEWS[view])
     else:
         tree = views.project_tree(project)
-    return render_template("project.html", project=project, tree=tree, board=board,
+    return render_template("project.html", project=project, tree=tree, board=board, items=items,
                            columns=views.BOARD_COLUMNS, view=view, ai_shares=ai_share.of_project(project),
                            open_form=open_form, error=error), status
 
@@ -92,16 +94,19 @@ def _view():
     """Read the work view asked for in the query string.
 
     Returns:
-        "kanban" for `?view=kanban`; "backlog" for anything else, the default.
+        "kanban", or a state view ("someday", "done", "cancelled"), as asked
+        by `?view=`; "backlog" for anything else, the default.
     """
-    return "kanban" if request.args.get("view") == "kanban" else "backlog"
+    view = request.args.get("view")
+    return view if view == "kanban" or view in views.STATE_VIEWS else "backlog"
 
 
 @bp.route("/projects/<key>")
 def project_detail(key):
     """Show a single project's details, its subprojects and its work, as a
-    tree of open items (backlog, the default) or as a kanban board
-    (`?view=kanban`).
+    tree of open items (backlog, the default), as a kanban board
+    (`?view=kanban`), or as the list of its someday, done or cancelled items
+    (`?view=someday|done|cancelled`).
     """
     return _render_project(_get_project(key))
 

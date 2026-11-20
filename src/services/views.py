@@ -148,6 +148,26 @@ def project_tree(project : Project, include_closed : bool = False) -> list:
     return _nodes(top, include_closed)
 
 
+# States a project page lists in a tab of their own, by the view name.
+STATE_VIEWS = {"someday": TaskState.SOMEDAY, "done": TaskState.DONE, "cancelled": TaskState.CANCELLED}
+
+
+def project_items(project : Project, state : TaskState) -> list:
+    """List a project's features and tasks in one state, newest first.
+
+    Args:
+        project: Project or subproject; a root project's subprojects'
+            items are included.
+        state: The state to list.
+
+    Returns:
+        The matching items, the most recently changed (or closed) first.
+    """
+    items = [item for scope in (project, *project.subprojects) for item in scope.tasks
+             if item.state is state]
+    return sorted(items, key=lambda item: item.closed_at or item.updated_at, reverse=True)
+
+
 # Kanban columns, left to right: one per state of work still to do. Done,
 # someday and cancelled tasks stay off the board.
 BOARD_COLUMNS = (

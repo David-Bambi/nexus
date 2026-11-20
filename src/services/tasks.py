@@ -463,7 +463,7 @@ def clarify(session : Session,
     return task
 
 def refine(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -> Task:
-    """Refine an inbox item as it stands: same place, same detail.
+    """Refine an inbox or someday item as it stands: same place, same detail.
 
     It is a clarification that changes nothing but the state, logged as
     "clarified" like any other.
@@ -478,11 +478,11 @@ def refine(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -> 
 
     Raises:
         NotFoundError: If no task has this id.
-        InvalidTransitionError: If the task isn't in the inbox.
+        InvalidTransitionError: If the task isn't inbox or someday.
     """
     task = get(session, task_id)
-    if task.state != TaskState.INBOX:
-        raise InvalidTransitionError(f"task '{task_id}' isn't inbox.")
+    if task.state not in (TaskState.INBOX, TaskState.SOMEDAY):
+        raise InvalidTransitionError(f"task '{task_id}' isn't inbox or someday.")
     return clarify(session, task.id, task.title, task.body,
                    task.project.key if task.project else None, task.context, task.size,
                    parent_ref=task.parent.ref if task.parent else None, actor=actor)
@@ -946,6 +946,7 @@ _STEPS = (
     (TaskState.WAITING, TaskState.REFINED),
     (TaskState.DONE, TaskState.DOING),
     (TaskState.CANCELLED, TaskState.REFINED),
+    (TaskState.SOMEDAY, TaskState.REFINED),
     (TaskState.INBOX, TaskState.CANCELLED),
     (TaskState.REFINED, TaskState.CANCELLED),
     (TaskState.DOING, TaskState.CANCELLED),
@@ -997,7 +998,7 @@ def _step(session : Session, task : Task, target : TaskState, reason : str, acto
     if target == TaskState.INBOX:
         return unrefine(session, task.id, actor=actor)
     if target == TaskState.REFINED:
-        if task.state == TaskState.INBOX:
+        if task.state in (TaskState.INBOX, TaskState.SOMEDAY):
             return refine(session, task.id, actor=actor)
         if task.state == TaskState.CANCELLED:
             return restore(session, task.id, actor=actor)
@@ -1015,7 +1016,8 @@ def change_state(session : Session, task_id : int, target : TaskState, reason : 
     The steps are the one-step changes (refine, unrefine, start, unstart,
     block, unblock, complete, reopen, cancel, restore), chained along the
     shortest path; each is logged as its own event, e.g. inbox to done is
-    refined, started, then completed. Someday isn't reached this way.
+    refined, started, then completed. Someday can be left this way (it is
+    refined first) but not reached.
     What could stop the chain halfway is checked before the first step.
 
     Args:

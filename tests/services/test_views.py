@@ -560,3 +560,24 @@ def test_dashboard_counts_each_root_project_features_done(session):
 
     [row] = views.dashboard(session).projects
     assert (row.project.key, row.features_done, row.features_total) == ("nx", 1, 3)
+
+
+# Project items by state --------------------------------------------------------------------------
+
+def test_project_items_lists_one_state_with_subprojects_newest_first(session):
+    """
+    Given a root and its subproject, each with a cancelled item, and a refined one
+    When listing the root's cancelled items, then the subproject's
+    Then the root lists both, newest first; the subproject only its own
+    """
+    projects.create(session, "nx", "Nexus")
+    projects.create(session, "web", "Web", parent_key="nx")
+    old = tasks.add_to_tree(session, "Old", project_key="nx")
+    new = tasks.add_to_tree(session, "New", project_key="web")
+    tasks.add_to_tree(session, "Open", project_key="nx")
+    tasks.cancel(session, old.id)
+    tasks.cancel(session, new.id)
+
+    root = projects.get(session, "nx")
+    assert [t.title for t in views.project_items(root, TaskState.CANCELLED)] == ["New", "Old"]
+    assert [t.title for t in views.project_items(projects.get(session, "web"), TaskState.CANCELLED)] == ["New"]

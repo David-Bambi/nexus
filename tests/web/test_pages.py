@@ -1529,3 +1529,49 @@ def test_project_page_without_a_repository_has_no_ai_share(client):
     """No directory: no AI share line."""
     client.post("/projects", data={"key": "nexus", "name": "Nexus"})
     assert 'data-field="ai_share"' not in client.get("/projects/nexus").get_data(as_text=True)
+
+
+# State views -------------------------------------------------------------------------------------
+
+def _project_with_states(client):
+    """Project 'nexus' with a someday task, a done feature (v0.1) and a cancelled task."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    client.post("/projects/nexus/items", data={"title": "Later idea"})
+    client.post("/tasks/1/defer")
+    client.post("/projects/nexus/items", data={"title": "Shipped feature", "kind": "feature"})
+    client.post("/tasks/2/state", data={"state": "DONE"})
+    client.post("/projects/nexus/items", data={"title": "Dropped idea"})
+    client.post("/tasks/3/cancel")
+
+
+@pytest.mark.parametrize("view, title, others, button, target", [
+    ("someday", "Later idea", ("Shipped feature", "Dropped idea"), "Refine", "REFINED"),
+    ("done", "Shipped feature", ("Later idea", "Dropped idea"), "Reopen", "DOING"),
+    ("cancelled", "Dropped idea", ("Later idea", "Shipped feature"), "Restore", "REFINED"),
+])
+def test_state_view_lists_its_items_with_a_way_back(client, view, title, others, button, target):
+    """Each state tab lists only its items, each with its button posting the way back to this tab."""
+    _project_with_states(client)
+    html = client.get(f"/projects/nexus?view={view}").get_data(as_text=True)
+    work = html.split('class="view-tabs"')[1]
+    assert f'aria-current="true">{view.capitalize()}</a>' in work
+    assert title in work and not any(other in work for other in others)
+    assert f'name="state" value="{target}"' in work and f">{button}</button>" in work
+    assert f'name="return_to" value="/projects/nexus?view={view}"' in work
+    assert 'id="add-root"' not in html and "Next major version" not in html
+
+
+def test_done_view_shows_a_feature_release_and_reopen_comes_back(client):
+    """A done feature shows the version it shipped in; Reopen moves it to doing and comes back."""
+    _project_with_states(client)
+    html = client.get("/projects/nexus?view=done").get_data(as_text=True)
+    assert "v0.1" in html.split('class="view-tabs"')[1]
+    response = client.post("/tasks/2/state", data={"state": "DOING", "return_to": "/projects/nexus?view=done"})
+    assert response.headers["Location"] == "/projects/nexus?view=done"
+    assert _shown_field(client.get("/tasks/2"), "state") == "DOING"
+
+
+def test_empty_state_view_says_so(client):
+    """A tab with nothing in its state says so."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    assert "No someday items." in client.get("/projects/nexus?view=someday").get_data(as_text=True)

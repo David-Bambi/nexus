@@ -4,7 +4,7 @@
 {% block title %}{{ project.name }} — Nexus{% endblock %}
 
 {% block content %}
-{% if view == "kanban" %}
+{% if view != "backlog" %}
 {{ ui.page_header(project.name, url_for('pages.projects_list'), "Projects") }}
 {% else %}
 {% call ui.page_header(project.name, url_for('pages.projects_list'), "Projects") %}
@@ -64,7 +64,7 @@
 <p>Subproject of <a href="{{ url_for('pages.project_detail', key=project.parent.key) }}">{{ project.parent.name }}</a></p>
 {% endif %}
 
-{% set can_add_subproject = not project.parent and view != "kanban" %}
+{% set can_add_subproject = not project.parent and view == "backlog" %}
 {% if project.subprojects or can_add_subproject %}
 <h2 id="subprojects" class="heading-actions">Subprojects
     {% if can_add_subproject %}{{ ui.reveal_button("add-subproject", "plus", "Add a subproject", expanded=open_form == "add-subproject") }}{% endif %}
@@ -92,7 +92,7 @@
 {% endif %}
 
 <h2 id="work" class="heading-actions">Work
-    {% if view != "kanban" %}{{ ui.reveal_button("add-root", "plus", "Add an item to the project", expanded=open_form == "add-root") }}{% endif %}
+    {% if view == "backlog" %}{{ ui.reveal_button("add-root", "plus", "Add an item to the project", expanded=open_form == "add-root") }}{% endif %}
 </h2>
 {{ ui.view_tabs(project.key, view) }}
 {% if view == "kanban" %}
@@ -101,6 +101,8 @@
 {% else %}
 <p class="empty">No tasks to do.</p>
 {% endif %}
+{% elif view != "backlog" %}
+{{ ui.state_items(items, view) }}
 {% else %}
 {{ ui.add_item_form(project.key, none, "add-root", open_form) }}
 {% if tree %}
@@ -109,8 +111,8 @@
 <p class="empty">No work items yet.</p>
 {% endif %}
 {% endif %}
-{% if view != "kanban" %}
-{# The kanban view only moves tasks: creating and managing stay in the backlog view. #}
+{% if view == "backlog" %}
+{# The other views only move items: creating and managing stay in the backlog view. #}
 
 <h2 id="criteria" class="heading-actions">Next major version
     {{ ui.reveal_button("add-criterion", "plus", "Add a criterion", expanded=open_form == "add-criterion") }}

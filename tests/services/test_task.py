@@ -853,3 +853,25 @@ def test_a_started_task_has_no_plan(session, nexus):
     (task,) = _top_items(session, "Readme")
     tasks.start(session, task.id)
     assert "plan" not in _history(session, task.id)[-1][1]
+
+
+# Someday back to work ----------------------------------------------------------------------------
+
+def test_refine_brings_a_someday_item_back_in_place(session, nexus):
+    """A someday item under a feature is refined as it stands, logged as clarified."""
+    feature = tasks.add_to_tree(session, "Auth", project_key="nexus", kind=TaskKind.FEATURE)
+    task = tasks.add_to_tree(session, "Login", parent_ref=feature.ref)
+    tasks.defer(session, task.id)
+
+    tasks.change_state(session, task.id, TaskState.REFINED)
+
+    assert (task.state, task.parent) == (TaskState.REFINED, feature)
+    assert _history(session, task.id)[-1][0] == "clarified"
+
+
+def test_change_state_jumps_from_someday_through_refined(session, nexus):
+    """Someday to done goes through refined, doing and done, each step logged."""
+    task = tasks.add_to_tree(session, "Login", project_key="nexus")
+    tasks.defer(session, task.id)
+    tasks.change_state(session, task.id, TaskState.DONE)
+    assert [a for a, _ in _history(session, task.id)][-3:] == ["clarified", "started", "completed"]
