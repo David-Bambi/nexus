@@ -32,6 +32,14 @@
 
 {% set closed = "1" if include_closed else none %}
 <h2>Work</h2>
+{{ ui.view_tabs(project.key, view) }}
+{% if view == "kanban" %}
+{% if board %}
+{{ ui.kanban_board(board, columns) }}
+{% else %}
+<p class="empty">No tasks to do.</p>
+{% endif %}
+{% else %}
 <p class="hint">
     {% if include_closed %}
     Showing done and cancelled items. <a href="{{ url_for('pages.project_detail', key=project.key) }}">Hide closed</a>
@@ -44,6 +52,9 @@
 {% else %}
 <p class="empty">No work items yet.</p>
 {% endif %}
+{% endif %}
+{% if view != "kanban" %}
+{# The kanban view only moves tasks: creating and managing stay in the backlog view. #}
 {{ ui.add_item_form(project.key, none, closed) }}
 
 <h2>Next major version</h2>
@@ -125,4 +136,5 @@
         </div>
     </form>
 </section>
+{% endif %}
 {% endblock %}

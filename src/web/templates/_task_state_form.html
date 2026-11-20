@@ -1,5 +1,38 @@
+{#
+  Form moving a task to one of its next states.
+
+  By default: a select, a Move button and a reason field shown for WAITING.
+  With `icons`: one small swatch button per next state, in the color of the
+  target state's column, its tooltip naming that state; the WAITING swatch
+  reveals a reason field below the swatches (app.js), sent with Enter. `return_to` is the page to come back to after
+  the move.
+#}
 {% set next_states = {"REFINED": ["DOING", "CANCELLED"], "DOING": ["WAITING", "DONE", "CANCELLED"], "WAITING": ["DOING", "CANCELLED"], "DONE": ["DOING"]}[task.state.name] %}
-{% if next_states %}
+{% if next_states and icons %}
+{% set form_id = "state-" ~ task.id %}
+{% set reason_id = "reason-" ~ task.id %}
+<div class="state-icons">
+    {% for name in next_states %}
+    {% if name == "WAITING" %}
+    <button type="button" class="state-swatch" data-state="{{ name }}" title="Move to {{ name }}" aria-label="Move {{ task.title }} to {{ name }}"
+            aria-expanded="false" aria-controls="{{ reason_id }}" data-reveal="{{ reason_id }}"></button>
+    {% else %}
+    <button type="submit" form="{{ form_id }}" name="state" value="{{ name }}" class="state-swatch" data-state="{{ name }}"
+            title="Move to {{ name }}" aria-label="Move {{ task.title }} to {{ name }}"></button>
+    {% endif %}
+    {% endfor %}
+</div>
+<form id="{{ form_id }}" class="state-icon-form" method="post" action="{{ state_action }}">
+    {% if return_to %}<input type="hidden" name="return_to" value="{{ return_to }}">{% endif %}
+</form>
+{% if "WAITING" in next_states %}
+<form id="{{ reason_id }}" class="state-reason" method="post" action="{{ state_action }}" hidden>
+    <input type="hidden" name="state" value="WAITING">
+    <input type="text" name="reason" placeholder="Reason (waiting), then Enter" aria-label="Reason (waiting)" required>
+    {% if return_to %}<input type="hidden" name="return_to" value="{{ return_to }}">{% endif %}
+</form>
+{% endif %}
+{% elif next_states %}
 <form class="form-inline state-form" method="post" action="{{ state_action }}">
     <select name="state" aria-label="State">
         {% for name in next_states %}
@@ -8,5 +41,6 @@
     </select>
     <button type="submit">Move</button>
     <input type="text" name="reason" placeholder="Reason (waiting)" aria-label="Reason (waiting)">
+    {% if return_to %}<input type="hidden" name="return_to" value="{{ return_to }}">{% endif %}
 </form>
 {% endif %}

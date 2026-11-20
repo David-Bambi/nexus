@@ -459,6 +459,35 @@ def test_task_state_invalid_shows_error(client, data, message):
     assert _shown_field(response, "state") == "REFINED"
 
 
+def test_task_state_returns_to_the_given_page(client):
+    """A state change with a local "return_to" goes back to that page."""
+    _refined_task_in_project(client)
+    response = client.post("/tasks/1/state", data={"state": "DOING",
+                                                   "return_to": "/projects/nexus?view=kanban"})
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/projects/nexus?view=kanban"
+    assert _shown_field(client.get("/tasks/1"), "state") == "DOING"
+
+
+@pytest.mark.parametrize("target", ["https://evil.example", "//evil.example"])
+def test_task_state_ignores_an_external_return_to(client, target):
+    """An external "return_to" is ignored: the task page is shown."""
+    _refined_task_in_project(client)
+    response = client.post("/tasks/1/state", data={"state": "DOING", "return_to": target})
+    assert response.status_code == 200
+    assert _shown_field(response, "state") == "DOING"
+
+
+def test_task_state_refused_shows_the_task_page_despite_return_to(client):
+    """A refused change (waiting without a reason) shows the error on the task page."""
+    _refined_task_in_project(client)
+    client.post("/tasks/1/state", data={"state": "DOING"})
+    response = client.post("/tasks/1/state", data={"state": "WAITING",
+                                                   "return_to": "/projects/nexus?view=kanban"})
+    assert response.status_code == 200
+    assert _shown_field(response, "state") == "DOING"
+
+
 def test_task_state_select_absent_for_inbox_task(client):
     """A captured task has no state select; clarifying comes first."""
     client.post("/tasks", data={"title": "Write the docs"})
@@ -695,6 +724,123 @@ def test_closed_items_are_hidden_unless_asked(client):
     assert "Dropped idea" not in client.get("/projects/nexus").get_data(as_text=True)
     shown = client.get("/projects/nexus?closed=1").get_data(as_text=True)
     assert "Dropped idea" in shown and "Hide closed" in shown
+
+
+# Kanban view ---------------------------------------------------------------------------------------
+
+def _kanban_project(client):
+    """Create project 'nexus' with feature Auth > Login > Form, task Auth > Hash and a loose
+    task Readme, all through the web; return the refs by title."""
+    from src.models.task import Task
+
+    feature_ref = _project_with_feature(client)
+    client.post("/projects/nexus/items", data={"title": "Login", "kind": "feature", "parent_ref": feature_ref})
+    session = client.application.extensions["db_session"]
+    login_ref = session.query(Task).filter_by(title="Login").one().ref
+    client.post("/projects/nexus/items", data={"title": "Form", "parent_ref": login_ref})
+    client.post("/projects/nexus/items", data={"title": "Hash", "parent_ref": feature_ref})
+    client.post("/projects/nexus/items", data={"title": "Readme"})
+    return {t.title: t for t in session.query(Task).all()}
+
+
+def test_project_page_shows_the_backlog_by_default(client):
+    """Without a view, or with an unknown one, the page shows the tree, its tab marked current."""
+    _kanban_project(client)
+    for path in ("/projects/nexus", "/projects/nexus?view=nope"):
+        html = client.get(path).get_data(as_text=True)
+        assert "tree-feature" in html and "kanban-lane" not in html
+        assert 'aria-current="true">Backlog</a>' in html
+
+
+def test_kanban_view_lays_tasks_out_in_lanes_and_columns(client):
+    """
+    Given a feature with a sub-feature and a task, and a loose task
+    When opening the kanban view
+    Then there is a lane per feature then one for loose tasks, four columns each,
+    and no card for a feature
+    """
+    _kanban_project(client)
+    html = client.get("/projects/nexus?view=kanban").get_data(as_text=True)
+
+    assert 'aria-current="true">Kanban</a>' in html
+    assert html.count('class="kanban-lane"') == 2
+    assert html.count('class="kanban-column"') == 8
+    for state in ("DONE", "SOMEDAY", "CANCELLED"):
+        assert f'<div class="kanban-column" data-state="{state}"' not in html
+    assert html.index("Auth") < html.index("Form") < html.index("No feature") < html.index("Readme")
+    assert html.count('class="kanban-card"') == 3
+    assert "tree-feature" not in html
+
+
+def test_kanban_card_has_the_state_form_coming_back_to_the_board(client):
+    """A refined card has an icon per next state (doing, cancelled), each naming its target,
+    posting back to the board; no select, no Move button."""
+    _kanban_project(client)
+    html = client.get("/projects/nexus?view=kanban").get_data(as_text=True)
+    board = html.split('class="kanban"')[1].split("add-item")[0]
+    assert board.count('title="Move to DOING"') == 3
+    assert board.count('title="Move to CANCELLED"') == 3
+    assert "<select" not in board and ">Move</button>" not in board
+
+
+def test_kanban_waiting_icon_reveals_a_reason_field(client):
+    """A started card's WAITING icon reveals a hidden reason form posting WAITING."""
+    refs = _kanban_project(client)
+    task_id = refs["Hash"].id
+    client.post(f"/tasks/{task_id}/start")
+    html = client.get("/projects/nexus?view=kanban").get_data(as_text=True)
+    assert f'data-reveal="reason-{task_id}"' in html
+    reason_form = html.split(f'id="reason-{task_id}"')[1].split("</form>")[0]
+    assert "hidden" in reason_form.split(">")[0]
+    assert 'name="state" value="WAITING"' in reason_form
+    assert 'name="reason"' in reason_form and "required" in reason_form
+    assert 'name="return_to" value="/projects/nexus?view=kanban"' in html
+
+
+def test_kanban_leaves_out_closed_tasks_and_their_empty_lane(client):
+    """
+    Given the only loose task cancelled
+    When opening the kanban view, even with closed items asked for
+    Then the task and its lane are gone, and there is no show-closed switch
+    """
+    refs = _kanban_project(client)
+    client.post(f"/tasks/{refs['Readme'].id}/cancel")
+    html = client.get("/projects/nexus?view=kanban&closed=1").get_data(as_text=True)
+    assert "Readme" not in html and "No feature" not in html
+    assert "Show closed" not in html and "Hide closed" not in html
+
+
+def test_kanban_state_change_goes_back_to_the_board(client):
+    """Moving a card from the board comes back to the board, with the card in its new column."""
+    refs = _kanban_project(client)
+    response = client.post(f"/tasks/{refs['Hash'].id}/state",
+                           data={"state": "DOING", "return_to": "/projects/nexus?view=kanban"})
+    assert response.headers["Location"] == "/projects/nexus?view=kanban"
+    html = client.get("/projects/nexus?view=kanban").get_data(as_text=True)
+    doing = html.index('<div class="kanban-column" data-state="DOING"')
+    assert doing < html.index("Hash") < html.index('<div class="kanban-column" data-state="WAITING"', doing)
+
+
+def test_kanban_shows_subproject_lanes(client):
+    """A subproject's lane comes after the project's own, titled with the subproject."""
+    _kanban_project(client)
+    client.post("/projects/nexus/subprojects", data={"key": "web", "name": "Web UI"})
+    client.post("/projects/web/items", data={"title": "Pages"})
+    html = client.get("/projects/nexus?view=kanban").get_data(as_text=True)
+    assert html.index("Readme") < html.index("Web UI /") < html.index("Pages")
+
+
+def test_kanban_view_has_no_creation_or_management_forms(client):
+    """The kanban view only moves tasks: no add item, criteria, edit, subproject, status or
+    delete form; the backlog view keeps them."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    html = client.get("/projects/nexus?view=kanban").get_data(as_text=True)
+    assert "No tasks to do." in html
+    for marker in ('class="form-inline add-item"', "New criterion", "<h2>Edit</h2>",
+                   "Create subproject", "<h2>Status</h2>", "danger-zone"):
+        assert marker not in html
+    backlog = client.get("/projects/nexus").get_data(as_text=True)
+    assert 'class="form-inline add-item"' in backlog and "Create subproject" in backlog
 
 
 # Project management --------------------------------------------------------------------------------

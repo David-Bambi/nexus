@@ -376,3 +376,111 @@ def test_item_tree_gives_a_feature_children(session, tree):
     """The tree below a feature holds its children only."""
     auth = next(t for t in tasks.list(session) if t.title == "Auth")
     assert _shape(views.item_tree(auth)) == [("Login", [("Form", [])]), ("Hash", [])]
+
+
+# Project board -----------------------------------------------------------------------------------
+
+def _board(lanes):
+    """Turn board lanes into (feature, subproject, {state: [task titles]}) triples,
+    keeping only non-empty columns."""
+    return [
+        (lane.feature.title if lane.feature else None,
+         lane.subproject.key if lane.subproject else None,
+         {state.name: [task.title for task in tasks_] for state, tasks_ in lane.columns.items() if tasks_})
+        for lane in lanes
+    ]
+
+
+def _by_title(session):
+    """Map every task and feature title to its item."""
+    return {t.title: t for t in tasks.list(session)}
+
+
+def test_project_board_lays_tasks_out_by_feature(session, tree):
+    """
+    Given a feature holding a sub-feature and a task, and a loose task
+    When building the board
+    Then the feature has a lane with its tasks, sub-features included, and the loose task has
+    its own lane last; features are never cards
+    """
+    assert _board(views.project_board(tree)) == [
+        ("Auth", None, {"REFINED": ["Form", "Hash"]}),
+        (None, None, {"REFINED": ["Readme"]}),
+    ]
+
+
+def test_project_board_has_a_column_per_open_state_in_order(session, tree):
+    """Each lane holds a column per state of work still to do, in board order."""
+    lane = views.project_board(tree)[0]
+    assert list(lane.columns) == list(views.BOARD_COLUMNS)
+    assert [state.name for state in views.BOARD_COLUMNS] == ["INBOX", "REFINED", "DOING", "WAITING"]
+
+
+def test_project_board_sorts_tasks_by_state(session, tree):
+    """
+    Given a started task and a blocked task
+    When building the board
+    Then each task sits in its state's column
+    """
+    by_title = _by_title(session)
+    tasks.start(session, by_title["Hash"].id)
+    tasks.start(session, by_title["Form"].id)
+    tasks.block(session, by_title["Form"].id, "Waiting on review")
+
+    assert _board(views.project_board(tree))[0] == (
+        "Auth", None, {"DOING": ["Hash"], "WAITING": ["Form"]})
+
+
+def test_project_board_follows_tree_order(session, tree):
+    """
+    Given a task moved above the sub-feature
+    When building the board
+    Then it comes first in the column
+    """
+    tasks.reorder(session, _by_title(session)["Hash"].id, "up")
+
+    assert _board(views.project_board(tree))[0][2]["REFINED"] == ["Hash", "Form"]
+
+
+def test_project_board_leaves_out_closed_and_someday_tasks_and_empty_lanes(session, tree):
+    """
+    Given a done task, a deferred task and the only loose task cancelled
+    When building the board
+    Then none of them is on the board, and the emptied loose lane is left out
+    """
+    by_title = _by_title(session)
+    tasks.start(session, by_title["Form"].id)
+    tasks.complete(session, by_title["Form"].id)
+    tasks.defer(session, by_title["Hash"].id)
+    tasks.cancel(session, by_title["Readme"].id)
+
+    assert views.project_board(tree) == []
+
+
+def test_project_board_leaves_out_features_without_tasks(session, tree):
+    """A feature with no task below it gets no lane."""
+    _refined(session, "Empty", "nx", kind=TaskKind.FEATURE)
+    assert [lane[0] for lane in _board(views.project_board(tree))] == ["Auth", None]
+
+
+def test_project_board_adds_subproject_lanes_after(session, tree):
+    """
+    Given a subproject with a feature and a loose task
+    When building the parent's board
+    Then the subproject's lanes come after the parent's, tagged with the subproject
+    """
+    projects.create(session, "sub", "Sub", parent_key="nx")
+    api = _refined(session, "Api", "sub", kind=TaskKind.FEATURE)
+    _refined(session, "Endpoint", "sub", parent_ref=api.ref)
+    _refined(session, "Loose", "sub")
+
+    assert _board(views.project_board(tree))[2:] == [
+        ("Api", "sub", {"REFINED": ["Endpoint"]}),
+        (None, "sub", {"REFINED": ["Loose"]}),
+    ]
+
+
+def test_project_board_empty_project(session):
+    """A project without tasks has an empty board."""
+    project = projects.create(session, "void", "Void")
+    assert views.project_board(project) == []

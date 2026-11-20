@@ -228,7 +228,13 @@ def task_restore(task_id):
 
 @bp.route("/tasks/<int:task_id>/state", methods=["POST"])
 def task_state(task_id):
-    """Move a task to the state picked in the form ("state", plus "reason" for waiting)."""
+    """Move a task to the state picked in the form ("state", plus "reason" for waiting).
+
+    On success, goes back to the safe "return_to" page when one is given
+    (e.g. the kanban board the form sits on); otherwise, and on a refusal,
+    shows the task page. "return_to" is separate from "next", which the task
+    page keeps as its back link.
+    """
     def move(session):
         try:
             target = TaskState[request.form.get("state", "")]
@@ -236,7 +242,11 @@ def task_state(task_id):
             raise ValidationError("unknown state.")
         return tasks.change_state(session, task_id, target, request.form.get("reason", ""))
 
-    return _apply_transition(task_id, move)
+    task, error = _run_transition(_session(), task_id, move)
+    target = _local_path(request.values.get("return_to"))
+    if target and not error:
+        return redirect(target)
+    return _render_task(task, error)
 
 
 @bp.route("/tasks/<int:task_id>/children", methods=["POST"])

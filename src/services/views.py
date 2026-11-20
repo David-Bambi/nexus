@@ -1,9 +1,10 @@
 from dataclasses import dataclass
+from typing import Optional
 
 from sqlalchemy.orm import Session, joinedload
 
 from src.models.project import Project
-from src.models.task import Task, TaskState
+from src.models.task import Task, TaskKind, TaskState
 from src.services import projects
 from src.services.errors import NotFoundError
 
@@ -65,6 +66,112 @@ def project_tree(project : Project, include_closed : bool = False) -> list:
     """
     top = [item for item in project.tasks if item.parent_id is None]
     return _nodes(top, include_closed)
+
+
+# Kanban columns, left to right: one per state of work still to do. Done,
+# someday and cancelled tasks stay off the board.
+BOARD_COLUMNS = (
+    TaskState.INBOX,
+    TaskState.REFINED,
+    TaskState.DOING,
+    TaskState.WAITING,
+)
+
+
+@dataclass
+class KanbanLane:
+    """One swimlane of a kanban board: a top-level feature's tasks, or the
+    tasks sitting right under a project."""
+
+    # Top-level feature of the lane; None for the project's loose tasks.
+    feature: Optional[Task]
+    # Subproject the lane belongs to; None for the board's own project.
+    subproject: Optional[Project]
+    # Tasks per state, in BOARD_COLUMNS order, every state present.
+    columns: dict
+
+
+def _sorted(items : list) -> list:
+    """Sort sibling items in tree order.
+
+    Args:
+        items: Sibling features and tasks.
+
+    Returns:
+        The items by position, then creation order.
+    """
+    return sorted(items, key=lambda item: (item.position, item.id))
+
+
+def _board_tasks(items : list):
+    """Walk sibling items depth first and yield the tasks shown on a board.
+
+    Args:
+        items: Sibling features and tasks.
+
+    Yields:
+        Each task whose state has a column, in tree order; features are
+        walked through, never shown.
+    """
+    for item in _sorted(items):
+        if item.kind == TaskKind.FEATURE:
+            yield from _board_tasks(item.children)
+        elif item.state in BOARD_COLUMNS:
+            yield item
+
+
+def _lane(feature : Optional[Task], subproject : Optional[Project], items : list) -> KanbanLane:
+    """Build one swimlane from the items it holds.
+
+    Args:
+        feature: Top-level feature of the lane, or None for loose tasks.
+        subproject: Subproject the lane belongs to, or None.
+        items: Items right under the lane's feature (or loose tasks).
+
+    Returns:
+        The lane, with its tasks sorted into state columns.
+    """
+    columns = {state: [] for state in BOARD_COLUMNS}
+    for task in _board_tasks(items):
+        columns[task.state].append(task)
+    return KanbanLane(feature, subproject, columns)
+
+
+def _project_lanes(project : Project, subproject : Optional[Project]) -> list:
+    """Build the swimlanes of a single project, without its subprojects.
+
+    Args:
+        project: Project or subproject whose items are laid out.
+        subproject: The same project when it is a subproject of the board,
+            None for the board's own project.
+
+    Returns:
+        A lane per top-level feature in tree order, then the lane of loose
+        tasks; lanes without a task are left out.
+    """
+    top = _sorted([item for item in project.tasks if item.parent_id is None])
+    lanes = [_lane(item, subproject, item.children)
+             for item in top if item.kind == TaskKind.FEATURE]
+    loose = [item for item in top if item.kind == TaskKind.TASK]
+    lanes.append(_lane(None, subproject, loose))
+    return [lane for lane in lanes if any(lane.columns.values())]
+
+
+def project_board(project : Project) -> list:
+    """Give a project's kanban board, ready to render.
+
+    Args:
+        project: Project or subproject; a root project's subprojects are
+            laid out after its own lanes.
+
+    Returns:
+        A KanbanLane per non-empty swimlane: the project's own lanes, then
+        each subproject's.
+    """
+    lanes = _project_lanes(project, None)
+    for subproject in project.subprojects:
+        lanes.extend(_project_lanes(subproject, subproject))
+    return lanes
 
 
 def item_tree(item : Task, include_closed : bool = False) -> list:

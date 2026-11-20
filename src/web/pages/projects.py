@@ -73,14 +73,30 @@ def _render_project(project, error=None, status=200):
         status: HTTP status of the response.
     """
     include_closed = request.args.get("closed") == "1"
-    tree = views.project_tree(project, include_closed=include_closed)
-    return render_template("project.html", project=project, tree=tree,
+    view = _view()
+    tree = board = None
+    if view == "kanban":
+        board = views.project_board(project)
+    else:
+        tree = views.project_tree(project, include_closed=include_closed)
+    return render_template("project.html", project=project, tree=tree, board=board,
+                           columns=views.BOARD_COLUMNS, view=view,
                            include_closed=include_closed, error=error), status
+
+
+def _view():
+    """Read the work view asked for in the query string.
+
+    Returns:
+        "kanban" for `?view=kanban`; "backlog" for anything else, the default.
+    """
+    return "kanban" if request.args.get("view") == "kanban" else "backlog"
 
 
 @bp.route("/projects/<key>")
 def project_detail(key):
-    """Show a single project's details, its subprojects and its work tree.
+    """Show a single project's details, its subprojects and its work, as a
+    tree (backlog, the default) or as a kanban board (`?view=kanban`).
 
     Done and cancelled items are hidden unless `?closed=1` is given.
     """

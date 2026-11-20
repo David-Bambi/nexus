@@ -145,6 +145,60 @@
 {% endmacro %}
 
 {# Events, oldest first; with `show_entity`, each row names its entity and links tasks. Empty payload values are left out. #}
+{#
+  Tabs switching a project's work between the backlog (tree) and the kanban
+  board.
+#}
+{% macro view_tabs(project_key, view) %}
+<nav class="view-tabs" aria-label="Work views">
+    <a href="{{ url_for('pages.project_detail', key=project_key) }}"{% if view != "kanban" %} aria-current="true"{% endif %}>Backlog</a>
+    <a href="{{ url_for('pages.project_detail', key=project_key, view='kanban') }}"{% if view == "kanban" %} aria-current="true"{% endif %}>Kanban</a>
+</nav>
+{% endmacro %}
+
+{#
+  A kanban board: a lane per top-level feature (then loose tasks), a column
+  per state. `lanes` come from views.project_board(), `columns` is
+  views.BOARD_COLUMNS.
+#}
+{% macro kanban_board(lanes, columns) %}
+{% set back = request.full_path.rstrip("?") %}
+<div class="kanban">
+    {% for lane in lanes %}
+    <section class="kanban-lane">
+        <h3 class="kanban-lane-title">
+            {% if lane.subproject %}<span class="kanban-subproject">{{ lane.subproject.name }} /</span>{% endif %}
+            {% if lane.feature %}{{ task_link(lane.feature, back) }} {{ ref_chip(lane.feature.ref) }}{% else %}No feature{% endif %}
+        </h3>
+        <div class="kanban-columns">
+            {% for state in columns %}
+            {% set cards = lane.columns[state] %}
+            <div class="kanban-column" data-state="{{ state.name }}">
+                <h4 class="kanban-column-title">{{ badge(state.name) }} <span class="hint">{{ cards | length }}</span></h4>
+                {% for task in cards %}{{ kanban_card(task, back) }}{% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endfor %}
+</div>
+{% endmacro %}
+
+{#
+  One kanban card: the task, its size, its blocked reason, and the state
+  color swatches (the WAITING one asks for a reason first), which come back to `back`.
+#}
+{% macro kanban_card(task, back) %}
+<article class="kanban-card">
+    <p class="kanban-card-title">{{ task_link(task, back) }} {{ ref_chip(task.ref) }}</p>
+    {% if task.size %}<p class="kanban-meta"><span class="size">{{ task.size }}</span></p>{% endif %}
+    {% if task.state.name == "WAITING" and task.blocked_reason %}<p class="blocked-reason">{{ task.blocked_reason }}</p>{% endif %}
+    {% with state_action = url_for('pages.task_state', task_id=task.id), return_to = back, icons = true %}
+    {% include "_task_state_form.html" %}
+    {% endwith %}
+</article>
+{% endmacro %}
+
 {% macro event_list(events, show_entity=false) %}
 <ul class="events">
     {% for e in events %}

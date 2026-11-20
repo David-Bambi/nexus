@@ -21,3 +21,17 @@ document.addEventListener("input", function (event) {
         button.disabled = input.value !== input.dataset.confirm;
     }
 });
+
+// A button with data-reveal="<id>" shows or hides the element with that id (e.g. the reason
+// field of the WAITING icon on a kanban card), focusing its first text field when shown.
+document.addEventListener("click", function (event) {
+    var button = event.target.closest("[data-reveal]");
+    if (button) {
+        var target = document.getElementById(button.dataset.reveal);
+        target.hidden = !target.hidden;
+        button.setAttribute("aria-expanded", String(!target.hidden));
+        if (!target.hidden) {
+            target.querySelector('input[type="text"]').focus();
+        }
+    }
+});
