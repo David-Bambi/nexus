@@ -643,6 +643,37 @@ def reopen(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -> 
     session.commit()
     return task
 
+def unstart(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -> Task:
+    """Put a started task back to refined, as if it hadn't been started.
+
+    A waiting task loses its blocked reason. The first "started" event stays
+    in the log, so a feature's frozen plan isn't taken again on a restart.
+
+    Args:
+        session: Database session to use.
+        task_id: Id of the task.
+        actor: Who made the change, recorded in the event log.
+
+    Returns:
+        The task, back to refined.
+
+    Raises:
+        NotFoundError: If no task has this id.
+        InvalidTransitionError: If the task isn't doing or waiting.
+    """
+    task = get(session, task_id)
+
+    if task.state not in (TaskState.DOING, TaskState.WAITING):
+        raise InvalidTransitionError(f"task '{task_id}' isn't doing or waiting.")
+
+    previous = task.state
+    task.state = TaskState.REFINED
+    task.blocked_reason = None
+
+    _log_transition(session, task, "unstarted", previous, actor=actor)
+    session.commit()
+    return task
+
 def defer(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -> Task:
     """Defer a task to someday, with no fixed schedule.
 
@@ -877,8 +908,8 @@ def change_state(session : Session, task_id : int, target : TaskState, reason : 
     """Move a task to a target state through the matching lifecycle transition.
 
     Covers the working states and cancelling: inbox to refined, refined to
-    doing, doing to waiting or done, waiting or done back to doing, any open
-    task to cancelled.
+    doing, doing to waiting or done, waiting or done back to doing, doing or
+    waiting back to refined, any open task to cancelled.
 
     Args:
         session: Database session to use.
@@ -904,8 +935,11 @@ def change_state(session : Session, task_id : int, target : TaskState, reason : 
         return block(session, task_id, reason, actor=actor)
     if target == TaskState.DONE:
         return complete(session, task_id, actor=actor)
-    if target == TaskState.REFINED and task.state == TaskState.INBOX:
-        return refine(session, task_id, actor=actor)
+    if target == TaskState.REFINED:
+        if task.state == TaskState.INBOX:
+            return refine(session, task_id, actor=actor)
+        if task.state in (TaskState.DOING, TaskState.WAITING):
+            return unstart(session, task_id, actor=actor)
     if target == TaskState.DOING:
         if task.state == TaskState.REFINED:
             return start(session, task_id, actor=actor)

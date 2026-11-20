@@ -648,6 +648,55 @@ def test_change_state_inbox_to_refined_refines(session, nexus):
     assert task.state == TaskState.REFINED
 
 
+# Unstart -----------------------------------------------------------------------------------------
+
+def test_unstart_puts_a_doing_task_back_to_refined(session, nexus):
+    """A doing task goes back to refined, logged as unstarted from DOING."""
+    task = tasks.add_to_tree(session, "Login", project_key="nexus", refined=True)
+    tasks.start(session, task.id)
+
+    tasks.unstart(session, task.id)
+
+    assert task.state == TaskState.REFINED
+    action, payload = _history(session, task.id)[-1]
+    assert action == "unstarted" and (payload["from"], payload["to"]) == ("DOING", "REFINED")
+
+
+def test_unstart_clears_the_blocked_reason_of_a_waiting_task(session, nexus):
+    """A waiting task goes back to refined and loses its blocked reason."""
+    task = tasks.add_to_tree(session, "Login", project_key="nexus", refined=True)
+    tasks.start(session, task.id)
+    tasks.block(session, task.id, "Waiting for the API")
+
+    tasks.change_state(session, task.id, TaskState.REFINED)
+
+    assert (task.state, task.blocked_reason) == (TaskState.REFINED, None)
+    assert _history(session, task.id)[-1][1]["from"] == "WAITING"
+
+
+@pytest.mark.parametrize("state", ["inbox", "refined", "done"])
+def test_unstart_refuses_a_task_not_started(session, nexus, state):
+    """Only a doing or waiting task can be unstarted."""
+    task = tasks.add_to_tree(session, "Login", project_key="nexus", refined=state != "inbox")
+    if state == "done":
+        tasks.start(session, task.id)
+        tasks.complete(session, task.id)
+    with pytest.raises(InvalidTransitionError):
+        tasks.unstart(session, task.id)
+
+
+def test_restart_after_unstart_keeps_the_first_plan(session, nexus):
+    """A feature unstarted then started again doesn't freeze its plan a second time."""
+    feature = tasks.add_to_tree(session, "Auth", project_key="nexus", kind=TaskKind.FEATURE, refined=True)
+    tasks.add_to_tree(session, "Login", parent_ref=feature.ref, refined=True)
+    tasks.start(session, feature.id)
+    tasks.unstart(session, feature.id)
+    tasks.start(session, feature.id)
+
+    starts = [payload for action, payload in _history(session, feature.id) if action == "started"]
+    assert "plan" in starts[0] and "plan" not in starts[1]
+
+
 def test_add_to_tree_needs_a_place(session, nexus):
     """Neither project nor parent: refused, nothing written."""
     with pytest.raises(ValidationError, match="give a project"):
