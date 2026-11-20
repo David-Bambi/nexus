@@ -16,7 +16,7 @@ __Ce qu'on y voit__
 
 __Ce qu'on y fait__
 - __Clarify__ un élément inbox ou someday.
-- Changer d'état : un bouton par passage (Start, Complete, Block…), ou le menu __State__ des passages permis (inbox placé : REFINED, CANCELLED).
+- Changer d'état : un bouton par passage (Start, Complete, Block…), ou le menu __State__ vers tout autre état, étapes enchaînées comme au [Kanban](kanban.cpt). Sauf capture sans projet ou someday.
 - Pour une fonctionnalité : ses __Children__ (tout le sous-arbre, fermés compris, avec ↑ / ↓ et un + par sous-fonctionnalité) ; un + près du titre ouvre l'ajout, qui revient à `#children` (projet requis).
 - __Place__ : déplacer (clé et référence parente), changer en tâche ou en fonctionnalité.
 - __Edit__ : titre, corps, contexte, taille, et la case [Correction](../../../mesure/correction.cpt).
