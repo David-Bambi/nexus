@@ -317,11 +317,14 @@ def add_to_tree(session : Session,
                 body : str | None = None,
                 context : str | None = None,
                 size : str | None = None,
+                refined : bool = False,
                 actor : str = events.ACTOR_WEB) -> Task:
-    """Add a feature or task straight into a project's tree, already refined.
+    """Add a feature or task straight into a project's tree.
 
-    Unlike a capture, the item is already triaged: it is created, then
-    clarified in place, so its history shows both steps.
+    Unlike a capture, the item is already placed: it is created in the inbox
+    state, at its place, waiting to be refined. With `refined`, it is also
+    clarified in place right away (e.g. an imported plan), so its history
+    shows both steps.
 
     Args:
         session: Database session to use.
@@ -333,10 +336,13 @@ def add_to_tree(session : Session,
         body: Optional free-text detail.
         context: Optional context tag (e.g. "@ordi").
         size: Optional effort size ("XS", "S", "M", "L").
+        refined: True to clarify the item right away, False (default) to
+            leave it in the inbox state.
         actor: Who made the change, recorded in the event log.
 
     Returns:
-        The new item, refined, last among its siblings.
+        The new item, in the inbox state (refined with `refined`), last
+        among its siblings.
 
     Raises:
         NotFoundError: If the project or the parent doesn't exist.
@@ -348,6 +354,8 @@ def add_to_tree(session : Session,
         raise ValidationError("give a project or a parent feature to add the item to.")
     item = create(session, title, project_key=project_key, body=body, context=context, size=size,
                   parent_ref=parent_ref, kind=kind, actor=actor)
+    if not refined:
+        return item
     return clarify(session, item.id, item.title, body, item.project.key, context, size,
                    parent_ref=parent_ref, actor=actor)
 
@@ -453,6 +461,31 @@ def clarify(session : Session,
     _log_transition(session, task, "clarified", previous, actor=actor, **_where(task))
     session.commit()
     return task
+
+def refine(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -> Task:
+    """Refine an inbox item as it stands: same place, same detail.
+
+    It is a clarification that changes nothing but the state, logged as
+    "clarified" like any other.
+
+    Args:
+        session: Database session to use.
+        task_id: Id of the task.
+        actor: Who made the change, recorded in the event log.
+
+    Returns:
+        The refined Task.
+
+    Raises:
+        NotFoundError: If no task has this id.
+        InvalidTransitionError: If the task isn't in the inbox.
+    """
+    task = get(session, task_id)
+    if task.state != TaskState.INBOX:
+        raise InvalidTransitionError(f"task '{task_id}' isn't inbox.")
+    return clarify(session, task.id, task.title, task.body,
+                   task.project.key if task.project else None, task.context, task.size,
+                   parent_ref=task.parent.ref if task.parent else None, actor=actor)
 
 # -----------------------------------------------------------------------------
 # Lifecycle transitions
@@ -843,8 +876,9 @@ def restore(session : Session, task_id : int, actor : str = events.ACTOR_WEB) ->
 def change_state(session : Session, task_id : int, target : TaskState, reason : str = "", actor : str = events.ACTOR_WEB) -> Task:
     """Move a task to a target state through the matching lifecycle transition.
 
-    Covers the working states and cancelling: refined to doing, doing to
-    waiting or done, waiting or done back to doing, any open task to cancelled.
+    Covers the working states and cancelling: inbox to refined, refined to
+    doing, doing to waiting or done, waiting or done back to doing, any open
+    task to cancelled.
 
     Args:
         session: Database session to use.
@@ -870,6 +904,8 @@ def change_state(session : Session, task_id : int, target : TaskState, reason : 
         return block(session, task_id, reason, actor=actor)
     if target == TaskState.DONE:
         return complete(session, task_id, actor=actor)
+    if target == TaskState.REFINED and task.state == TaskState.INBOX:
+        return refine(session, task_id, actor=actor)
     if target == TaskState.DOING:
         if task.state == TaskState.REFINED:
             return start(session, task_id, actor=actor)

@@ -19,6 +19,19 @@ def test_inbox_returns_only_inbox_tasks(session):
     result = views.inbox(session)
     assert [t.id for t in result] == [inbox_task.id]
 
+def test_inbox_leaves_out_items_placed_in_a_project(session):
+    """Inbox lists only captures with no project
+    Given a capture and an inbox item added to a project's tree
+    When listing the inbox and counting it on the dashboard
+    Then only the capture is there
+    """
+    projects.create(session, "nx", "Nexus")
+    capture = tasks.capture(session, "Loose idea")
+    tasks.add_to_tree(session, "Placed", project_key="nx")
+
+    assert [t.id for t in views.inbox(session)] == [capture.id]
+    assert views.dashboard(session).inbox_count == 1
+
 def test_inbox_oldest_first(session):
     """Inbox lists tasks oldest first
     Given two captured tasks

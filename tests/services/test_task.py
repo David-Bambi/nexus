@@ -594,26 +594,64 @@ def test_reorder_refuses_a_capture_or_a_bad_direction(session, nexus):
 
 # Add to tree -------------------------------------------------------------------------------------
 
-def test_add_to_tree_creates_a_refined_item_with_its_detail(session, nexus):
+def test_add_to_tree_creates_a_placed_inbox_item_with_its_detail(session, nexus):
     """
     Given a project
     When a feature is added to its tree, then a task under it by parent only
-    Then both are refined, in place, with their detail, and history shows created then clarified
+    Then both are inbox, in place, with their detail, and history shows created only
     """
     feature = tasks.add_to_tree(session, "Auth", project_key="nexus", kind=TaskKind.FEATURE)
     task = tasks.add_to_tree(session, "Login", parent_ref=feature.ref, body="Form",
                              context="@ordi", size="S")
 
-    assert (feature.kind, feature.state, feature.project.key) == (TaskKind.FEATURE, TaskState.REFINED, "nexus")
-    assert (task.parent, task.project.key, task.state) == (feature, "nexus", TaskState.REFINED)
+    assert (feature.kind, feature.state, feature.project.key) == (TaskKind.FEATURE, TaskState.INBOX, "nexus")
+    assert (task.parent, task.project.key, task.state) == (feature, "nexus", TaskState.INBOX)
     assert (task.body, task.context, task.size) == ("Form", "@ordi", "S")
+    assert [action for action, _ in _history(session, task.id)] == ["created"]
+
+
+def test_add_to_tree_refined_clarifies_right_away(session, nexus):
+    """With refined, the item is created then clarified in place."""
+    task = tasks.add_to_tree(session, "Login", project_key="nexus", refined=True)
+
+    assert (task.state, task.project.key) == (TaskState.REFINED, "nexus")
     assert [action for action, _ in _history(session, task.id)] == ["created", "clarified"]
+
+
+def test_refine_keeps_place_and_detail(session, nexus):
+    """
+    Given a placed inbox task under a feature
+    When it is refined
+    Then it is refined, still under its feature, with its detail, logged as clarified
+    """
+    feature = tasks.add_to_tree(session, "Auth", project_key="nexus", kind=TaskKind.FEATURE)
+    task = tasks.add_to_tree(session, "Login", parent_ref=feature.ref, body="Form", size="S")
+
+    tasks.refine(session, task.id)
+
+    assert (task.state, task.parent, task.project.key) == (TaskState.REFINED, feature, "nexus")
+    assert (task.body, task.size) == ("Form", "S")
+    assert [action for action, _ in _history(session, task.id)] == ["created", "clarified"]
+
+
+def test_refine_refuses_an_item_not_in_the_inbox(session, nexus):
+    """Only an inbox item can be refined."""
+    task = tasks.add_to_tree(session, "Login", project_key="nexus", refined=True)
+    with pytest.raises(InvalidTransitionError):
+        tasks.refine(session, task.id)
+
+
+def test_change_state_inbox_to_refined_refines(session, nexus):
+    """change_state moves an inbox item to refined."""
+    task = tasks.add_to_tree(session, "Login", project_key="nexus")
+    tasks.change_state(session, task.id, TaskState.REFINED)
+    assert task.state == TaskState.REFINED
 
 
 def test_add_to_tree_needs_a_place(session, nexus):
     """Neither project nor parent: refused, nothing written."""
     with pytest.raises(ValidationError, match="give a project"):
-        tasks.add_to_tree(session, "Loose")
+        tasks.add_to_tree(session, "Loose", refined=True)
     assert tasks.list(session) == []
 
 
@@ -622,7 +660,7 @@ def test_add_to_tree_refuses_a_parent_of_another_project_before_writing(session,
     projects.create(session, "other", "Other")
     feature = tasks.add_to_tree(session, "Auth", project_key="nexus", kind=TaskKind.FEATURE)
     with pytest.raises(ValidationError):
-        tasks.add_to_tree(session, "Stray", project_key="other", parent_ref=feature.ref)
+        tasks.add_to_tree(session, "Stray", project_key="other", parent_ref=feature.ref, refined=True)
     assert [t.title for t in tasks.list(session)] == ["Auth"]
 
 
@@ -652,8 +690,8 @@ def test_every_item_event_records_its_parent_at_that_moment(session, nexus):
     When it is renamed, moved to the top, then cancelled
     Then each event names the parent it had at that moment
     """
-    feature = tasks.add_to_tree(session, "Auth", project_key="nexus", kind=TaskKind.FEATURE)
-    task = tasks.add_to_tree(session, "Login", parent_ref=feature.ref)
+    feature = tasks.add_to_tree(session, "Auth", project_key="nexus", kind=TaskKind.FEATURE, refined=True)
+    task = tasks.add_to_tree(session, "Login", parent_ref=feature.ref, refined=True)
     tasks.update(session, task.id, title="Login form")
     tasks.move(session, task.id, project_key="nexus")
     tasks.cancel(session, task.id)
@@ -669,11 +707,11 @@ def test_first_start_of_a_feature_freezes_its_plan(session, nexus):
     When it starts, is cancelled, restored and started again
     Then only the first started event carries the plan, in sibling order
     """
-    feature = tasks.add_to_tree(session, "Auth", project_key="nexus", kind=TaskKind.FEATURE)
-    login = tasks.add_to_tree(session, "Login", parent_ref=feature.ref)
-    logout = tasks.add_to_tree(session, "Logout", parent_ref=feature.ref)
+    feature = tasks.add_to_tree(session, "Auth", project_key="nexus", kind=TaskKind.FEATURE, refined=True)
+    login = tasks.add_to_tree(session, "Login", parent_ref=feature.ref, refined=True)
+    logout = tasks.add_to_tree(session, "Logout", parent_ref=feature.ref, refined=True)
     tasks.start(session, feature.id)
-    tasks.add_to_tree(session, "Added later", parent_ref=feature.ref)
+    tasks.add_to_tree(session, "Added later", parent_ref=feature.ref, refined=True)
     tasks.cancel(session, login.id)
     tasks.cancel(session, logout.id)
     tasks.cancel(session, tasks.list(session)[-1].id)

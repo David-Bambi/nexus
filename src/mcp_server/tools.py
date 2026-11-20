@@ -262,7 +262,8 @@ _PARENT = _string("Ref of the feature it goes under, e.g. f-4k2.")
 
 
 @tool("add_task",
-      "Add a feature or task to a project's tree, already refined (not into the inbox: use capture_task for that). "
+      "Add a feature or task to a project's tree, in the inbox state: placed, still to refine (clarify_task "
+      "refines it). For a bare capture with no project, use capture_task. "
       "Give the project, the parent feature, or both; with only a parent, its project is used.",
       {"project": _PROJECT, "parent": _PARENT, "title": _string("Item title."),
        "kind": _string("Item kind (default task).", list(_KINDS)),
@@ -288,8 +289,11 @@ def clarify_task(session : Session, args : dict) -> dict:
     """Clarify an inbox or someday item."""
     task = _task_of(session, args)
     project = args.get("project")
-    if project is None and args.get("parent") is None and task.project is not None:
-        project = task.project.key
+    parent = args.get("parent")
+    if project is None and parent is None:
+        # Neither given: the item keeps its current place.
+        project = task.project.key if task.project else None
+        parent = task.parent.ref if task.parent else None
     return serialize.task(tasks.clarify(
         session, task.id,
         args.get("title") or task.title,
@@ -297,7 +301,7 @@ def clarify_task(session : Session, args : dict) -> dict:
         project,
         args["context"] if "context" in args else task.context,
         args["size"] if "size" in args else task.size,
-        parent_ref=args.get("parent"),
+        parent_ref=parent,
         kind=_KINDS[args["kind"]] if args.get("kind") else None,
         actor=ACTOR))
 

@@ -233,9 +233,9 @@ def test_search_inbox_and_dashboard(session, world):
     """
     _, planned, _, inbox = world
     assert [t["ref"] for t in ok(session, "search", term="INBOX")["tasks"]] == [inbox.ref]
-    assert [t["ref"] for t in ok(session, "inbox")["tasks"]] == [planned.parent.ref, inbox.ref]
+    assert [t["ref"] for t in ok(session, "inbox")["tasks"]] == [inbox.ref]
     dashboard = ok(session, "dashboard")
-    assert dashboard["inbox_count"] == 2 and dashboard["refine_count"] == 2 and "in_progress" not in dashboard
+    assert dashboard["inbox_count"] == 1 and dashboard["refine_count"] == 2 and "in_progress" not in dashboard
 
 
 # Writing -------------------------------------------------------------------------------------------
@@ -255,10 +255,10 @@ def test_add_task_to_a_project(session, world):
     """
     Given a project
     When adding a task to it, then to a missing one
-    Then the first is refined at the top of the project and the second is refused
+    Then the first is inbox at the top of the project and the second is refused
     """
     added = ok(session, "add_task", project="nx", title="A", context="@ordi", size="M", body="Detail")
-    assert (added["state"], added["project"], added["parent"], added["kind"]) == ("REFINED", "nx", None, "TASK")
+    assert (added["state"], added["project"], added["parent"], added["kind"]) == ("INBOX", "nx", None, "TASK")
     assert (added["context"], added["size"], added["body"]) == ("@ordi", "M", "Detail")
     assert "doesn't exist" in refused(session, "add_task", project="ghost", title="C")
     assert "unknown argument(s): version" in refused(session, "add_task", project="nx", title="B", version="1.0")
@@ -269,8 +269,16 @@ def test_add_task_as_a_feature_or_under_a_parent(session, world):
     feature = ok(session, "add_task", project="nx", title="Auth", kind="feature")
     child = ok(session, "add_task", parent=feature["ref"], title="Login")
     assert feature["kind"] == "FEATURE" and feature["ref"].startswith("f-")
-    assert (child["parent"], child["project"], child["state"]) == (feature["ref"], "nx", "REFINED")
+    assert (child["parent"], child["project"], child["state"]) == (feature["ref"], "nx", "INBOX")
     assert "give a project" in refused(session, "add_task", title="Nowhere")
+
+
+def test_clarify_task_with_no_place_keeps_the_current_one(session, world):
+    """A placed inbox task clarified with neither project nor parent stays under its feature."""
+    feature = ok(session, "add_task", project="nx", title="Auth", kind="feature")
+    child = ok(session, "add_task", parent=feature["ref"], title="Login")
+    clarified = ok(session, "clarify_task", ref=child["ref"])
+    assert (clarified["state"], clarified["project"], clarified["parent"]) == ("REFINED", "nx", feature["ref"])
 
 
 def test_import_data_dry_run_then_real(session):
@@ -474,10 +482,10 @@ def test_every_write_tool_logs_the_mcp_actor(session, world, name, arguments):
     tasks.clarify(session, waiting.id, "Waiting", None, "nx", None, None)
     tasks.start(session, waiting.id)
     tasks.block(session, waiting.id, "why")
-    done = tasks.add_to_tree(session, "Done", project_key="nx")
+    done = tasks.add_to_tree(session, "Done", project_key="nx", refined=True)
     tasks.start(session, done.id)
     tasks.complete(session, done.id)
-    cancelled = tasks.add_to_tree(session, "Cancelled", project_key="nx")
+    cancelled = tasks.add_to_tree(session, "Cancelled", project_key="nx", refined=True)
     tasks.cancel(session, cancelled.id)
     from src.services import versioning
     criterion = versioning.add_criterion(session, "nx", "Ready")
@@ -615,6 +623,7 @@ def test_criteria_by_number_then_major_release(session):
     """
     ok(session, "create_project", key="nx", name="Nexus")
     feature = ok(session, "add_task", project="nx", title="Auth", kind="feature")
+    ok(session, "clarify_task", ref=feature["ref"])
     ok(session, "start_task", ref=feature["ref"])
     ok(session, "complete_task", ref=feature["ref"])
 

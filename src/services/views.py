@@ -18,7 +18,7 @@ class DashboardView:
     doing: list
     # Tasks blocked on a third party or a prerequisite.
     waiting: list
-    # Number of captured tasks still to triage.
+    # Number of captured tasks (no project) still to triage.
     inbox_count: int
     # Number of refined items, ready to be started.
     refine_count: int
@@ -255,16 +255,19 @@ def item_tree(item : Task, include_closed : bool = False) -> list:
 def inbox(session : Session) -> list:
     """List captured tasks still waiting to be triaged.
 
+    An inbox item already placed in a project isn't a capture: it waits to
+    be refined in its project, so it is left out.
+
     Args:
         session: Database session to use.
 
     Returns:
-        Inbox-state tasks, oldest first (the order they should be
-        processed in, one at a time).
+        Inbox-state tasks with no project, oldest first (the order they
+        should be processed in, one at a time).
     """
     return (
         session.query(Task)
-        .filter(Task.state == TaskState.INBOX)
+        .filter(Task.state == TaskState.INBOX, Task.project_id.is_(None))
         .order_by(Task.created_at)
         .all()
     )
@@ -387,6 +390,7 @@ def dashboard(session : Session) -> DashboardView:
     return DashboardView(
         doing=in_state(TaskState.DOING),
         waiting=in_state(TaskState.WAITING),
-        inbox_count=session.query(Task).filter(Task.state == TaskState.INBOX).count(),
+        inbox_count=session.query(Task).filter(Task.state == TaskState.INBOX,
+                                               Task.project_id.is_(None)).count(),
         refine_count=session.query(Task).filter(Task.state == TaskState.REFINED).count(),
     )

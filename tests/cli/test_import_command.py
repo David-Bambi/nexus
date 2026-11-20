@@ -125,7 +125,7 @@ def test_export_features_to_stdout_and_to_a_file(session, tmp_path):
     from src.services import projects, tasks
 
     projects.create(session, "nx", "Nexus")
-    tasks.add_to_tree(session, "Auth", project_key="nx", kind=TaskKind.FEATURE)
+    tasks.add_to_tree(session, "Auth", project_key="nx", kind=TaskKind.FEATURE, refined=True)
 
     def run(*argv):
         out, err = io.StringIO(), io.StringIO()

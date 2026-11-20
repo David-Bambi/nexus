@@ -7,7 +7,8 @@
   reveals a reason field below the swatches (app.js), sent with Enter. `return_to` is the page to come back to after
   the move.
 #}
-{% set next_states = {"REFINED": ["DOING", "CANCELLED"], "DOING": ["WAITING", "DONE", "CANCELLED"], "WAITING": ["DOING", "CANCELLED"], "DONE": ["DOING"]}[task.state.name] %}
+{# A capture with no project is clarified on its page first; a placed inbox item can be refined as it stands. #}
+{% set next_states = {"INBOX": ["REFINED", "CANCELLED"] if task.project else [], "REFINED": ["DOING", "CANCELLED"], "DOING": ["WAITING", "DONE", "CANCELLED"], "WAITING": ["DOING", "CANCELLED"], "DONE": ["DOING"]}[task.state.name] %}
 {% if next_states and icons %}
 {% set form_id = "state-" ~ task.id %}
 {% set reason_id = "reason-" ~ task.id %}

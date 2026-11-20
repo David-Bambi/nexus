@@ -63,7 +63,7 @@ def _require_title(title : str | None) -> str:
 
 def add(session : Session, args : list[str], out : TextIO) -> None:
     """`nexus add task|feature <project> [--parent f-ref]`: add an item to a
-    project's tree, already refined.
+    project's tree, in the inbox state (placed, still to refine).
 
     Args:
         session: Database session to use.

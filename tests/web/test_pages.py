@@ -689,7 +689,7 @@ def test_add_items_builds_the_tree(client):
     """
     Given a project with a feature
     When a task is added under the feature and another at the top
-    Then the project page shows them nested, each refined
+    Then the project page shows them nested, each inbox
     """
     feature_ref = _project_with_feature(client)
     response = client.post("/projects/nexus/items",
@@ -700,7 +700,7 @@ def test_add_items_builds_the_tree(client):
     html = client.get("/projects/nexus").get_data(as_text=True)
     assert html.index("Auth") < html.index("Login form") < html.index("Readme")
     assert html.count("tree-feature") == 1 and html.count("tree-task") == 2
-    assert "REFINED" in html and "INBOX" not in html
+    assert "INBOX" in html and "REFINED" not in html
 
 
 def test_add_forms_are_hidden_behind_plus_buttons(client):
@@ -783,6 +783,7 @@ def test_backlog_shows_open_items_only(client):
     client.post("/projects/nexus/items", data={"title": "Dropped idea"})
     client.post("/projects/nexus/items", data={"title": "Shipped"})
     client.post("/tasks/1/cancel")
+    client.post("/tasks/2/state", data={"state": "REFINED"})
     client.post("/tasks/2/start")
     client.post("/tasks/2/complete")
 
@@ -806,6 +807,7 @@ def test_backlog_feature_row_shows_its_overview(client):
     by_title = {t.title: t for t in session.query(Task).all()}
     for title, size in (("Form", "S"), ("Hash", "M")):
         client.post(f"/tasks/{by_title[title].id}/update", data={"title": title, "size": size})
+    client.post(f"/tasks/{by_title['Hash'].id}/state", data={"state": "REFINED"})
     client.post(f"/tasks/{by_title['Hash'].id}/start")
     client.post(f"/tasks/{by_title['Hash'].id}/complete")
     client.post(f"/tasks/{by_title['Dropped'].id}/cancel")
@@ -830,7 +832,10 @@ def _kanban_project(client):
     client.post("/projects/nexus/items", data={"title": "Form", "parent_ref": login_ref})
     client.post("/projects/nexus/items", data={"title": "Hash", "parent_ref": feature_ref})
     client.post("/projects/nexus/items", data={"title": "Readme"})
-    return {t.title: t for t in session.query(Task).all()}
+    items = session.query(Task).all()
+    for item in items:
+        client.post(f"/tasks/{item.id}/state", data={"state": "REFINED"})
+    return {t.title: t for t in items}
 
 
 def test_project_page_shows_the_backlog_by_default(client):
@@ -871,6 +876,29 @@ def test_kanban_card_has_the_state_form_coming_back_to_the_board(client):
     assert board.count('title="Move to DOING"') == 3
     assert board.count('title="Move to CANCELLED"') == 3
     assert "<select" not in board and ">Move</button>" not in board
+
+
+def test_kanban_inbox_card_can_be_refined_in_place(client):
+    """A card added to the project sits in INBOX with a REFINED icon; moving it keeps its feature."""
+    feature_ref = _project_with_feature(client)
+    client.post("/projects/nexus/items", data={"title": "Form", "parent_ref": feature_ref})
+    html = client.get("/projects/nexus?view=kanban").get_data(as_text=True)
+    inbox = html.index('<div class="kanban-column" data-state="INBOX"')
+    assert inbox < html.index("Form") < html.index('<div class="kanban-column" data-state="REFINED"', inbox)
+    assert 'title="Move to REFINED"' in html
+
+    client.post("/tasks/2/state", data={"state": "REFINED", "return_to": "/projects/nexus?view=kanban"})
+    html = client.get("/tasks/2").get_data(as_text=True)
+    assert _shown_field(client.get("/tasks/2"), "state") == "REFINED" and feature_ref in html
+
+
+def test_inbox_page_leaves_out_items_placed_in_a_project(client):
+    """The inbox page shows a capture, not an item added to a project."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    client.post("/projects/nexus/items", data={"title": "Placed item"})
+    client.post("/tasks", data={"title": "Loose capture"})
+    html = client.get("/inbox").get_data(as_text=True)
+    assert "Loose capture" in html and "Placed item" not in html
 
 
 def test_kanban_waiting_icon_reveals_a_reason_field(client):
@@ -1122,6 +1150,7 @@ def test_completed_feature_raises_the_shown_version(client):
     """Completing a feature from the web shows the new minor version."""
     client.post("/projects", data={"key": "nexus", "name": "Nexus"})
     client.post("/projects/nexus/items", data={"title": "Auth", "kind": "feature"})
+    client.post("/tasks/1/state", data={"state": "REFINED"})
     client.post("/tasks/1/start")
     client.post("/tasks/1/complete")
     assert "v0.1" in client.get("/projects/nexus").get_data(as_text=True)
@@ -1139,6 +1168,7 @@ def test_projects_list_nests_subprojects_with_versions(client):
     client.post("/projects", data={"key": "beta", "name": "Beta"})
     client.post("/projects/alpha/subprojects", data={"key": "sub", "name": "Sub"})
     client.post("/projects/sub/items", data={"title": "Feat", "kind": "feature"})
+    client.post("/tasks/1/state", data={"state": "REFINED"})
     client.post("/tasks/1/start")
     client.post("/tasks/1/complete")
 
@@ -1208,6 +1238,7 @@ def test_feature_page_shows_its_release(client):
     """A completed feature shows the version it shipped in."""
     client.post("/projects", data={"key": "nexus", "name": "Nexus"})
     client.post("/projects/nexus/items", data={"title": "Auth", "kind": "feature"})
+    client.post("/tasks/1/state", data={"state": "REFINED"})
     client.post("/tasks/1/start")
     client.post("/tasks/1/complete")
     assert 'data-field="released_in">v0.1' in client.get("/tasks/1").get_data(as_text=True)

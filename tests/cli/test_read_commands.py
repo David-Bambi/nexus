@@ -132,9 +132,9 @@ def tree_data(session):
     criterion = versioning.add_criterion(session, "nx", "Tests green")
     versioning.set_criterion_done(session, criterion.id, True)
     versioning.add_criterion(session, "nx", "Docs built")
-    feature = tasks.add_to_tree(session, "Auth", project_key="nx", kind=TaskKind.FEATURE)
-    login = tasks.add_to_tree(session, "Login", parent_ref=feature.ref)
-    dropped = tasks.add_to_tree(session, "Dropped", parent_ref=feature.ref)
+    feature = tasks.add_to_tree(session, "Auth", project_key="nx", kind=TaskKind.FEATURE, refined=True)
+    login = tasks.add_to_tree(session, "Login", parent_ref=feature.ref, refined=True)
+    dropped = tasks.add_to_tree(session, "Dropped", parent_ref=feature.ref, refined=True)
     tasks.cancel(session, dropped.id)
     return feature, login, dropped
 

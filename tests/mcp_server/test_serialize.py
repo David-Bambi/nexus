@@ -28,8 +28,8 @@ def test_tree_nests_children_and_task_brief_gives_released_in(session):
     Then the feature carries its released version and its child, nested
     """
     project = projects.create(session, "nx", "Nexus")
-    feature = tasks.add_to_tree(session, "Auth", project_key="nx", kind=TaskKind.FEATURE)
-    child = tasks.add_to_tree(session, "Login", parent_ref=feature.ref)
+    feature = tasks.add_to_tree(session, "Auth", project_key="nx", kind=TaskKind.FEATURE, refined=True)
+    child = tasks.add_to_tree(session, "Login", parent_ref=feature.ref, refined=True)
     tasks.cancel(session, child.id)
     tasks.start(session, feature.id)
     tasks.complete(session, feature.id)

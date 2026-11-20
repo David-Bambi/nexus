@@ -184,11 +184,11 @@ def test_features_export_gives_the_plan_directory_children_and_drift_events(sess
 
     projects.create(session, "nx", "Nexus", directory="/srv/nexus")
     projects.create(session, "web", "Web", parent_key="nx")
-    feature = tasks.add_to_tree(session, "Auth", project_key="web", kind=TaskKind.FEATURE)
-    login = tasks.add_to_tree(session, "Login", parent_ref=feature.ref, size="S")
-    logout = tasks.add_to_tree(session, "Logout", parent_ref=feature.ref)
+    feature = tasks.add_to_tree(session, "Auth", project_key="web", kind=TaskKind.FEATURE, refined=True)
+    login = tasks.add_to_tree(session, "Login", parent_ref=feature.ref, size="S", refined=True)
+    logout = tasks.add_to_tree(session, "Logout", parent_ref=feature.ref, refined=True)
     tasks.start(session, feature.id)
-    added = tasks.add_to_tree(session, "Reset", parent_ref=feature.ref, size="M")
+    added = tasks.add_to_tree(session, "Reset", parent_ref=feature.ref, size="M", refined=True)
     tasks.update(session, login.id, correction=True, title="Login form")
     tasks.move(session, logout.id, project_key="web")
     tasks.cancel(session, added.id)
@@ -212,8 +212,8 @@ def test_features_export_gives_the_plan_directory_children_and_drift_events(sess
 def test_features_export_names_deleted_children_and_released_versions(session):
     """All a deleted child's events keep its ref, not just the deletion; a shipped feature gives its version and close date."""
     projects.create(session, "nx", "Nexus")
-    feature = tasks.add_to_tree(session, "Auth", project_key="nx", kind=TaskKind.FEATURE)
-    gone = tasks.add_to_tree(session, "Gone", parent_ref=feature.ref)
+    feature = tasks.add_to_tree(session, "Auth", project_key="nx", kind=TaskKind.FEATURE, refined=True)
+    gone = tasks.add_to_tree(session, "Gone", parent_ref=feature.ref, refined=True)
     gone_ref = gone.ref
     tasks.delete(session, gone.id)
     tasks.start(session, feature.id)

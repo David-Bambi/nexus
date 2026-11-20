@@ -111,7 +111,7 @@ _KINDS = {"task": TaskKind.TASK, "feature": TaskKind.FEATURE}
 
 @bp.route("/projects/<key>/items", methods=["POST"])
 def project_add_item(key):
-    """Add a feature or task to a project's tree, already refined.
+    """Add a feature or task to a project's tree, in the inbox state.
 
     The form gives a title, a kind and, to add under a feature, its ref.
     On success, comes back to the parent feature's row (or to the work

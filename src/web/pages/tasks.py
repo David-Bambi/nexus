@@ -254,7 +254,7 @@ def task_state(task_id):
 
 @bp.route("/tasks/<int:task_id>/children", methods=["POST"])
 def task_add_child(task_id):
-    """Add a refined feature or task under a feature, then come back to the
+    """Add a feature or task under a feature, in the inbox state, then come back to the
     feature's children; a refused add shows the page with its form open."""
     def add(session):
         feature = tasks.get(session, task_id)
