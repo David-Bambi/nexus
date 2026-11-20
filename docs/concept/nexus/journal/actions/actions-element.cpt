@@ -10,7 +10,7 @@ related:
 __Actions__ (sur `task`, pour une fonctionnalité comme pour une tâche)
 - Création et rangement : `created`, `clarified`, `moved`, `reordered`, `kind_changed`, `deleted`.
 - Modification : `updated`, ou `corrected` pour une [correction](../../mesure/correction.cpt).
-- État : `started`, `blocked`, `unblocked`, `completed`, `reopened`, `deferred`, `cancelled`, `restored`.
+- État : `started`, `unstarted`, `blocked`, `unblocked`, `completed`, `reopened`, `deferred`, `cancelled`, `restored`.
 
 __Contenu__
 
@@ -19,6 +19,7 @@ created        {title, kind, project, parent}   # une capture : {title, parent}
 clarified      {from, to, project, parent}
 updated        {champ: {from, to}}              # seulement les champs changés ; corrected pareil
 started        {from, to, plan}                 # plan : au premier démarrage d'une fonctionnalité
+unstarted      {from, to}                       # DOING ou WAITING vers REFINED
 blocked        {from, to, reason}
 autres états   {from, to}                       # noms des états, ex. DOING
 moved          {from: {project, parent}, to: {project, parent}}
@@ -33,4 +34,5 @@ __Particularités__
 - Ajouter dans l'arbre écrit seulement `created` ; l'import écrit `created` puis `clarified`.
 - Raffiner un élément placé écrit `clarified`, comme toute clarification.
 - Clarifier en changeant de type écrit aussi `kind_changed`.
+- `unstarted` ramène un élément commencé en REFINED ; une tâche en attente perd sa raison. Le premier `started` reste : au redémarrage, pas de nouveau `plan`.
 - Terminer une fonctionnalité peut écrire `minor_bumped` sur son projet.
