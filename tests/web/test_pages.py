@@ -1495,3 +1495,16 @@ def test_subproject_edit_form_has_no_priority(client):
     client.post("/projects/nexus/subprojects", data={"key": "web", "name": "Web"})
     html = client.get("/projects/web").get_data(as_text=True)
     assert 'name="priority"' not in html and "badge-priority-low" in html
+
+
+def test_dashboard_shows_each_project_progress(client):
+    """A project with features shows a bar and its count; one without says so."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    client.post("/projects", data={"key": "empty", "name": "Empty"})
+    client.post("/projects/nexus/items", data={"title": "Auth", "kind": "feature"})
+    client.post("/tasks/1/state", data={"state": "DONE"})
+    client.post("/projects/nexus/items", data={"title": "Tree", "kind": "feature"})
+
+    section = client.get("/").get_data(as_text=True).split("<h2>Projects</h2>")[1].split("<h2>Doing</h2>")[0]
+    assert '<progress value="1" max="2"' in section and ">1/2</span>" in section
+    assert "No features" in section

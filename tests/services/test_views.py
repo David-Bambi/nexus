@@ -537,3 +537,26 @@ def test_project_board_empty_project(session):
     """A project without tasks has an empty board."""
     project = projects.create(session, "void", "Void")
     assert views.project_board(project) == []
+
+
+# Project progress --------------------------------------------------------------------------------
+
+def test_dashboard_counts_each_root_project_features_done(session):
+    """
+    Given a root with a nested feature, a done feature and a cancelled one, and a subproject feature
+    When reading the dashboard
+    Then the root shows 1 done out of 3 (cancelled left out, nested and subproject counted)
+    """
+    projects.create(session, "nx", "Nexus")
+    projects.create(session, "web", "Web", parent_key="nx")
+    outer = tasks.add_to_tree(session, "Outer", project_key="nx", kind=TaskKind.FEATURE, refined=True)
+    tasks.add_to_tree(session, "Inner", parent_ref=outer.ref, kind=TaskKind.FEATURE)
+    done = tasks.add_to_tree(session, "Done", project_key="web", kind=TaskKind.FEATURE, refined=True)
+    tasks.start(session, done.id)
+    tasks.complete(session, done.id)
+    dropped = tasks.add_to_tree(session, "Dropped", project_key="nx", kind=TaskKind.FEATURE)
+    tasks.cancel(session, dropped.id)
+    tasks.add_to_tree(session, "A task", project_key="nx")
+
+    [row] = views.dashboard(session).projects
+    assert (row.project.key, row.features_done, row.features_total) == ("nx", 1, 3)

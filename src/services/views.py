@@ -11,6 +11,18 @@ from src.services.errors import NotFoundError
 
 
 @dataclass
+class ProjectProgress:
+    """How far a root project has got, in features."""
+
+    # The root project.
+    project: Project
+    # Features done, the root's and its subprojects', at any depth.
+    features_done: int
+    # Features not cancelled, the root's and its subprojects', at any depth.
+    features_total: int
+
+
+@dataclass
 class DashboardView:
     """Everything the overview page shows, gathered in one read."""
 
@@ -22,7 +34,8 @@ class DashboardView:
     inbox_count: int
     # Number of refined items, ready to be started.
     refine_count: int
-    # Active root projects, by priority (high first), then creation order.
+    # ProjectProgress of each active root project, by priority (high
+    # first), then creation order.
     projects: list
 
 
@@ -368,6 +381,21 @@ def search(session : Session, term : str, limit : int | None = None) -> list:
     return query.all()
 
 
+def _progress(session : Session, root : Project) -> ProjectProgress:
+    """Count a root project's features, done and not cancelled.
+
+    Args:
+        session: Database session to use.
+        root: The root project; its subprojects' features count too.
+    """
+    project_ids = [root.id, *(sub.id for sub in root.subprojects)]
+    states = [state for (state,) in session.query(Task.state).filter(
+        Task.kind == TaskKind.FEATURE, Task.project_id.in_(project_ids))]
+    return ProjectProgress(project=root,
+                           features_done=states.count(TaskState.DONE),
+                           features_total=len(states) - states.count(TaskState.CANCELLED))
+
+
 def dashboard(session : Session) -> DashboardView:
     """Gather what the overview page shows.
 
@@ -377,7 +405,8 @@ def dashboard(session : Session) -> DashboardView:
     Returns:
         A DashboardView with the doing and waiting items (oldest first),
         the inbox and refine counters (same definitions as inbox() and
-        to_refine()), and the active root projects by priority.
+        to_refine()), and the progress of the active root projects, by
+        priority.
     """
     def in_state(state : TaskState) -> list:
         """List the tasks in the given state, oldest first."""
@@ -395,5 +424,5 @@ def dashboard(session : Session) -> DashboardView:
         inbox_count=session.query(Task).filter(Task.state == TaskState.INBOX,
                                                Task.project_id.is_(None)).count(),
         refine_count=session.query(Task).filter(Task.state == TaskState.REFINED).count(),
-        projects=[p for p in projects.list(session) if p.parent_id is None],
+        projects=[_progress(session, p) for p in projects.list(session) if p.parent_id is None],
     )

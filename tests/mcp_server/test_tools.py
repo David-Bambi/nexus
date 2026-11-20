@@ -702,5 +702,5 @@ def test_update_project_priority_and_dashboard_projects(session, world):
     assert ok(session, "update_project", project="other", priority="HIGH")["priority"] == "HIGH"
     assert "follows its root" in refused(session, "update_project", project="v2", priority="LOW")
     assert "must be one of" in refused(session, "update_project", project="nx", priority="URGENT")
-    assert [(p["key"], p["priority"]) for p in ok(session, "dashboard")["projects"]] == [
-        ("other", "HIGH"), ("nx", "NORMAL")]
+    assert [(p["key"], p["priority"], p["features_done"], p["features_total"])
+            for p in ok(session, "dashboard")["projects"]] == [("other", "HIGH", 0, 0), ("nx", "NORMAL", 0, 1)]

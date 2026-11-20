@@ -73,9 +73,10 @@ def event(item : Event) -> dict:
 
 
 def dashboard(view : DashboardView) -> dict:
-    """The dashboard: active root projects by priority, doing and waiting items, counters."""
-    return {"projects": [{"key": p.key, "name": p.name, "priority": p.priority.name,
-                          "version": versioning.label(p)} for p in view.projects],
+    """The dashboard: active root projects by priority with their progress, doing and waiting items, counters."""
+    return {"projects": [{"key": row.project.key, "name": row.project.name, "priority": row.project.priority.name,
+                          "version": versioning.label(row.project), "features_done": row.features_done,
+                          "features_total": row.features_total} for row in view.projects],
             "doing": [task_brief(t) for t in view.doing],
             "waiting": [task_brief(t) for t in view.waiting],
             "inbox_count": view.inbox_count,
