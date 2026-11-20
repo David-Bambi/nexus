@@ -17,4 +17,4 @@ __Arguments__
 __Règles__
 - Lecture seule.
 
-__Résultat__ : `projects` (les projets racines actifs par priorité, `{key, name, priority, version}`), `doing` et `waiting` (les éléments en cours et en attente, en bref), `inbox_count` (captures sans projet, à trier) et `refine_count` (éléments clarifiés, prêts à démarrer).
+__Résultat__ : `projects` (les projets racines actifs par priorité, `{key, name, priority, version, features_done, features_total}`, l'avancement en fonctionnalités), `doing` et `waiting` (les éléments en cours et en attente, en bref), `inbox_count` (captures sans projet, à trier) et `refine_count` (éléments clarifiés, prêts à démarrer).
