@@ -85,14 +85,11 @@
     </div>
 
     {% if task.kind.name == "FEATURE" %}
-    <h2>Children</h2>
-    {% if children %}
-    {{ ui.work_tree(children, task.project.key) }}
-    {% else %}
-    <p class="empty">No children yet.</p>
-    {% endif %}
+    <h2 id="children" class="heading-actions">Children
+        {% if task.project %}{{ ui.reveal_button("add-child", "plus", "Add an item under " ~ task.title, expanded=open_form == "add-child") }}{% endif %}
+    </h2>
     {% if task.project %}
-    <form class="form-inline add-item" method="post" action="{{ url_for('pages.task_add_child', task_id=task.id, next=next) }}">
+    <form id="add-child" class="form-inline add-item" method="post" action="{{ url_for('pages.task_add_child', task_id=task.id, next=next) }}"{% if open_form != "add-child" %} hidden{% endif %}>
         <input type="text" name="title" placeholder="New item…" aria-label="Title" required>
         <select name="kind" aria-label="Kind">
             <option value="task">task</option>
@@ -100,6 +97,11 @@
         </select>
         <button type="submit">Add</button>
     </form>
+    {% endif %}
+    {% if children %}
+    {{ ui.work_tree(children, task.project.key) }}
+    {% else %}
+    <p class="empty">No children yet.</p>
     {% endif %}
     {% endif %}
 

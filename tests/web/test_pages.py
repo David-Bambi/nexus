@@ -1167,11 +1167,41 @@ def test_feature_page_adds_and_shows_children(client):
     client.post("/projects", data={"key": "nexus", "name": "Nexus"})
     client.post("/projects/nexus/items", data={"title": "Auth", "kind": "feature"})
     response = client.post("/tasks/1/children", data={"title": "Login form", "kind": "task"})
-    assert response.status_code == 200
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/tasks/1#children"
 
     html = client.get("/tasks/1").get_data(as_text=True)
     assert "Login form" in html and "REFINED" in html
     assert 'data-field="released_in">—' in html
+
+
+def test_feature_page_add_form_is_hidden_behind_its_plus(client):
+    """On a feature's page, the add form starts hidden, opened by the "+" next to Children."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    client.post("/projects/nexus/items", data={"title": "Auth", "kind": "feature"})
+    html = client.get("/tasks/1").get_data(as_text=True)
+    assert '<h2 id="children" class="heading-actions">Children' in html
+    assert 'aria-label="Add an item under Auth"' in html and 'data-reveal="add-child"' in html
+    assert 'action="/tasks/1/children" hidden>' in html
+
+
+def test_feature_page_refused_add_shows_its_form_open(client):
+    """An empty title is refused, and the feature page shows the add form open, keeping next."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    client.post("/projects/nexus/items", data={"title": "Auth", "kind": "feature"})
+    response = client.post("/tasks/1/children?next=/projects/nexus", data={"title": " "})
+    html = response.get_data(as_text=True)
+    assert "title must be specified" in html
+    assert 'action="/tasks/1/children?next=/projects/nexus">' in html
+    assert 'aria-expanded="true" aria-controls="add-child"' in html
+
+
+def test_feature_page_add_keeps_its_back_link(client):
+    """After an add, the feature page comes back with the same back link."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    client.post("/projects/nexus/items", data={"title": "Auth", "kind": "feature"})
+    response = client.post("/tasks/1/children?next=/projects/nexus", data={"title": "Login"})
+    assert response.headers["Location"] == "/tasks/1?next=/projects/nexus#children"
 
 
 def test_feature_page_shows_its_release(client):

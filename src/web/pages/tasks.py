@@ -62,12 +62,14 @@ def capture():
     return redirect(_safe_next(request.form.get("next"), "pages.tasks_list"))
 
 
-def _render_task(task, error):
+def _render_task(task, error, open_form=None):
     """Render the task detail page with its event history.
 
     Args:
         task: The task to show.
         error: Message to display, or None.
+        open_form: Id of the hidden form to show open, e.g. the one whose
+            action was refused; None to keep every form closed.
     """
     return render_template(
         "task.html",
@@ -75,6 +77,7 @@ def _render_task(task, error):
         history=events.history(_session(), "task", task.id),
         children=views.item_tree(task, include_closed=True),
         error=error,
+        open_form=open_form,
         next=_local_path(request.values.get("next")),
     )
 
@@ -251,7 +254,8 @@ def task_state(task_id):
 
 @bp.route("/tasks/<int:task_id>/children", methods=["POST"])
 def task_add_child(task_id):
-    """Add a refined feature or task under a feature, then show the feature."""
+    """Add a refined feature or task under a feature, then come back to the
+    feature's children; a refused add shows the page with its form open."""
     def add(session):
         feature = tasks.get(session, task_id)
         if feature.project is None:
@@ -261,7 +265,11 @@ def task_add_child(task_id):
                           kind=_KINDS.get(request.form.get("kind", "task"), TaskKind.TASK))
         return tasks.get(session, task_id)
 
-    return _apply_transition(task_id, add)
+    task, error = _run_transition(_session(), task_id, add)
+    if error:
+        return _render_task(task, error, open_form="add-child")
+    return redirect(url_for("pages.task_detail", task_id=task_id,
+                            next=_local_path(request.values.get("next")), _anchor="children"))
 
 
 @bp.route("/tasks/<int:task_id>/move", methods=["POST"])
