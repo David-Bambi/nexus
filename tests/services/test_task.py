@@ -1,7 +1,7 @@
 import pytest
 
 from src.models.task import TaskKind, TaskState
-from src.services import events, projects, tasks
+from src.services import events, projects, tasks, views
 from src.services.errors import ConflictError, InvalidTransitionError, NotFoundError, ValidationError
 
 FEATURE = TaskKind.FEATURE
@@ -333,11 +333,11 @@ def test_change_state_walks_the_working_states(session):
                            (TaskState.DOING, ""), (TaskState.DONE, ""), (TaskState.DOING, "")):
         assert tasks.change_state(session, task.id, target, reason).state is target
 
-@pytest.mark.parametrize("target", [TaskState.INBOX, TaskState.DONE, TaskState.WAITING])
+@pytest.mark.parametrize("target", [TaskState.SOMEDAY, TaskState.DONE, TaskState.WAITING])
 def test_change_state_not_allowed(session, target):
     """Change state refuses a move the lifecycle doesn't allow
     Given a refined task
-    When moving it to inbox, done or waiting
+    When moving it to someday, done or waiting
     Then an invalid transition error is raised
     """
     task = _refined_task(session)
@@ -646,6 +646,38 @@ def test_change_state_inbox_to_refined_refines(session, nexus):
     task = tasks.add_to_tree(session, "Login", project_key="nexus")
     tasks.change_state(session, task.id, TaskState.REFINED)
     assert task.state == TaskState.REFINED
+
+
+# Unrefine ----------------------------------------------------------------------------------------
+
+def test_unrefine_puts_a_placed_item_back_to_inbox_in_its_place(session, nexus):
+    """A refined task under a feature goes back to inbox, still under it, logged as unrefined."""
+    feature = tasks.add_to_tree(session, "Auth", project_key="nexus", kind=TaskKind.FEATURE)
+    task = tasks.add_to_tree(session, "Login", parent_ref=feature.ref, size="S", refined=True)
+
+    tasks.change_state(session, task.id, TaskState.INBOX)
+
+    assert (task.state, task.parent, task.project.key, task.size) == (TaskState.INBOX, feature, "nexus", "S")
+    action, payload = _history(session, task.id)[-1]
+    assert action == "unrefined" and (payload["from"], payload["to"]) == ("REFINED", "INBOX")
+    assert task not in views.inbox(session)
+
+
+def test_unrefine_sends_an_item_with_no_project_back_to_the_global_inbox(session):
+    """A refined capture with no project goes back to the global inbox."""
+    task = _refined_task(session)
+    tasks.unrefine(session, task.id)
+    assert views.inbox(session) == [task]
+
+
+@pytest.mark.parametrize("state", ["inbox", "doing"])
+def test_unrefine_refuses_an_item_not_refined(session, nexus, state):
+    """Only a refined item can go back to inbox."""
+    task = tasks.add_to_tree(session, "Login", project_key="nexus", refined=state == "doing")
+    if state == "doing":
+        tasks.start(session, task.id)
+    with pytest.raises(InvalidTransitionError):
+        tasks.unrefine(session, task.id)
 
 
 # Unstart -----------------------------------------------------------------------------------------

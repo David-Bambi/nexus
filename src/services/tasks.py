@@ -487,6 +487,35 @@ def refine(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -> 
                    task.project.key if task.project else None, task.context, task.size,
                    parent_ref=task.parent.ref if task.parent else None, actor=actor)
 
+def unrefine(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -> Task:
+    """Put a refined item back to the inbox state, to be refined again.
+
+    It keeps its place and detail: a placed item stays in its project, an
+    item with no project goes back to the global inbox.
+
+    Args:
+        session: Database session to use.
+        task_id: Id of the task.
+        actor: Who made the change, recorded in the event log.
+
+    Returns:
+        The task, back to inbox.
+
+    Raises:
+        NotFoundError: If no task has this id.
+        InvalidTransitionError: If the task isn't refined.
+    """
+    task = get(session, task_id)
+
+    if task.state != TaskState.REFINED:
+        raise InvalidTransitionError(f"task '{task_id}' isn't refined.")
+
+    task.state = TaskState.INBOX
+
+    _log_transition(session, task, "unrefined", TaskState.REFINED, actor=actor)
+    session.commit()
+    return task
+
 # -----------------------------------------------------------------------------
 # Lifecycle transitions
 # -----------------------------------------------------------------------------
@@ -907,8 +936,8 @@ def restore(session : Session, task_id : int, actor : str = events.ACTOR_WEB) ->
 def change_state(session : Session, task_id : int, target : TaskState, reason : str = "", actor : str = events.ACTOR_WEB) -> Task:
     """Move a task to a target state through the matching lifecycle transition.
 
-    Covers the working states and cancelling: inbox to refined, refined to
-    doing, doing to waiting or done, waiting or done back to doing, doing or
+    Covers the working states and cancelling: inbox to refined and back,
+    refined to doing, doing to waiting or done, waiting or done back to doing, doing or
     waiting back to refined, any open task to cancelled.
 
     Args:
@@ -935,6 +964,8 @@ def change_state(session : Session, task_id : int, target : TaskState, reason : 
         return block(session, task_id, reason, actor=actor)
     if target == TaskState.DONE:
         return complete(session, task_id, actor=actor)
+    if target == TaskState.INBOX and task.state == TaskState.REFINED:
+        return unrefine(session, task_id, actor=actor)
     if target == TaskState.REFINED:
         if task.state == TaskState.INBOX:
             return refine(session, task_id, actor=actor)
