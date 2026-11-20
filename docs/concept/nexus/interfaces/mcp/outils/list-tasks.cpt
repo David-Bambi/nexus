@@ -18,4 +18,4 @@ __Règles__
 - Lecture seule. Un projet inconnu est refusé.
 - Avec une limite, ce sont les éléments les plus récents qui sont gardés.
 
-__Résultat__ : `{tasks, count, truncated}`. Chaque élément en bref : `ref`, `kind`, `title`, `state`, `project`, `parent`, `size`, `context`, `released_in`.
+__Résultat__ : `{tasks, count, truncated}`. Chaque élément en bref : `ref`, `kind`, `title`, `state`, `project`, `parent`, `size`, `context`, `released_in`, `archived`. Les [archivés](../../../modele/fermer-et-supprimer.cpt) sont compris.

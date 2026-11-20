@@ -17,4 +17,4 @@ __Arguments__
 __Règles__
 - Lecture seule.
 
-__Résultat__ : tous les champs (dont `body`, `blocked_reason`, dates), plus `history` : les événements du [journal](../../../journal/journal.cpt), `{at, actor, action, payload}`, du plus ancien au plus récent. Une fonctionnalité ajoute ses `children` directs, fermés compris.
+__Résultat__ : tous les champs (dont `body`, `blocked_reason`, dates, `archived_at`), plus `history` : les événements du [journal](../../../journal/journal.cpt), `{at, actor, action, payload}`, du plus ancien au plus récent. Une fonctionnalité ajoute ses `children` directs, fermés compris.

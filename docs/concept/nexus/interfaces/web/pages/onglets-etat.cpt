@@ -1,22 +1,22 @@
 ---
 title: Onglets d'état d'un projet
-summary: "Les onglets Someday, Done et Cancelled de la page projet : ce qui est mis de côté ou fermé, et le bouton pour le ressortir"
+summary: "Les onglets Someday, Done, Cancelled et Archived de la page projet : ce qui est mis de côté, fermé ou rangé, et les boutons pour le ressortir ou l'archiver"
 icon: lucide:archive-restore
 image: onglets-etat.png
 links: []
 related:
-  - 
+  -
 ---
 
-__Adresse__ : `/projects/<clé>?view=someday`, `done` ou `cancelled`, trois onglets de la page [Projet](projet.cpt).
+__Adresse__ : `/projects/<clé>?view=someday`, `done`, `cancelled` ou `archived`, quatre onglets de la page [Projet](projet.cpt).
 
 __Ce qu'on y voit__
-- Les fonctionnalités et tâches du projet dans cet état, sous-projets compris pour un projet racine, les plus récentes d'abord (date de clôture, sinon de dernière modification).
-- Par ligne : titre, référence, place (projet, fonctionnalité parente), version de livraison d'une fonctionnalité terminée, date.
-- Onglet vide : « No someday items. » (etc.).
+- Les éléments du projet dans cet état, non archivés, ou les [archivés](../../../modele/fermer-et-supprimer.cpt) avec leur badge d'état ; sous-projets compris, les plus récents d'abord.
+- Par ligne : titre, référence, place, version de livraison, date.
 
 __Ce qu'on y fait__
-- Ressortir un élément : __Refine__ (someday → refined), __Reopen__ (done → doing), __Restore__ (cancelled → refined). Le bouton passe par le [changement d'état](../../../modele/etats.cpt) et revient à l'onglet.
-- Rien d'autre, comme au [Kanban](kanban.cpt) : créer et gérer restent dans __Backlog__.
+- Ressortir : __Refine__ (someday), __Reopen__ (done), __Restore__ (cancelled), par le [changement d'état](../../../modele/etats.cpt).
+- Done et Cancelled : __Archive__ par ligne, __Archive all__ en tête. Archived : __Unarchive__.
+- Chaque bouton revient à l'onglet. Créer et gérer restent dans __Backlog__.
 
-Pourquoi : voir et ressortir ce qui est mis de côté ou fermé, projet par projet, sans quitter sa page ; un seul mécanisme pour les trois états.
+Pourquoi : voir, ressortir ou ranger ce qui est fini, projet par projet, sans quitter sa page.

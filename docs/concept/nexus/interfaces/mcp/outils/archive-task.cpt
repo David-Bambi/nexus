@@ -1,0 +1,23 @@
+---
+title: archive_task et unarchive_task
+summary: "Range un élément fermé hors des listes, ou l'y ramène, avec ses descendants"
+icon: lucide:wrench
+tags: [element]
+links: []
+related:
+  -
+---
+
+__Rôle__ : `archive_task` [archive](../../../modele/fermer-et-supprimer.cpt) un élément terminé ou annulé ; `unarchive_task` le ramène dans les listes.
+
+__Arguments__
+- Obligatoire : `ref`.
+- Aucun facultatif.
+
+__Règles__
+- Archiver un élément ni done ni cancelled, ou déjà archivé, est refusé ; désarchiver un élément non archivé aussi.
+- Une fonctionnalité entraîne tout son sous-arbre ; chaque élément touché écrit `archived` ou `unarchived`.
+- L'état ne change pas ; `reopen_task` ou `restore_task` lèvent l'archive. Écriture, non destructif.
+- Pas d'« Archive all » ici : c'est sur le web.
+
+__Résultat__ : l'élément, avec `archived` et `archived_at`.

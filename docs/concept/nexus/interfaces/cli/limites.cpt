@@ -11,7 +11,7 @@ La CLI lit, capture, ajoute, change l'état, importe et exporte. Elle ne fait pa
 
 - modifier, clarifier, déplacer ou réordonner un élément, changer son type ;
 - créer un projet, sauf par l'import ;
-- supprimer quoi que ce soit, archiver un projet ;
+- supprimer quoi que ce soit, archiver un projet ou un élément ;
 - modifier les critères ou passer à la version majeure : elle montre la version et les critères, sans les modifier.
 
 Pour tout cela : l'[application web](../web/web.cpt), ou un assistant par le [serveur MCP](../mcp/mcp.cpt).

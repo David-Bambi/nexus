@@ -10,7 +10,7 @@ related:
 __Actions__ (sur `task`, pour une fonctionnalité comme pour une tâche)
 - Création et rangement : `created`, `clarified`, `moved`, `reordered`, `kind_changed`, `deleted`.
 - Modification : `updated`, ou `corrected` pour une [correction](../../mesure/correction.cpt).
-- État : `started`, `unstarted`, `unrefined`, `blocked`, `unblocked`, `completed`, `reopened`, `deferred`, `cancelled`, `restored`.
+- État et archive : `started`, `unstarted`, `unrefined`, `blocked`, `unblocked`, `completed`, `reopened`, `deferred`, `cancelled`, `restored`, `archived`, `unarchived`.
 
 __Contenu__
 
@@ -32,9 +32,9 @@ deleted        {title, kind, ref}
 
 __Particularités__
 - Une modification qui ne change rien n'écrit rien.
-- Ajouter dans l'arbre écrit seulement `created` ; l'import écrit `created` puis `clarified`.
-- Raffiner un élément placé écrit `clarified`, comme toute clarification.
+- Ajouter dans l'arbre écrit seulement `created` ; l'import ajoute `clarified`, comme raffiner un élément placé.
 - Clarifier en changeant de type écrit aussi `kind_changed`.
 - `unstarted` ramène un élément commencé en REFINED ; une tâche en attente perd sa raison. Le premier `started` reste : au redémarrage, pas de nouveau `plan`.
 - `unrefined` ramène un élément raffiné en INBOX ; il garde sa place et son détail, ou retourne dans l'inbox global s'il n'a pas de projet.
+- [Archiver](../../modele/fermer-et-supprimer.cpt) une fonctionnalité écrit aussi `archived` pour chaque descendant.
 - Terminer une fonctionnalité peut écrire `minor_bumped` sur son projet.

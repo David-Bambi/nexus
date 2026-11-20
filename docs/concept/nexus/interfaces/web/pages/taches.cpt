@@ -11,7 +11,7 @@ related:
 __Adresse__ : `/tasks`.
 
 __Ce qu'on y voit__
-- Toutes les fonctionnalités et tâches, de la plus ancienne à la plus récente, avec leur référence, leur état et leur place.
+- Toutes les fonctionnalités et tâches, sauf les [archivées](../../../modele/fermer-et-supprimer.cpt), de la plus ancienne à la plus récente, avec leur référence, leur état et leur place.
 - Au-delà de 100, seules les 100 plus récentes s'affichent, avec une note qui renvoie à la recherche.
 
 __Ce qu'on y fait__ : retrouver un élément récent et l'ouvrir.
