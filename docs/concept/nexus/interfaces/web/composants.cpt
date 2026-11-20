@@ -4,14 +4,14 @@ summary: "Les macros partagées des pages, et comment en ajouter une"
 icon: lucide:puzzle
 links: []
 related:
-  - 
+  -
 ---
 
-Les pages partagent leurs morceaux sous forme de __macros__ Jinja (des petits gabarits qu'on appelle comme des fonctions).
+Les pages partagent leurs morceaux en __macros__ Jinja (petits gabarits appelés comme des fonctions).
 
 - `base.html` : le cadre commun, que chaque page étend.
-- `_components.html`, importé sous le nom `ui` : `page_header`, `field`, `size_select`, `badge`, `ref_chip`, `task_link`, `task_place`, `add_item_form`, `reorder_buttons`, `work_tree`, `view_tabs` (onglets Backlog / Kanban), `kanban_board`, `kanban_card`, `stat`, `event_list`, `error_message`, `empty`.
-- Deux inclusions restent des fichiers à part, car elles lisent les variables de la page : `_clarify_form.html` et `_task_state_form.html`. Ce dernier a une variante `icons` pour les cartes du Kanban : des pastilles de couleur au lieu du menu, et un champ de raison qui apparaît pour WAITING.
+- `_components.html`, importé sous le nom `ui` : `page_header` (accepte des icônes via `{% call %}`), `field`, `size_select`, `badge`, `ref_chip`, `task_link`, `task_place`, `add_item_form`, `reorder_buttons`, `work_tree`, `feature_summary`, `icon` (SVG en ligne : plus, pencil, trash, save, close), `reveal_button` (icône qui ouvre un formulaire caché), `view_tabs`, `kanban_board`, `kanban_card`, `stat`, `event_list`, `error_message`, `empty`.
+- Deux inclusions restent des fichiers à part, car elles lisent les variables de la page : `_clarify_form.html` et `_task_state_form.html` (variante `icons` pour les cartes du Kanban).
 
 Ajouter un composant :
 1. une macro dans `_components.html`, avec un commentaire `{# #}` qui dit ce qu'elle affiche et attend ;

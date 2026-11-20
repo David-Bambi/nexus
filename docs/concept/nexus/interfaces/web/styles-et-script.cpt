@@ -7,13 +7,13 @@ related:
   - 
 ---
 
-Le style tient dans une feuille, `app.css`, le comportement dans un petit script, `app.js` ; les gabarits ne gardent que la structure.
+Style dans `app.css`, comportement dans `app.js` ; les gabarits ne gardent que la structure.
 
-- `app.css` commence par des __jetons__ (couleurs, espacements, tailles de texte) et un __thème sombre__ qui redéfinit les mêmes couleurs. Ailleurs, jamais de couleur ou de taille en dur.
-- `app.js` : la touche `c` met le curseur dans la barre de capture ; `data-confirm` n'active un bouton que si la valeur exacte est tapée ; `data-reveal` ouvre un champ caché.
-- Aucun `style=`, `<script>` ni `onclick` dans les gabarits : un test le vérifie.
-- Texte et badges respectent le contraste WCAG AA dans les deux thèmes, vérifié par un autre test.
+- `app.css` commence par des __jetons__ (couleurs, espacements, tailles) et un __thème sombre__ qui redéfinit les couleurs. Ailleurs, jamais de couleur ou de taille en dur.
+- `app.js` : la touche `c` met le curseur dans la barre de capture ; `data-confirm` n'active un bouton que si la valeur exacte est tapée ; `data-reveal` ouvre ou referme un champ caché (raison WAITING, formulaires du projet) ; une règle `[hidden]` globale le garde caché.
+- Aucun `style=`, `<script>` ni `onclick` dans les gabarits (testé).
+- Contraste WCAG AA des textes et badges dans les deux thèmes (testé).
 
-Pourquoi : une feuille et un script se relisent bien ; les jetons font du thème sombre un bloc.
+Pourquoi : une feuille et un script se relisent bien, les jetons font du thème sombre un bloc.
 
-Écartés : un cadriciel CSS (Pico à surcharger, Tailwind à construire) et des scripts propres à chaque page.
+Écartés : un cadriciel CSS (Pico à surcharger, Tailwind à construire) et des scripts par page.

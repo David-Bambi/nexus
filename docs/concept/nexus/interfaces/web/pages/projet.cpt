@@ -1,24 +1,23 @@
 ---
 title: Projet
-summary: "Un projet, vue Backlog : arbre de travail, critères de majeure, modification et zone dangereuse"
+summary: "Un projet, vue Backlog : arbre de travail ouvert et critères de majeure, chaque formulaire derrière une icône"
 icon: lucide:folder-kanban
 image: projet.png
 links: []
 related:
-  - 
+  -
 ---
 
-__Adresse__ : `/projects/<clé>`. Deux onglets : __Backlog__, par défaut, ici, et [Kanban](kanban.cpt).
+__Adresse__ : `/projects/<clé>`. Onglets __Backlog__ (ici, par défaut) et [Kanban](kanban.cpt).
 
 __Ce qu'on y voit__
-- En tête : clé, statut, version, répertoire (ou celui du parent, « (from … ) »), sous-projets.
-- __Work__ : l'arbre, avec référence, état, et version de sortie d'une fonctionnalité terminée. Les éléments fermés sont cachés, sauf avec __Show closed__.
-- __Next major version__ : les critères, et le bouton __Release N+1.0__, actif quand tous sont cochés.
+- En tête : clé, statut, version, répertoire (ou celui du parent), __Subprojects__ (projet racine).
+- __Work__ : l'arbre des éléments ouverts. Chaque fonctionnalité résume son sous-arbre : « 0/3 · 2 S · 1 M », faites/total puis tailles des tâches ouvertes, jamais additionnées.
+- __Next major version__ : les critères, et __Release N+1.0__, actif quand tous sont cochés.
 
-__Ce qu'on y fait__
-- Ajouter un élément en haut ou sous une fonctionnalité (il naît __refined__) ; ↑ / ↓ pour le réordonner.
-- Gérer les critères, passer à la version majeure.
-- Modifier nom, description et répertoire (la clé ne change pas) ; créer un sous-projet (projet racine seulement) ; archiver ou restaurer.
-- __Supprimer__, dans la zone dangereuse, une fois la clé tapée ; refusé si le projet n'est pas vide.
+__Ce qu'on y fait__ : chaque formulaire s'ouvre sous son icône (crayon, corbeille, +).
+- Modifier ou supprimer le projet (clé à taper, projet vide seulement).
+- Créer un sous-projet ; ajouter un élément à la racine ou sous une fonctionnalité (__refined__) ; ↑ / ↓ au survol (la capture, sans survol, les montre).
+- Ajouter, cocher, enregistrer ou supprimer un critère ; archiver ou restaurer.
 
-Un critère atteint par l'adresse d'un autre projet donne une page introuvable (404).
+Pourquoi : une page lisible, sans changer de page. Un refus rouvre le formulaire ; un succès revient à la ligne touchée.
