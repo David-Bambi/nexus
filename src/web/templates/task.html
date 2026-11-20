@@ -87,7 +87,7 @@
     {% if task.kind.name == "FEATURE" %}
     <h2>Children</h2>
     {% if children %}
-    {{ ui.work_tree(children, task.project.key, "1") }}
+    {{ ui.work_tree(children, task.project.key) }}
     {% else %}
     <p class="empty">No children yet.</p>
     {% endif %}

@@ -372,6 +372,46 @@ def test_project_tree_leaves_out_subprojects(session, tree):
     assert [title for title, _ in _shape(views.project_tree(tree))] == ["Auth", "Readme"]
 
 
+def test_project_tree_counts_a_feature_subtree(session, tree):
+    """
+    Given a feature with a sub-feature, one task done and one cancelled
+    When building the tree
+    Then the feature counts done over total on its whole subtree, cancelled left out,
+    even though the done task is hidden
+    """
+    by_title = {t.title: t for t in tasks.list(session)}
+    _refined(session, "Salt", "nx", parent_ref=by_title["Login"].ref)
+    tasks.start(session, by_title["Form"].id)
+    tasks.complete(session, by_title["Form"].id)
+    tasks.cancel(session, by_title["Hash"].id)
+
+    auth = views.project_tree(tree)[0]
+    assert (auth.done, auth.total) == (1, 2)
+    login = auth.children[0]
+    assert (login.done, login.total) == (1, 2)
+    readme = views.project_tree(tree)[1]
+    assert (readme.done, readme.total, readme.sizes) == (0, 0, [])
+
+
+def test_project_tree_gives_a_feature_open_sizes_in_order(session, tree):
+    """
+    Given sized tasks under a feature, one of them done and one without a size
+    When building the tree
+    Then the feature lists the open sized tasks per size, smallest first
+    """
+    by_title = {t.title: t for t in tasks.list(session)}
+    auth = by_title["Auth"]
+    for title, size in (("Big", "L"), ("Small", "S"), ("Other", "S"), ("Done", "XS")):
+        item = _refined(session, title, "nx", parent_ref=auth.ref)
+        tasks.update(session, item.id, title=title, size=size)
+    tasks.start(session, by_title["Hash"].id)
+    done = {t.title: t for t in tasks.list(session)}["Done"]
+    tasks.start(session, done.id)
+    tasks.complete(session, done.id)
+
+    assert views.project_tree(tree)[0].sizes == [("S", 2), ("L", 1)]
+
+
 def test_item_tree_gives_a_feature_children(session, tree):
     """The tree below a feature holds its children only."""
     auth = next(t for t in tasks.list(session) if t.title == "Auth")

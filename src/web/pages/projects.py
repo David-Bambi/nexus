@@ -64,24 +64,27 @@ def _get_project(key):
         abort(404)
 
 
-def _render_project(project, error=None, status=200):
-    """Render a project page: its details, subprojects and work tree.
+def _render_project(project, error=None, status=200, open_form=None):
+    """Render a project page: its details, subprojects and work.
+
+    The backlog shows open items only; done and cancelled ones are left out.
 
     Args:
         project: The project or subproject to show.
         error: Message of a refused action, shown on the page; None if none.
         status: HTTP status of the response.
+        open_form: Id of the hidden form to show open, e.g. the one whose
+            action was refused; None to keep every form closed.
     """
-    include_closed = request.args.get("closed") == "1"
     view = _view()
     tree = board = None
     if view == "kanban":
         board = views.project_board(project)
     else:
-        tree = views.project_tree(project, include_closed=include_closed)
+        tree = views.project_tree(project)
     return render_template("project.html", project=project, tree=tree, board=board,
                            columns=views.BOARD_COLUMNS, view=view,
-                           include_closed=include_closed, error=error), status
+                           open_form=open_form, error=error), status
 
 
 def _view():
@@ -96,9 +99,8 @@ def _view():
 @bp.route("/projects/<key>")
 def project_detail(key):
     """Show a single project's details, its subprojects and its work, as a
-    tree (backlog, the default) or as a kanban board (`?view=kanban`).
-
-    Done and cancelled items are hidden unless `?closed=1` is given.
+    tree of open items (backlog, the default) or as a kanban board
+    (`?view=kanban`).
     """
     return _render_project(_get_project(key))
 
@@ -112,6 +114,8 @@ def project_add_item(key):
     """Add a feature or task to a project's tree, already refined.
 
     The form gives a title, a kind and, to add under a feature, its ref.
+    On success, comes back to the parent feature's row (or to the work
+    section); on a refusal, shows the page with that add form open.
     """
     session = _session()
     project = _get_project(key)
@@ -124,17 +128,22 @@ def project_add_item(key):
         tasks.add_to_tree(session, title, project_key=key, parent_ref=parent_ref, kind=kind)
     except (NotFoundError, ValidationError, ConflictError) as e:
         session.rollback()
-        return _render_project(project, str(e), 400)
-    return redirect(url_for("pages.project_detail", key=key, closed=request.args.get("closed")))
+        return _render_project(project, str(e), 400, open_form=f"add-{parent_ref or 'root'}")
+    anchor = f"item-{parent_ref}" if parent_ref else "work"
+    return redirect(url_for("pages.project_detail", key=key, _anchor=anchor))
 
 
-def _project_action(key, fn, status=400):
+def _project_action(key, fn, status=400, anchor=None, form=None):
     """Run a change on a project and come back to its page, or show the error.
 
     Args:
         key: Key of the project the page shows.
         fn: Callable taking the session and applying the change.
         status: HTTP status of the response when the change is refused.
+        anchor: Id on the page to come back to after the change (e.g.
+            "criteria"); None for the top of the page.
+        form: Id of the hidden form to show open again when the change is
+            refused; None to keep every form closed.
     """
     session = _session()
     project = _get_project(key)
@@ -142,8 +151,8 @@ def _project_action(key, fn, status=400):
         fn(session)
     except (NotFoundError, ValidationError, ConflictError) as e:
         session.rollback()
-        return _render_project(project, str(e), status)
-    return redirect(url_for("pages.project_detail", key=key))
+        return _render_project(project, str(e), status, open_form=form)
+    return redirect(url_for("pages.project_detail", key=key, _anchor=anchor))
 
 
 @bp.route("/projects/<key>/subprojects", methods=["POST"])
@@ -152,7 +161,7 @@ def project_add_subproject(key):
     return _project_action(key, lambda s: projects.create(
         s, request.form.get("key", "").strip(), request.form.get("name", "").strip(),
         request.form.get("description") or None, parent_key=key,
-        directory=request.form.get("directory")))
+        directory=request.form.get("directory")), anchor="subprojects", form="add-subproject")
 
 
 @bp.route("/projects/<key>/update", methods=["POST"])
@@ -160,7 +169,7 @@ def project_update(key):
     """Change a project's name, description and directory (blank clears it)."""
     return _project_action(key, lambda s: projects.update(
         s, key, request.form.get("name", ""), request.form.get("description"),
-        directory=request.form.get("directory", "")))
+        directory=request.form.get("directory", "")), form="edit-project")
 
 
 @bp.route("/projects/<key>/archive", methods=["POST"])
@@ -177,12 +186,13 @@ def project_restore(key):
 
 @bp.route("/projects/<key>/delete", methods=["POST"])
 def project_delete(key):
-    """Delete an empty project; a non-empty one is shown again with the reason."""
+    """Delete an empty project; a non-empty one is shown again with the
+    reason, its delete confirmation open."""
     session = _session()
     try:
         projects.delete(session, key)
     except NotFoundError:
         abort(404)
     except ConflictError as e:
-        return _render_project(projects.get(session, key), str(e), 409)
+        return _render_project(projects.get(session, key), str(e), 409, open_form="delete-project")
     return redirect(url_for("pages.projects_list"))

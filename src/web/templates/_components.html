@@ -3,10 +3,18 @@
   Import with: {% import "_components.html" as ui %}
 #}
 
-{# Heading of a page, with an optional link back to its parent page. #}
+{#
+  Heading of a page, with an optional link back to its parent page. Called
+  with {% call %}, the block's content (e.g. icon buttons) follows the title
+  on the same line.
+#}
 {% macro page_header(title, back_url=none, back_label=none) %}
 {% if back_url %}<p class="back"><a href="{{ back_url }}">← {{ back_label }}</a></p>{% endif %}
+{% if caller is defined %}
+<h1 class="heading-actions">{{ title }} {{ caller() }}</h1>
+{% else %}
 <h1>{{ title }}</h1>
+{% endif %}
 {% endmacro %}
 
 {#
@@ -86,10 +94,11 @@
 
 {#
   Form adding a feature or task to a project's tree, under `parent_ref` when
-  given. `closed` keeps the "show closed" choice after the redirect.
+  given. With `form_id`, it starts hidden, opened by its reveal button,
+  unless `open_form` names it (a refused add shown again).
 #}
-{% macro add_item_form(project_key, parent_ref=none, closed=none) %}
-<form class="form-inline add-item" method="post" action="{{ url_for('pages.project_add_item', key=project_key, closed=closed) }}">
+{% macro add_item_form(project_key, parent_ref=none, form_id=none, open_form=none) %}
+<form class="form-inline add-item"{% if form_id %} id="{{ form_id }}"{% if form_id != open_form %} hidden{% endif %}{% endif %} method="post" action="{{ url_for('pages.project_add_item', key=project_key) }}">
     {% if parent_ref %}<input type="hidden" name="parent_ref" value="{{ parent_ref }}">{% endif %}
     <input type="text" name="title" placeholder="New item…" aria-label="Title" required>
     <select name="kind" aria-label="Kind">
@@ -116,32 +125,73 @@
 {% endmacro %}
 
 {#
-  A work tree: nested lists of features (collapsible, with an add form) and
-  tasks, each with up / down buttons. `nodes` come from
-  views.project_tree() or views.item_tree().
+  A feature's overview: tasks done over total in its subtree (cancelled left
+  out), then its open sized tasks per size, e.g. "2/5 · 2 S · 1 M".
 #}
-{% macro work_tree(nodes, project_key, closed=none) %}
+{% macro feature_summary(node) %}
+{% if node.total %}
+<span class="tree-summary" title="Done tasks / tasks, then open tasks per size">{{ node.done }}/{{ node.total }}{% for size, count in node.sizes %} · {{ count }} {{ size }}{% endfor %}</span>
+{% endif %}
+{% endmacro %}
+
+{#
+  A work tree: nested lists of features (collapsible, with an overview and a
+  "+" opening an add form under the row) and tasks. Each row has an anchor
+  (item-<ref>) and up / down buttons shown on hover. `nodes` come from
+  views.project_tree() or views.item_tree(); `open_form` is the id of an add
+  form to show open.
+#}
+{% macro work_tree(nodes, project_key, open_form=none) %}
 <ul class="tree">
     {% for node in nodes %}
     {% set item = node.item %}
-    <li class="tree-item tree-{{ item.kind.name | lower }}">
+    <li class="tree-item tree-{{ item.kind.name | lower }}" id="item-{{ item.ref }}">
         {% if item.kind.name == "FEATURE" %}
         <details open>
-            <summary>
+            <summary class="tree-row">
                 {{ task_link(item) }} {{ ref_chip(item.ref) }} {{ badge(item.state.name) }}
                 {% if item.released_in %}<span class="hint">v{{ item.released_in }}</span>{% endif %}
+                {{ feature_summary(node) }}
+                {{ reveal_button("add-" ~ item.ref, "plus", "Add an item under " ~ item.title, expanded=open_form == "add-" ~ item.ref) }}
                 {{ reorder_buttons(item) }}
             </summary>
-            {% if node.children %}{{ work_tree(node.children, project_key, closed) }}{% endif %}
-            {{ add_item_form(project_key, item.ref, closed) }}
+            {{ add_item_form(project_key, item.ref, "add-" ~ item.ref, open_form) }}
+            {% if node.children %}{{ work_tree(node.children, project_key, open_form) }}{% endif %}
         </details>
         {% else %}
-        {{ task_link(item) }} {{ ref_chip(item.ref) }} {{ badge(item.state.name) }}
-        {{ reorder_buttons(item) }}
+        <div class="tree-row">
+            {{ task_link(item) }} {{ ref_chip(item.ref) }} {{ badge(item.state.name) }}
+            {{ reorder_buttons(item) }}
+        </div>
         {% endif %}
     </li>
     {% endfor %}
 </ul>
+{% endmacro %}
+
+{#
+  A small inline SVG icon drawn in the text color: plus, pencil, trash,
+  save or close. Decorative: the button around it carries the label.
+#}
+{% macro icon(name) %}
+<svg class="icon" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+    {%- if name == "plus" %}<path d="M5 12h14"/><path d="M12 5v14"/>
+    {%- elif name == "pencil" %}<path d="M21.17 6.81a1 1 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z"/><path d="m15 5 4 4"/>
+    {%- elif name == "trash" %}<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+    {%- elif name == "save" %}<path d="M20 6 9 17l-5-5"/>
+    {%- elif name == "close" %}<path d="M18 6 6 18"/><path d="m6 6 12 12"/>
+    {%- endif %}
+</svg>
+{% endmacro %}
+
+{#
+  Icon button opening or closing the hidden element `target_id` (app.js,
+  data-reveal); `label` is its tooltip and accessible name. With `expanded`,
+  the target starts open (e.g. a refused form shown again).
+#}
+{% macro reveal_button(target_id, icon_name, label, expanded=false) %}
+<button type="button" class="icon-button" title="{{ label }}" aria-label="{{ label }}"
+        aria-expanded="{{ 'true' if expanded else 'false' }}" aria-controls="{{ target_id }}" data-reveal="{{ target_id }}">{{ icon(icon_name) }}</button>
 {% endmacro %}
 
 {# Events, oldest first; with `show_entity`, each row names its entity and links tasks. Empty payload values are left out. #}

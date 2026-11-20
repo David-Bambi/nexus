@@ -97,6 +97,12 @@ fieldset {
     border: 0;
 }
 
+/* A hidden element stays hidden whatever display its class gives it (e.g. a
+   form-inline form waiting for its reveal button). */
+[hidden] {
+    display: none !important;
+}
+
 img,
 svg {
     display: block;
@@ -531,11 +537,58 @@ form {
     cursor: pointer;
 }
 
-/* Up / down buttons of a tree item, small and on the item's line. */
+/* One line of the tree: the item, its overview and its up / down buttons. */
+.tree-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+/* A feature's row keeps its fold marker, drawn here since the flex layout
+   drops the browser's own: pointing right when folded, down when open. */
+summary.tree-row {
+    list-style: none;
+}
+
+summary.tree-row::-webkit-details-marker {
+    display: none;
+}
+
+summary.tree-row::before {
+    content: "▸";
+    color: var(--color-text-muted);
+    transition: transform 0.1s;
+}
+
+details[open] > summary.tree-row::before {
+    transform: rotate(90deg);
+}
+
+/* A feature's overview, e.g. "2/5 · 2 S · 1 M". */
+.tree-summary {
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+}
+
+/* Up / down buttons of a tree item, small and on the item's line; shown
+   only while the row is hovered or holds the keyboard focus, except on
+   touch screens, which can't hover. */
 .reorder {
     display: inline-flex;
     gap: var(--space-1);
-    margin-left: var(--space-2);
+    visibility: hidden;
+}
+
+.tree-row:hover > .reorder,
+.tree-row:focus-within > .reorder {
+    visibility: visible;
+}
+
+@media (hover: none) {
+    .reorder {
+        visibility: visible;
+    }
 }
 
 .reorder form {
@@ -548,10 +601,66 @@ form {
     font-size: var(--text-sm);
 }
 
-/* The add form under a feature sits indented like its children. */
+/* The add form opened under a feature sits indented like its children. */
 .tree .add-item {
     padding-left: var(--space-5);
     margin-block: var(--space-1);
+}
+
+/* A section title with its icon buttons on the same line. */
+.heading-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+/* Icon buttons: a small square button around an inline SVG icon, opening
+   a hidden form (data-reveal) or sending one. */
+.icon-button {
+    display: inline-grid;
+    place-items: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+    border-color: transparent;
+    background: transparent;
+    color: var(--color-text-muted);
+}
+
+.icon-button:hover,
+.icon-button[aria-expanded="true"] {
+    border-color: var(--color-border);
+    background: var(--color-surface-muted);
+    color: var(--color-text);
+}
+
+.icon {
+    width: 1rem;
+    height: 1rem;
+}
+
+/* A removal icon button turns red when hovered. */
+.icon-button-danger:hover {
+    color: var(--color-danger);
+}
+
+/* A criterion row: its text takes the whole line, the save and delete icons
+   at its end. */
+.criteria > li {
+    flex-wrap: nowrap;
+}
+
+.criterion-text {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: var(--space-1);
+    min-width: 0;
+}
+
+.criterion-text input[type="text"] {
+    flex: 1;
+    min-width: 0;
 }
 
 /* Work views: Backlog / Kanban tabs above a project's work. */
@@ -702,10 +811,6 @@ form {
     margin: 0;
 }
 
-.state-reason[hidden] {
-    display: none;
-}
-
 .state-reason input[type="text"] {
     width: 100%;
     min-width: 0;
@@ -745,8 +850,9 @@ form {
 }
 
 /* Irreversible actions, set apart at the bottom of a page. */
+/* Delete confirmation, opened by the trash icon under the project's name. */
 .danger-zone {
-    margin-top: var(--space-7);
+    margin-block: var(--space-3) var(--space-5);
     padding: var(--space-4);
     border: 1px solid var(--color-danger);
     border-radius: var(--radius);

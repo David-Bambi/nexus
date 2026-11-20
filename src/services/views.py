@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 from sqlalchemy.orm import Session, joinedload
@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session, joinedload
 from src.models.project import Project
 from src.models.task import Task, TaskKind, TaskState
 from src.services import projects
+from src.services.sizes import SIZE_GUIDE
 from src.services.errors import NotFoundError
 
 
@@ -31,10 +32,74 @@ class TreeNode:
     item: Task
     # Nodes of its children, in sibling order; always empty for a task.
     children: list
+    # Done tasks in a feature's whole subtree; always 0 for a task.
+    done: int = 0
+    # Tasks in a feature's whole subtree, cancelled ones left out; always 0
+    # for a task.
+    total: int = 0
+    # (size, count) pairs of the open sized tasks in a feature's subtree,
+    # smallest size first; always empty for a task.
+    sizes: list = field(default_factory=list)
 
 
 # States hidden from a project tree unless closed items are asked for.
 _CLOSED_STATES = (TaskState.DONE, TaskState.CANCELLED)
+
+
+def _subtree_tasks(feature : Task):
+    """Yield every task below a feature, whatever its state.
+
+    Args:
+        feature: The feature whose subtree is walked.
+
+    Yields:
+        Each task of the subtree, sub-features walked through.
+    """
+    for child in feature.children:
+        if child.kind == TaskKind.FEATURE:
+            yield from _subtree_tasks(child)
+        else:
+            yield child
+
+
+def _size_rank(size : str) -> tuple:
+    """Sort key putting the guide's sizes in order, other values after.
+
+    Args:
+        size: A task size, from the guide or not.
+
+    Returns:
+        A key sorting XS, S, M, L first, then any other size by name.
+    """
+    order = list(SIZE_GUIDE)
+    return (order.index(size), "") if size in order else (len(order), size)
+
+
+def _node(item : Task, include_closed : bool) -> TreeNode:
+    """Build the tree node of one item, with its overview when a feature.
+
+    Args:
+        item: Feature or task.
+        include_closed: Whether done and cancelled children are kept.
+
+    Returns:
+        The item's TreeNode. A feature's done/total count every task of its
+        subtree but cancelled ones, closed or hidden; its sizes count the
+        open (neither done nor cancelled) tasks that have a size.
+    """
+    node = TreeNode(item, _nodes(item.children, include_closed))
+    if item.kind == TaskKind.FEATURE:
+        counts = {}
+        for task in _subtree_tasks(item):
+            if task.state == TaskState.CANCELLED:
+                continue
+            node.total += 1
+            if task.state == TaskState.DONE:
+                node.done += 1
+            elif task.size:
+                counts[task.size] = counts.get(task.size, 0) + 1
+        node.sizes = [(size, counts[size]) for size in sorted(counts, key=_size_rank)]
+    return node
 
 
 def _nodes(items : list, include_closed : bool) -> list:
@@ -49,7 +114,7 @@ def _nodes(items : list, include_closed : bool) -> list:
         A TreeNode per kept item, in sibling order.
     """
     kept = [item for item in items if include_closed or item.state not in _CLOSED_STATES]
-    return [TreeNode(item, _nodes(item.children, include_closed))
+    return [_node(item, include_closed)
             for item in sorted(kept, key=lambda item: (item.position, item.id))]
 
 

@@ -642,7 +642,18 @@ def test_deleting_a_non_empty_project_shows_why(client):
     _refined_task_in_project(client)
     response = client.post("/projects/nexus/delete")
     assert response.status_code == 409 and b"isn&#39;t empty" in response.data
+    assert b'<section id="delete-project" class="danger-zone">' in response.data
+    assert b'aria-expanded="true" aria-controls="delete-project"' in response.data
     assert client.get("/projects/nexus").status_code == 200
+
+
+def test_delete_confirmation_is_hidden_behind_the_trash(client):
+    """The delete confirmation starts hidden, opened by the trash next to the project's name."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    html = client.get("/projects/nexus").get_data(as_text=True)
+    assert 'aria-label="Delete the project"' in html and 'data-reveal="delete-project"' in html
+    assert '<section id="delete-project" class="danger-zone" hidden>' in html
+    assert html.index('data-reveal="delete-project"') < html.index('id="work"')
 
 
 def test_task_page_shows_kind_and_parent(app, client):
@@ -692,6 +703,53 @@ def test_add_items_builds_the_tree(client):
     assert "REFINED" in html and "INBOX" not in html
 
 
+def test_add_forms_are_hidden_behind_plus_buttons(client):
+    """
+    Given a project with a feature
+    When opening the backlog
+    Then the root add form and the feature's add form are hidden, each opened by its "+" button
+    """
+    feature_ref = _project_with_feature(client)
+    html = client.get("/projects/nexus").get_data(as_text=True)
+    for form_id, label in (("add-root", "Add an item to the project"),
+                           (f"add-{feature_ref}", "Add an item under Auth")):
+        assert f'<form class="form-inline add-item" id="{form_id}" hidden' in html
+        assert f'aria-label="{label}"' in html and f'data-reveal="{form_id}"' in html
+    assert html.count('class="form-inline add-item"') == 2
+
+
+def test_add_item_comes_back_to_its_place(client):
+    """An add under a feature comes back to the feature's row; an add at the top, to the work section."""
+    feature_ref = _project_with_feature(client)
+    response = client.post("/projects/nexus/items", data={"title": "Form", "parent_ref": feature_ref})
+    assert response.headers["Location"] == f"/projects/nexus#item-{feature_ref}"
+    response = client.post("/projects/nexus/items", data={"title": "Readme"})
+    assert response.headers["Location"] == "/projects/nexus#work"
+
+
+def test_refused_add_shows_its_form_open(client):
+    """An add refused under a feature shows the page with that form open and the others hidden."""
+    feature_ref = _project_with_feature(client)
+    response = client.post("/projects/nexus/items", data={"title": " ", "parent_ref": feature_ref})
+    html = response.get_data(as_text=True)
+    assert response.status_code == 400
+    assert f'id="add-{feature_ref}" method="post"' in html
+    assert '<form class="form-inline add-item" id="add-root" hidden' in html
+    assert f'aria-expanded="true" aria-controls="add-{feature_ref}"' in html
+
+
+def test_feature_page_tree_keeps_its_plus_buttons(client):
+    """On a feature's page, a sub-feature of its tree has its "+" and hidden add form too."""
+    feature_ref = _project_with_feature(client)
+    client.post("/projects/nexus/items", data={"title": "Login", "kind": "feature", "parent_ref": feature_ref})
+    from src.models.task import Task
+    session = client.application.extensions["db_session"]
+    auth, login = (session.query(Task).filter_by(title=t).one() for t in ("Auth", "Login"))
+    html = client.get(f"/tasks/{auth.id}").get_data(as_text=True)
+    assert f'data-reveal="add-{login.ref}"' in html
+    assert f'id="add-{login.ref}" hidden' in html
+
+
 def test_add_item_with_empty_title_shows_the_error(client):
     """An empty title is refused and the project page shows why."""
     client.post("/projects", data={"key": "nexus", "name": "Nexus"})
@@ -715,15 +773,47 @@ def test_add_item_to_a_missing_project_is_404(client):
     assert client.post("/projects/missing/items", data={"title": "X"}).status_code == 404
 
 
-def test_closed_items_are_hidden_unless_asked(client):
-    """A cancelled item is hidden from the tree, and shown with ?closed=1."""
+def test_backlog_shows_open_items_only(client):
+    """
+    Given a cancelled item and a done item
+    When opening the backlog, even with ?closed=1
+    Then neither is shown, and there is no show-closed switch
+    """
     client.post("/projects", data={"key": "nexus", "name": "Nexus"})
     client.post("/projects/nexus/items", data={"title": "Dropped idea"})
+    client.post("/projects/nexus/items", data={"title": "Shipped"})
     client.post("/tasks/1/cancel")
+    client.post("/tasks/2/start")
+    client.post("/tasks/2/complete")
 
-    assert "Dropped idea" not in client.get("/projects/nexus").get_data(as_text=True)
-    shown = client.get("/projects/nexus?closed=1").get_data(as_text=True)
-    assert "Dropped idea" in shown and "Hide closed" in shown
+    for path in ("/projects/nexus", "/projects/nexus?closed=1"):
+        html = client.get(path).get_data(as_text=True)
+        assert "Dropped idea" not in html and "Shipped" not in html
+        assert "Show closed" not in html and "Hide closed" not in html
+
+
+def test_backlog_feature_row_shows_its_overview(client):
+    """
+    Given a feature with two sized tasks, one of them done, and a cancelled one
+    When opening the backlog
+    Then the feature row reads 1/2 and the open size, and each row has its anchor
+    """
+    feature_ref = _project_with_feature(client)
+    for title in ("Form", "Hash", "Dropped"):
+        client.post("/projects/nexus/items", data={"title": title, "parent_ref": feature_ref})
+    session = client.application.extensions["db_session"]
+    from src.models.task import Task
+    by_title = {t.title: t for t in session.query(Task).all()}
+    for title, size in (("Form", "S"), ("Hash", "M")):
+        client.post(f"/tasks/{by_title[title].id}/update", data={"title": title, "size": size})
+    client.post(f"/tasks/{by_title['Hash'].id}/start")
+    client.post(f"/tasks/{by_title['Hash'].id}/complete")
+    client.post(f"/tasks/{by_title['Dropped'].id}/cancel")
+
+    html = client.get("/projects/nexus").get_data(as_text=True)
+    assert ">1/2 · 1 S</span>" in html
+    assert f'id="item-{feature_ref}"' in html and f'id="item-{by_title["Form"].ref}"' in html
+    assert html.count('class="tree-row"') == 2
 
 
 # Kanban view ---------------------------------------------------------------------------------------
@@ -836,7 +926,7 @@ def test_kanban_view_has_no_creation_or_management_forms(client):
     client.post("/projects", data={"key": "nexus", "name": "Nexus"})
     html = client.get("/projects/nexus?view=kanban").get_data(as_text=True)
     assert "No tasks to do." in html
-    for marker in ('class="form-inline add-item"', "New criterion", "<h2>Edit</h2>",
+    for marker in ('class="form-inline add-item"', "New criterion", 'id="edit-project"',
                    "Create subproject", "<h2>Status</h2>", "danger-zone"):
         assert marker not in html
     backlog = client.get("/projects/nexus").get_data(as_text=True)
@@ -850,19 +940,34 @@ def test_create_subproject_from_the_project_page(client):
     client.post("/projects", data={"key": "nexus", "name": "Nexus"})
     response = client.post("/projects/nexus/subprojects", data={"key": "web", "name": "Web UI"})
     assert response.status_code == 302
+    assert response.headers["Location"] == "/projects/nexus#subprojects"
 
     html = client.get("/projects/nexus").get_data(as_text=True)
     assert "Web UI" in html
     sub = client.get("/projects/web").get_data(as_text=True)
-    assert "Subproject of" in sub and "New subproject" not in sub
+    assert "Subproject of" in sub
+    assert "Subprojects" not in sub and 'id="add-subproject"' not in sub
+
+
+def test_root_project_shows_subprojects_title_with_its_plus(client):
+    """A root project without subprojects still shows the title, with a "+" opening the hidden form."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    html = client.get("/projects/nexus").get_data(as_text=True)
+    assert '<h2 id="subprojects" class="heading-actions">Subprojects' in html
+    assert 'aria-label="Add a subproject"' in html and 'data-reveal="add-subproject"' in html
+    assert 'action="/projects/nexus/subprojects" hidden>' in html
+    assert "<h2>New subproject</h2>" not in html
 
 
 def test_create_subproject_with_a_taken_key_shows_the_error(client):
     """A duplicate key is refused on the project page."""
     client.post("/projects", data={"key": "nexus", "name": "Nexus"})
     response = client.post("/projects/nexus/subprojects", data={"key": "nexus", "name": "Again"})
+    html = response.get_data(as_text=True)
     assert response.status_code == 400
-    assert "already exists" in response.get_data(as_text=True)
+    assert "already exists" in html
+    assert 'action="/projects/nexus/subprojects">' in html
+    assert 'aria-expanded="true" aria-controls="add-subproject"' in html
 
 
 def test_update_project_name_and_description(client):
@@ -874,11 +979,24 @@ def test_update_project_name_and_description(client):
 
 
 def test_update_project_with_empty_name_shows_the_error(client):
-    """An empty name is refused."""
+    """An empty name is refused, and the page shows the edit form open."""
     client.post("/projects", data={"key": "nexus", "name": "Nexus"})
     response = client.post("/projects/nexus/update", data={"name": " "})
+    html = response.get_data(as_text=True)
     assert response.status_code == 400
-    assert "name must be specified" in response.get_data(as_text=True)
+    assert "name must be specified" in html
+    assert 'id="edit-project" class="form-stacked" method="post" action="/projects/nexus/update">' in html
+    assert 'aria-expanded="true" aria-controls="edit-project"' in html
+
+
+def test_edit_form_is_hidden_behind_the_pencil(client):
+    """The edit form starts hidden, opened by the pencil next to the project's name."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    html = client.get("/projects/nexus").get_data(as_text=True)
+    assert '<h1 class="heading-actions">Nexus' in html
+    assert 'aria-label="Edit the project"' in html and 'data-reveal="edit-project"' in html
+    assert 'action="/projects/nexus/update" hidden>' in html
+    assert "<h2>Edit</h2>" not in html
 
 
 def test_archive_then_restore_a_project(client):
@@ -948,6 +1066,47 @@ def test_uncheck_and_delete_a_criterion(client):
 
     client.post("/projects/nexus/criteria/1/delete")
     assert "Docs built" not in client.get("/projects/nexus").get_data(as_text=True)
+
+
+def test_criterion_row_has_its_full_text_and_save_and_delete_icons(client):
+    """
+    Given a criterion with a long text
+    When opening the backlog
+    Then its row holds the whole text, a save icon sending it and a delete icon sending the
+    hidden delete form; the add form is hidden behind its "+"
+    """
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    text = "Every page works with the keyboard alone, and every form shows its errors in place"
+    client.post("/projects/nexus/criteria", data={"text": text})
+    html = client.get("/projects/nexus").get_data(as_text=True)
+
+    assert f'value="{text}"' in html
+    assert 'aria-label="Save criterion"' in html
+    assert 'form="delete-criterion-1"' in html and 'aria-label="Delete criterion"' in html
+    assert 'id="delete-criterion-1" method="post" action="/projects/nexus/criteria/1/delete" hidden' in html
+    assert 'id="add-criterion"' in html and 'data-reveal="add-criterion"' in html
+    assert '/criteria" hidden>' in html
+
+
+def test_criterion_actions_come_back_to_the_criteria(client):
+    """Adding, editing, checking and deleting a criterion come back to the criteria section."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    for path, data in (("/projects/nexus/criteria", {"text": "Docs built"}),
+                       ("/projects/nexus/criteria/1/update", {"text": "Docs built and checked"}),
+                       ("/projects/nexus/criteria/1/check", {"done": "1"}),
+                       ("/projects/nexus/criteria/1/delete", {})):
+        response = client.post(path, data=data)
+        assert response.headers["Location"] == "/projects/nexus#criteria"
+
+
+def test_refused_criterion_add_shows_its_form_open(client):
+    """An empty criterion is refused, and the page shows the add form open."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    response = client.post("/projects/nexus/criteria", data={"text": " "})
+    html = response.get_data(as_text=True)
+    assert response.status_code == 400
+    assert 'action="/projects/nexus/criteria">' in html
+    assert 'aria-expanded="true" aria-controls="add-criterion"' in html
 
 
 def test_criterion_of_another_project_is_404(client):
@@ -1135,18 +1294,18 @@ def test_item_page_links_back_to_its_project(client):
 def test_reorder_buttons_move_an_item_and_come_back(client):
     """
     Given a project with items A then B
-    When B's up button is sent from the project page showing closed items
-    Then it comes back to that page, with B before A
+    When B's up button is sent from the project page with a query string
+    Then it comes back to that exact page, with B before A
     """
     client.post("/projects", data={"key": "nexus", "name": "Nexus"})
     client.post("/projects/nexus/items", data={"title": "Item A"})
     client.post("/projects/nexus/items", data={"title": "Item B"})
-    page = client.get("/projects/nexus?closed=1").get_data(as_text=True)
+    page = client.get("/projects/nexus?view=backlog").get_data(as_text=True)
     assert 'aria-label="Move Item B up"' in page
 
-    response = client.post("/tasks/2/reorder?next=/projects/nexus?closed%3D1", data={"direction": "up"})
+    response = client.post("/tasks/2/reorder?next=/projects/nexus?view%3Dbacklog", data={"direction": "up"})
     assert response.status_code == 302
-    assert response.headers["Location"] == "/projects/nexus?closed=1"
+    assert response.headers["Location"] == "/projects/nexus?view=backlog"
 
     html = client.get("/projects/nexus").get_data(as_text=True)
     assert html.index("Item B") < html.index("Item A")

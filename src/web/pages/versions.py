@@ -28,7 +28,8 @@ def _criterion_of(session, key, criterion_id):
 @bp.route("/projects/<key>/criteria", methods=["POST"])
 def criterion_add(key):
     """Add a criterion for the project's next major version."""
-    return _project_action(key, lambda s: versioning.add_criterion(s, key, request.form.get("text", "")))
+    return _project_action(key, lambda s: versioning.add_criterion(s, key, request.form.get("text", "")),
+                           anchor="criteria", form="add-criterion")
 
 
 @bp.route("/projects/<key>/criteria/<int:criterion_id>/update", methods=["POST"])
@@ -36,7 +37,8 @@ def criterion_update(key, criterion_id):
     """Change a criterion's text."""
     _criterion_of(_session(), key, criterion_id)
     return _project_action(
-        key, lambda s: versioning.update_criterion(s, criterion_id, request.form.get("text", "")))
+        key, lambda s: versioning.update_criterion(s, criterion_id, request.form.get("text", "")),
+        anchor="criteria")
 
 
 @bp.route("/projects/<key>/criteria/<int:criterion_id>/check", methods=["POST"])
@@ -44,14 +46,15 @@ def criterion_check(key, criterion_id):
     """Check a criterion (form field done=1) or uncheck it (done=0)."""
     _criterion_of(_session(), key, criterion_id)
     done = request.form.get("done") == "1"
-    return _project_action(key, lambda s: versioning.set_criterion_done(s, criterion_id, done))
+    return _project_action(key, lambda s: versioning.set_criterion_done(s, criterion_id, done),
+                           anchor="criteria")
 
 
 @bp.route("/projects/<key>/criteria/<int:criterion_id>/delete", methods=["POST"])
 def criterion_delete(key, criterion_id):
     """Delete a criterion."""
     _criterion_of(_session(), key, criterion_id)
-    return _project_action(key, lambda s: versioning.delete_criterion(s, criterion_id))
+    return _project_action(key, lambda s: versioning.delete_criterion(s, criterion_id), anchor="criteria")
 
 
 @bp.route("/projects/<key>/release", methods=["POST"])
