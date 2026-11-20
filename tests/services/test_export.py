@@ -231,3 +231,16 @@ def test_features_export_of_an_empty_database(session):
     """No feature: an empty list under the schema name."""
     data = export.features(session)
     assert data["features"] == [] and data["schema"] == "nexus.features/1"
+
+
+def test_dump_json_carries_the_archive_mark(session):
+    """An archived item's archived_at is in the full export; others have null."""
+    projects.create(session, "nexus", "Nexus")
+    archived = tasks.add_to_tree(session, "Old", project_key="nexus")
+    tasks.add_to_tree(session, "Open", project_key="nexus")
+    tasks.cancel(session, archived.id)
+    tasks.archive(session, archived.id)
+
+    rows = {row["title"]: row for row in export.dump_json(session)["tasks"]}
+
+    assert rows["Old"]["archived_at"] and rows["Open"]["archived_at"] is None

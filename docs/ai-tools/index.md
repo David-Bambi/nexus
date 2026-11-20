@@ -47,8 +47,8 @@ Tools meant for all of David's projects, deployed into `~/.claude`
 
 ## Global tools used for the Concept map
 
-The Concept skills (`ecrire-fiche`, `dessiner-schema`, `verifier-fiches`,
-`planifier-carte`) are global, not part of this repository. `docs-manager`
+The Concept skills (`concept_ecrire_fiche`, `concept_dessiner_schema`, `concept_verifier_fiches`,
+`concept_planifier_carte`) are global, not part of this repository. `docs-manager`
 follows them to keep the map in `docs/concept/`; the global `documentaliste`
 agent was used to write it first.
 

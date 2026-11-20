@@ -67,7 +67,7 @@ def dump_json(session : Session) -> dict:
         projects and subprojects, a subproject with its "parent_id", each
         with its "version_major" and "version_minor"), "criteria" (major
         criteria, by "project_id"), "tasks" (features and tasks, each with
-        its "kind", "parent_id", "released_in" and "tags" names), "tags"
+        its "kind", "parent_id", "released_in", "archived_at" and "tags" names), "tags"
         and "events". Enums are given by name and
         dates in ISO 8601. Archived projects and done tasks are included.
     """
