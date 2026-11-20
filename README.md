@@ -1,5 +1,7 @@
 # Nexus
 
+*[Version française](README.fr.md)*
+
 A single-user, GTD-inspired project manager served as a local web app.
 
 Work is a tree: project → subprojects (one level) → features (any depth) →
@@ -89,6 +91,7 @@ uv run nexus NX --all                       # project detail (key or s- ref): ve
 uv run nexus f-4k2                          # feature or task detail (f- or t- ref)
 uv run nexus add feature NX -t "Title"      # also: add task NX -p f-4k2 -t "Title" -s S
 uv run nexus "buy a USB-C cable"            # capture into the inbox
+uv run nexus state t-4k2 done               # move to a state, through each step (--reason for waiting)
 uv run nexus import plan.json --dry-run     # import projects and their trees, all or nothing
 uv run nexus import - --text < ideas.txt    # one inbox task per line
 uv run nexus export features -o features.json  # feature export read by metrique (nexus.features/1)
@@ -96,9 +99,9 @@ uv run nexus version                        # installed package version
 ```
 
 Exit codes: 0 ok, 1 refused by a data rule, 2 wrong command line. The CLI
-reads, captures, adds, imports and exports; it cannot edit, move or change
-the state of items, nor edit criteria or release a major version (the web UI
-and the MCP server can). It applies pending migrations when it starts, so it
+reads, captures, adds, changes state, imports and exports; it cannot edit or
+move items, nor edit criteria or release a major version (the web UI and the
+MCP server can). It applies pending migrations when it starts, so it
 can upgrade the real database before the service is redeployed. Import
 format and details: `docs/concept/nexus/interfaces/cli/` and
 `docs/concept/nexus/interfaces/import/`.
@@ -106,7 +109,7 @@ format and details: `docs/concept/nexus/interfaces/cli/` and
 ## MCP server
 
 The running service also speaks the Model Context Protocol, so an AI
-assistant can read and update your projects (30 tools: list, get, search,
+assistant can read and update your projects (33 tools: list, get, search,
 dashboard, capture, add, clarify, move, reorder, change kind, update, state
 changes, project and criteria editing, major release, import). Register it
 once in Claude Code:
@@ -175,6 +178,28 @@ systemctl --user start nexus                     # creates an empty 2.0 database
 
 Nothing is migrated: the 1.x data stays readable in the archived file (and
 in a JSON export taken before the upgrade).
+
+## Use of AI
+
+This project was made with an AI assistant, Claude (Anthropic), through
+Claude Code, from September to November 2026. The table below shows how much
+each part relies on it. The project page also shows, per category, the share
+of lines added in commits co-signed by Claude.
+
+- 🤖 **AI-generated**: the AI produced the content; I directed it and reviewed it.
+- 🤝 **AI-assisted**: I did the work; the AI proposed, explained, reviewed or fixed.
+- ✋ **No AI**: done entirely by me.
+
+| Area | Level | In practice |
+|---|---|---|
+| Project management | 🤖 AI-generated | Specs, plans, features, tasks and criteria |
+| Design and architecture | 🤖 AI-generated | Layering, data model and the decisions in the Concept map |
+| Code | 🤖 AI-generated | Web app, services, CLI and MCP server |
+| Code comments | 🤖 AI-generated | Docstrings and comments |
+| Tests | 🤖 AI-generated | The pytest suite |
+| Documentation and README | 🤖 AI-generated | Concept map, MkDocs site and these READMEs |
+| Graphic assets | 🤖 AI-generated | Stylesheet, page layout, diagrams and screenshots |
+| Tools | 🤖 AI-generated | Service, CLI and deploy scripts |
 
 ## Documentation
 
