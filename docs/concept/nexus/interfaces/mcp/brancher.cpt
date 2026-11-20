@@ -1,0 +1,21 @@
+---
+title: Brancher Claude Code
+summary: "Enregistrer le serveur, ouvrir une nouvelle session, et laisser les permissions protéger l'écriture"
+icon: lucide:cable
+links: []
+related:
+  - 
+---
+
+Pour que Claude Code voie les outils de Nexus, on enregistre le serveur une fois :
+
+```
+claude mcp add --transport http nexus http://127.0.0.1:8765/mcp
+claude mcp list        # état de la connexion
+```
+
+- Un serveur ajouté n'est chargé qu'au __démarrage d'une session__ : ouvrir une nouvelle session pour voir les outils.
+- Après un redéploiement du service, se reconnecter avec `/mcp` dans Claude Code.
+- À la connexion, le serveur envoie de courtes __instructions__ : l'arbre, clés et références, capturer, ajouter ou clarifier, la version calculée, l'essai à blanc avant d'importer. Un test vérifie que chaque outil cité existe.
+
+__Sécurité d'écriture__ : elle repose sur les permissions du client. Les outils de lecture, marqués `readOnlyHint`, peuvent être autorisés d'office ; les outils d'écriture demandent confirmation. Le serveur n'a pas de mode lecture seule.

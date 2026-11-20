@@ -1,0 +1,21 @@
+---
+title: Déplacer et réordonner
+summary: "Changer un élément de place, d'ordre ou de type sans perdre son état"
+icon: lucide:move
+links: []
+related:
+  - 
+---
+
+Un élément peut changer de place, d'ordre ou de type ; il __garde son état__.
+
+__Déplacer__ vers le haut d'un projet, ou sous une fonctionnalité :
+- une fonctionnalité emporte tout son __sous-arbre__, qui change de projet avec elle ;
+- refusé sous soi-même ou sous un descendant (pas de boucle), sous une tâche, ou si l'élément y est déjà ;
+- l'élément arrive en dernier parmi ses nouveaux voisins.
+
+__Réordonner__ : monter ou descendre d'une place parmi les voisins (même projet, même parent).
+- Un élément ouvert saute les voisins terminés ou annulés, cachés dans l'arbre : il ne semble jamais rester sur place.
+- Une capture sans projet ne se réordonne pas.
+
+__Changer de type__ : tâche en fonctionnalité, ou l'inverse. La lettre de la référence suit (`t-…` devient `f-…`). Une fonctionnalité qui a des enfants reste une fonctionnalité.

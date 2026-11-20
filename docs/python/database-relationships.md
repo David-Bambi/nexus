@@ -3,9 +3,8 @@
 !!! note "1.x examples"
     The examples below use the 1.x `Version` and `DefinitionOfDoneCriterion`
     models, removed in 2.0
-    ([0013](../architecture/adr/0013-project-feature-task-tree.md)). The
-    concept still applies; the current model is in the
-    [overview](../architecture/overview.md#domain-model).
+    (Concept map: `docs/concept/nexus/modele/arbre.cpt`). The concept still applies;
+    the current model is in the Concept map (`docs/concept/nexus/modele/`).
 
 Two ways to link two tables show up in `src/models/`: a plain foreign-key
 column, and a separate junction table. Which one to use isn't a style
@@ -30,7 +29,7 @@ version_id: Mapped[Optional[int]] = mapped_column(ForeignKey("version.id"))
 
 One project has many versions; one project/version has many tasks (`Task`'s
 FKs are nullable because a task with neither is a raw GTD capture, not an
-edge case — see `docs/architecture/overview.md`). In both cases, no
+edge case — see `docs/concept/nexus/modele/arbre.cpt`). In both cases, no
 junction table is needed: the "many" row simply carries a column pointing
 at its one parent.
 

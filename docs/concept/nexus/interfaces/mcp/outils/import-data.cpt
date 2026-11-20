@@ -1,0 +1,22 @@
+---
+title: import_data
+summary: "Importe un document ou une liste de titres, tout ou rien, avec essai à blanc"
+icon: lucide:wrench
+tags: [element]
+links: []
+related:
+  - 
+---
+
+__Rôle__ : importe un document (projets, sous-projets, arbre, tâches libres) ou une liste de titres, [tout ou rien](../../import/tout-ou-rien.cpt).
+
+__Arguments__
+- `document` (le [JSON d'import](../../import/format.cpt)) ou `text` (un titre par ligne) : exactement l'un des deux.
+- Facultatif : `dry_run`, l'essai à blanc.
+
+__Règles__
+- Mêmes règles que `nexus import` : toutes les erreurs listées, rien d'écrit s'il y en a une.
+- Les instructions du serveur conseillent l'essai à blanc d'abord.
+- Écriture, non destructif.
+
+__Résultat__ : `dry_run`, `projects_created`, `projects_reused`, `tasks_created`, et `created` : `{kind, ref, title}` par élément (`ref` vide à blanc).

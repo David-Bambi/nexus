@@ -1,0 +1,13 @@
+---
+title: Sous-agents
+summary: "Les agents spécialisés du dépôt, une fiche par agent"
+icon: lucide:bot
+type: liste
+gabarit: docs-manager.cpt
+links: [docs-manager.cpt,
+        git-manager.cpt]
+related:
+  - 
+---
+
+Les agents spécialisés que Claude Code peut appeler dans ce dépôt, définis dans `.claude/agents/`. 2 entrées.

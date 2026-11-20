@@ -1,0 +1,18 @@
+---
+title: Acteurs
+summary: "Qui a fait la modification : la page web, la ligne de commande ou un assistant (mcp)"
+icon: lucide:users
+links: []
+related:
+  - 
+---
+
+Chaque événement note son __acteur__ : par quelle porte la modification est arrivée.
+
+- `web` : un formulaire de l'application web. C'est la valeur par défaut.
+- `cli` : la commande `nexus`.
+- `mcp` : un assistant IA, par le serveur MCP.
+
+Chaque service qui modifie quelque chose prend un argument `actor` ; la CLI passe `cli`, le serveur MCP passe `mcp`. L'import n'a pas d'acteur à lui : il reçoit celui de son appelant.
+
+À quoi ça sert : savoir ce qu'un assistant a modifié, et le distinguer de ce qu'on a fait soi-même. L'acteur est aussi exporté avec chaque événement d'une fonctionnalité.

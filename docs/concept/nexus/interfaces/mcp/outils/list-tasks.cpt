@@ -1,0 +1,21 @@
+---
+title: list_tasks
+summary: "Liste les fonctionnalités et tâches, filtrées par état ou projet"
+icon: lucide:wrench
+tags: [lecture]
+links: []
+related:
+  - 
+---
+
+__Rôle__ : liste les fonctionnalités et les tâches, de la plus ancienne à la plus récente.
+
+__Arguments__
+- Aucun obligatoire.
+- Facultatifs : `state` (un des sept états, en majuscules : `DOING`…), `project` (clé), `limit`.
+
+__Règles__
+- Lecture seule. Un projet inconnu est refusé.
+- Avec une limite, ce sont les éléments les plus récents qui sont gardés.
+
+__Résultat__ : `{tasks, count, truncated}`. Chaque élément en bref : `ref`, `kind`, `title`, `state`, `project`, `parent`, `size`, `context`, `released_in`.

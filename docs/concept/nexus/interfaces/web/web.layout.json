@@ -1,0 +1,22 @@
+{
+  "pile.cpt": {
+    "x": 17,
+    "y": 11
+  },
+  "styles-et-script.cpt": {
+    "x": 176,
+    "y": 126
+  },
+  "composants.cpt": {
+    "x": 13,
+    "y": 121
+  },
+  "navigation.cpt": {
+    "x": 181,
+    "y": 8
+  },
+  "pages/pages.cpt": {
+    "x": 411,
+    "y": 0
+  }
+}

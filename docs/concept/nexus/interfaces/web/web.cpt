@@ -1,0 +1,21 @@
+---
+title: Application web
+summary: "Les pages servies par Flask : ce qu'on y voit et comment elles sont faites"
+icon: lucide:globe
+type: carte
+links: [pile.cpt,
+        styles-et-script.cpt,
+        composants.cpt,
+        navigation.cpt,
+        pages/pages.cpt]
+related:
+  - 
+---
+
+L'application web sert des __pages complètes__, avec des formulaires HTML classiques et presque pas de JavaScript. C'est la porte la plus complète : ce que la CLI et le MCP ne font pas (supprimer, archiver) se fait ici.
+
+- [Pile technique](pile.cpt) : Flask, Jinja, SQLAlchemy, SQLite.
+- [Styles et script](styles-et-script.cpt) : une feuille, un script, rien en ligne.
+- [Composants](composants.cpt) : les macros partagées.
+- [En-tête et navigation](navigation.cpt) : sections, capture, retour.
+- [Pages](pages/pages.cpt) : une fiche par écran.

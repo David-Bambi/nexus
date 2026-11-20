@@ -1,0 +1,29 @@
+---
+title: nexus tasks
+summary: "Le tableau de toutes les fonctionnalités et tâches"
+icon: lucide:square-terminal
+tags: [lecture]
+links: []
+related:
+  - 
+---
+
+__Syntaxe__
+
+```
+nexus tasks
+```
+
+__Résultat__
+- Un tableau de toutes les fonctionnalités et tâches, de la plus ancienne à la plus récente, fermées comprises.
+- Colonnes : `REF`, `STATE`, `PROJECT`, `PARENT`, `TITLE` ; un tiret quand il n'y a pas de projet ou de parent.
+- `(none)` si la base est vide. Pas de limite de lignes, contrairement à la page web.
+
+__Exemple__
+
+```
+nexus tasks
+# REF    STATE    PROJECT  PARENT  TITLE
+# f-…    DOING    NX       -       Page CLI
+# t-…    REFINED  NX       f-…     Écrire la page CLI
+```

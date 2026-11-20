@@ -1,0 +1,21 @@
+---
+title: Arbre de travail
+summary: "Projet, sous-projet, fonctionnalité, tâche : qui contient quoi"
+icon: lucide:folder-tree
+image: arbre.svg
+links: []
+related:
+  - 
+---
+
+Nexus range le travail en __arbre__ : un projet se découpe en parties, les parties en fonctionnalités, les fonctionnalités en tâches.
+
+- __Projet racine__ : le haut de l'arbre.
+- __Sous-projet__ : une partie d'un projet racine, sur __un seul niveau__. Il a son propre arbre et sa propre version.
+- __Fonctionnalité__ : contient des fonctionnalités et des tâches, __sans limite de profondeur__.
+- __Tâche__ : une feuille, jamais d'enfant.
+- __Capture__ : une tâche pas encore rangée, sans projet (l'inbox de GTD).
+
+Fonctionnalités et tâches partagent la table `task`, distinguées par `kind`. Chaque élément a une place parmi ses voisins.
+
+Pourquoi un arbre plutôt que des versions planifiées : le travail est un découpage, et l'arbre dit ce qui appartient à quoi. Garder des versions à côté donnerait deux façons de grouper les mêmes tâches, avec des règles pour les garder d'accord.

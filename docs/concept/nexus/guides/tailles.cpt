@@ -1,0 +1,23 @@
+---
+title: Les quatre tailles
+summary: "XS, S, M, L : des niveaux d'effort qui doublent à chaque cran, jamais des heures"
+icon: lucide:scaling
+links: []
+related:
+  - ../interfaces/web/pages/tailles.cpt
+---
+
+Une taille dit l'__effort__ d'un élément, jamais des heures : chaque cran vaut à peu près le double du précédent.
+
+- __XS__
+  - Quand : un changement trivial, en un seul endroit, sans décision.
+  - Exemple : corriger une faute ou un libellé, changer une valeur de configuration.
+- __S__
+  - Quand : un petit changement déjà compris, dans une seule couche, avec son test.
+  - Exemple : ajouter un champ à un formulaire ; un outil MCP qui enveloppe un service existant.
+- __M__
+  - Quand : une fonctionnalité sur plusieurs couches (modèle, service, page, tests), ou avec une petite décision de conception ; le chemin est clair.
+  - Exemple : ajouter un réglage de projet et son formulaire.
+- __L__
+  - Quand : un nouveau concept ou des questions ouvertes ; il faut concevoir, sur plusieurs séances.
+  - Exemple : une nouvelle entité avec sa migration, son service, ses pages et sa documentation.

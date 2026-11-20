@@ -1,0 +1,21 @@
+---
+title: delete_criterion
+summary: "Retire un critère ; les numéros suivants descendent"
+icon: lucide:wrench
+tags: [projet]
+links: []
+related:
+  - 
+---
+
+__Rôle__ : retire un critère de la prochaine version majeure ; les numéros suivants descendent d'un cran.
+
+__Arguments__
+- Obligatoires : `project`, `number`.
+- Aucun facultatif.
+
+__Règles__
+- Un numéro hors de la liste est refusé.
+- Écriture, __destructif__ : c'est le seul outil marqué ainsi.
+
+__Résultat__ : `{project, version, criteria}`, la liste à jour.

@@ -1,0 +1,19 @@
+---
+title: git-manager
+summary: "L'agent des opérations git : relire, indexer, valider, gérer les branches localement"
+icon: lucide:git-commit-horizontal
+links: []
+related:
+  - 
+---
+
+__Rôle__ : fait les opérations git du dépôt : relire les changements, indexer, valider, créer, changer, fusionner ou rebaser des branches localement. Ses messages de commit sont courts, à l'impératif, et disent pourquoi.
+
+__Quand l'appeler__
+- Quand un travail est prêt à être validé.
+- Pour une opération de branche.
+
+__Ce qu'il ne fait pas__
+- Écrire ou modifier du code.
+- Pousser, ouvrir ou fusionner une PR sans accord explicite ; jamais de push forcé ni de réécriture d'un historique partagé.
+- Sauter les hooks, toucher à la configuration git, ou lancer une opération destructive sans demande explicite.

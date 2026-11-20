@@ -1,0 +1,20 @@
+---
+title: Pile technique
+summary: "Flask, Jinja, SQLAlchemy et SQLite, sans étape de construction"
+icon: lucide:boxes
+links: []
+related:
+  - 
+---
+
+L'application web tient sur une pile Python simple, __sans étape de construction__.
+
+- __Flask__ : le serveur web ; __Jinja__ : les gabarits HTML.
+- __SQLAlchemy__ : l'accès à la base ; __Alembic__ : les migrations ; __SQLite__ : le moteur.
+- __waitress__ : le serveur de production.
+- Ni npm ni outil d'assemblage du code client.
+- HTMX, prévu pour rafraîchir des morceaux de page, n'est pas chargé : chaque action est un formulaire qui recharge la page.
+
+Pourquoi : tout reste en Python, côté serveur, sans seconde chaîne d'outils à entretenir. SQLite tient en un seul fichier, simple à sauvegarder et à déplacer.
+
+Écarté : FastAPI aurait donné une API typée, mais impose de séparer l'interface du serveur, inutile pour une application locale à un seul utilisateur.

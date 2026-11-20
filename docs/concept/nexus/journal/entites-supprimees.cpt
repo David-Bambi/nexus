@@ -1,0 +1,16 @@
+---
+title: Historique des éléments supprimés
+summary: "Pourquoi le journal survit à une suppression : pas de clé étrangère, identifiants jamais réutilisés"
+icon: lucide:archive
+links: []
+related:
+  - 
+---
+
+Le journal garde l'histoire d'un élément même après sa suppression.
+
+- Un événement désigne son élément par `entity_type` (`task`, `project`, `criterion`) et `entity_id`, __sans clé étrangère__ : la base ne l'efface pas quand l'élément disparaît.
+- `created` et `deleted` portent le titre (ou la clé et le nom d'un projet, la référence d'un élément) : l'histoire reste lisible sans l'élément.
+- Toutes les tables sont en `AUTOINCREMENT` : SQLite ne redonne __jamais__ l'identifiant d'une ligne supprimée.
+
+Pourquoi ce dernier point : sans lui, un nouvel élément pourrait reprendre l'identifiant d'un ancien, et hériter de son historique. Deux histoires se mélangeraient.

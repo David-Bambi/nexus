@@ -1,0 +1,15 @@
+---
+title: Plan figé
+summary: "Au premier démarrage d'une fonctionnalité, la liste de ses enfants est gardée comme plan"
+icon: lucide:snowflake
+links: []
+related:
+  - 
+---
+
+Quand une fonctionnalité démarre pour la __première fois__, son événement `started` porte `plan` : les références de ses enfants directs, dans leur ordre. C'est le __plan figé__.
+
+- Les démarrages suivants (après une annulation puis une restauration, par exemple) ne le portent pas.
+- L'export reprend ce plan, avec la date du premier démarrage ; `null` si la fonctionnalité n'a jamais démarré.
+
+Ce que la mesure compare : tout ce qui change ensuite dans les enfants est de la dérive. Un enfant ajouté, retiré, annulé, rouvert ou renommé après le premier démarrage s'écarte du plan.

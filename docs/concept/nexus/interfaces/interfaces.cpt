@@ -1,0 +1,24 @@
+---
+title: Interfaces
+summary: "Trois portes sur les mêmes règles : le web, la ligne de commande et le serveur MCP"
+icon: lucide:plug
+background: interfaces.svg
+backgroundOpacity: 0.3
+type: carte
+links: [couche-services.cpt,
+        web/web.cpt,
+        cli/cli.cpt,
+        mcp/mcp.cpt,
+        import/import.cpt]
+related:
+  - 
+---
+
+Nexus a trois portes sur les mêmes règles : l'application web, la ligne de commande et le serveur MCP. Toutes appellent la couche services ; la CLI et le MCP partagent aussi l'import.
+
+Sur le fond de carte :
+- en bas : la [Couche services](couche-services.cpt), où vivent les règles ;
+- en haut à gauche : l'[Application web](web/web.cpt) ;
+- en haut au milieu : la [Ligne de commande](cli/cli.cpt) ;
+- en haut à droite : le [Serveur MCP](mcp/mcp.cpt) ;
+- entre les deux : l'[Import en bloc](import/import.cpt).

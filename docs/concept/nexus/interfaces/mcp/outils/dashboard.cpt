@@ -1,0 +1,20 @@
+---
+title: dashboard
+summary: "Les éléments en cours et en attente, et les compteurs inbox et à affiner"
+icon: lucide:wrench
+tags: [lecture]
+links: []
+related:
+  - 
+---
+
+__Rôle__ : donne la vue d'ensemble du [tableau de bord](../../web/pages/tableau-de-bord.cpt).
+
+__Arguments__
+- Aucun obligatoire.
+- Aucun facultatif.
+
+__Règles__
+- Lecture seule.
+
+__Résultat__ : `doing` et `waiting` (les éléments en cours et en attente, en bref), `inbox_count` (captures à trier) et `refine_count` (éléments clarifiés, prêts à démarrer).

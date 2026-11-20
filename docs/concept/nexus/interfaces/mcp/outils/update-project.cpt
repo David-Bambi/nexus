@@ -1,0 +1,22 @@
+---
+title: update_project
+summary: "Modifie nom, description ou répertoire d'un projet"
+icon: lucide:wrench
+tags: [projet]
+links: []
+related:
+  - 
+---
+
+__Rôle__ : modifie le nom, la description ou le répertoire d'un projet. La clé ne change jamais.
+
+__Arguments__
+- Obligatoire : `project`, et au moins un champ à changer.
+- Facultatifs : `name`, `description`, `directory`.
+
+__Règles__
+- Une description ou un répertoire vide l'efface ; un champ absent garde sa valeur ; un nom vide est refusé.
+- Seuls les champs qui changent sont notés au journal.
+- Écriture, idempotent, non destructif.
+
+__Résultat__ : le projet, avec `directory` (le sien) et `effective_directory` (le sien, sinon celui du parent).

@@ -1,0 +1,14 @@
+---
+title: Parent dans chaque événement
+summary: "Chaque événement d'un élément note la fonctionnalité au-dessus de lui à ce moment"
+icon: lucide:corner-left-up
+links: []
+related:
+  - ../journal/actions/actions-element.cpt
+---
+
+Chaque événement d'une fonctionnalité ou d'une tâche porte `parent` : la référence de la fonctionnalité juste au-dessus __à ce moment-là__, ou `null`.
+
+Le service l'ajoute de lui-même à chaque écriture au journal ; aucune interface n'a à y penser.
+
+Pourquoi : quand un enfant change de fonctionnalité, ce qui lui est arrivé avant reste attribué à l'ancienne, et ce qui suit à la nouvelle. La dérive reste ainsi attribuable après un déplacement. L'[export](evenements-exportes.cpt) s'en sert pour savoir quels événements rattacher à chaque fonctionnalité.

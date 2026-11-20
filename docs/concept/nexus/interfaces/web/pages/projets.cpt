@@ -1,0 +1,20 @@
+---
+title: Projets
+summary: "La liste des projets et de leurs sous-projets, avec leur version"
+icon: lucide:folders
+image: projets.png
+links: []
+related:
+  - 
+---
+
+__Adresse__ : `/projects`.
+
+__Ce qu'on y voit__
+- Les projets racines, chacun suivi de ses sous-projets en retrait.
+- Pour chacun : nom, clé, référence `s-…` d'un sous-projet, version `vX.Y`, statut et description.
+- Les projets archivés sont cachés.
+
+__Ce qu'on y fait__
+- Ouvrir un projet.
+- Créer un projet : clé, nom, description et [répertoire](../../../mesure/repertoire.cpt) facultatif. Une clé déjà prise ou [réservée](../../../modele/references.cpt) est refusée.

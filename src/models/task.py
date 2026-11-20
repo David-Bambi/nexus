@@ -10,8 +10,8 @@ from src.models.tag import task_tag_table
 
 
 class TaskState(Enum):
-    """A work item's position in the GTD workflow. See the state diagram in
-    docs/architecture/overview.md for the allowed transitions."""
+    """A work item's position in the GTD workflow. See
+    docs/concept/nexus/modele/etats.cpt for the allowed transitions."""
 
     INBOX = auto()
     REFINED = auto()

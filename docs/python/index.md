@@ -2,7 +2,7 @@
 
 Generic Python and library concept explainers, grounded in this project's
 own code but not themselves decisions about Nexus's architecture — those
-live under [Architecture](../architecture/overview.md) instead.
+live in the Concept map (`docs/concept/`) instead.
 
 - [SQLAlchemy in Nexus](sqlalchemy.md) — engine, sessions, and how Alembic
   derives migrations from the models.

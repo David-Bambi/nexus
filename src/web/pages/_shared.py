@@ -3,7 +3,8 @@ from flask import Blueprint, current_app
 from src.services import sizes
 
 # Full-page (non-fragment) routes. Adapters only: no business logic here —
-# validate input, call a service, render a template (ADR-0001). Every module
+# validate input, call a service, render a template (see
+# docs/concept/nexus/interfaces/couche-services.cpt). Every module
 # of this package registers its routes on this single blueprint.
 bp = Blueprint("pages", __name__)
 

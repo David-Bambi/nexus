@@ -1,0 +1,16 @@
+---
+title: Conventions
+summary: "Ce qui fait foi : docs/ ; ce qui n'est que contexte : artifacts/ ; ce qui est généré : la référence"
+icon: lucide:scale
+links: []
+related:
+  - 
+---
+
+Ce que Claude doit croire, produire et ne pas toucher dans ce dépôt.
+
+- __`docs/` fait foi__ : la carte Concept pour le projet, MkDocs pour le code. `artifacts/specs/` n'est que du contexte : en cas de désaccord, `docs/` gagne.
+- __`artifacts/`__ reçoit ce que Claude produit (specs, plans, sorties d'exploration). Ce n'est jamais la documentation qui fait foi.
+- __`docs/reference/`__ est générée à la construction du site, à partir des docstrings de `src/`. Jamais écrite à la main.
+- Chaque changement de comportement met `docs/` à jour __dans la même passe__.
+- Une décision vit dans la fiche de la partie qu'elle concerne, avec sa raison. Quand elle change, on réécrit la fiche ; git garde l'historique.

@@ -1,0 +1,22 @@
+---
+title: move_task
+summary: "Déplace un élément sous un projet ou une fonctionnalité, sans changer son état"
+icon: lucide:wrench
+tags: [element]
+links: []
+related:
+  - 
+---
+
+__Rôle__ : déplace un élément vers le haut d'un projet, ou sous une fonctionnalité. Il garde son état ; une fonctionnalité emporte son sous-arbre.
+
+__Arguments__
+- Obligatoire : `ref`.
+- Facultatifs : `project`, `parent` ; il en faut au moins un.
+
+__Règles__
+- Refusé sous soi-même ou un descendant, sous une tâche, ou si l'élément y est déjà.
+- L'élément arrive en dernier parmi ses nouveaux voisins.
+- Écriture, non destructif. Voir [Déplacer et réordonner](../../../modele/deplacer.cpt).
+
+__Résultat__ : l'élément déplacé, avec son nouveau `project` et son nouveau `parent`.

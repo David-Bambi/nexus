@@ -1,0 +1,21 @@
+---
+title: set_criterion_done
+summary: "Coche ou décoche un critère"
+icon: lucide:wrench
+tags: [projet]
+links: []
+related:
+  - 
+---
+
+__Rôle__ : coche ou décoche un critère de la prochaine version majeure.
+
+__Arguments__
+- Obligatoires : `project`, `number`, `done` (`true` pour cocher, `false` pour décocher).
+- Aucun facultatif.
+
+__Règles__
+- Un numéro hors de la liste est refusé.
+- Écriture, idempotent, non destructif.
+
+__Résultat__ : `{project, version, criteria}`, la liste à jour.

@@ -1,0 +1,27 @@
+---
+title: Détail d'un élément
+summary: "nexus suivi d'une référence f- ou t- : champs et enfants"
+icon: lucide:square-terminal
+tags: [lecture]
+links: []
+related:
+  - 
+---
+
+__Syntaxe__
+
+```
+nexus f-…
+nexus t-…
+```
+
+__Résultat__
+- Les champs : référence, titre, type, état, projet, parent, contexte, taille, version de sortie (`vX.Y`), raison du blocage, dates de création et de fermeture, puis la description.
+- Une fonctionnalité ajoute « Children » : tout son sous-arbre, éléments fermés compris.
+- Les deux écritures d'une référence trouvent l'élément : une tâche devenue fonctionnalité répond à `t-…` comme à `f-…`.
+
+__Exemple__
+
+```
+nexus f-…
+```

@@ -1,0 +1,15 @@
+---
+title: Export complet
+summary: "Toute la base en JSON, à la demande : une copie, pas un format d'import"
+icon: lucide:file-json
+links: []
+related:
+  - 
+---
+
+`/export.json` télécharge __toute la base__ en JSON, à tout moment (lien __Export__ de l'en-tête). C'est la copie à prendre entre deux démarrages.
+
+- Contenu : projets et sous-projets (avec version), éléments (avec type, parent, référence, version de sortie et étiquettes), étiquettes, critères et événements. Projets archivés et éléments fermés compris.
+- Les états sont donnés par leur nom, les dates au format ISO 8601.
+
+__Pas un format d'import__ : l'export garde les identifiants internes et ses propres formes. Le réimporter demanderait de renuméroter les lignes et des règles de conflit, et lierait le format d'[import](../../interfaces/import/import.cpt) au format de sauvegarde. L'import a donc son propre format.

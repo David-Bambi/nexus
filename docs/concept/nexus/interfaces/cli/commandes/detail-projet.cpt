@@ -1,0 +1,29 @@
+---
+title: Détail d'un projet
+summary: "nexus suivi d'une clé ou d'une référence s- : champs, critères, sous-projets et arbre"
+icon: lucide:square-terminal
+tags: [lecture]
+links: []
+related:
+  - 
+---
+
+__Syntaxe__
+
+```
+nexus <clé> [--all]
+nexus s-… [--all]
+```
+
+__Résultat__
+- Les champs du projet : clé, référence, nom, parent, statut, version, répertoire (suivi de « (from … ) » s'il vient du parent), description.
+- « Criteria for N+1.0 » : les critères de la [version majeure](../../../modele/version/majeure.cpt), `[x] 1. texte`, s'il y en a.
+- Le tableau des sous-projets, avec leur version.
+- « Work » : l'arbre, deux espaces de retrait par niveau, une ligne `réf ÉTAT titre` par élément, `(vX.Y)` après une fonctionnalité sortie.
+- Les éléments terminés et annulés n'apparaissent qu'avec `--all`.
+
+__Exemple__
+
+```
+nexus NX --all
+```

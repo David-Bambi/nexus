@@ -1,0 +1,22 @@
+---
+title: add_task
+summary: "Ajoute une tâche ou une fonctionnalité dans l'arbre d'un projet, déjà clarifiée"
+icon: lucide:wrench
+tags: [element]
+links: []
+related:
+  - 
+---
+
+__Rôle__ : ajoute une fonctionnalité ou une tâche dans l'arbre d'un projet, déjà __refined__. Pour l'inbox, c'est [capture_task](capture-task.cpt).
+
+__Arguments__
+- Obligatoire : `title`.
+- Facultatifs : `project` (clé), `parent` (référence d'une fonctionnalité ; seul, son projet est pris), `kind` (`task` par défaut, ou `feature`), `body`, `context`, `size` (`XS`, `S`, `M`, `L`).
+
+__Règles__
+- Il faut `project`, `parent`, ou les deux.
+- Refusé si le parent est une tâche ou appartient à un autre projet.
+- Écriture, non destructif. Voir [Capturer, clarifier, ajouter](../../../modele/capturer-et-clarifier.cpt).
+
+__Résultat__ : l'élément créé, avec tous ses champs (`ref`, `kind`, `state`, `project`, `parent`, `released_in`, dates…).

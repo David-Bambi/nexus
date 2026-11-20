@@ -1,0 +1,21 @@
+---
+title: Import en bloc
+summary: "Faire entrer tout un découpage d'un coup, par la CLI ou le MCP, tout ou rien"
+icon: lucide:file-input
+type: carte
+links: [format.cpt,
+        tout-ou-rien.cpt,
+        correspondance.cpt,
+        import-texte.cpt]
+related:
+  - 
+---
+
+L'import fait entrer tout un découpage d'un coup : projets, sous-projets, fonctionnalités et tâches. C'est un service, `services/importer.py`, sans accès aux fichiers ni au terminal. `nexus import` et l'outil MCP `import_data` appellent donc les mêmes fonctions : même validation, même tout-ou-rien, et l'acteur de l'appelant.
+
+- [Format du document](format.cpt) : la forme du JSON.
+- [Tout ou rien](tout-ou-rien.cpt) : validation complète, une transaction, essai à blanc.
+- [Projets existants et doublons](correspondance.cpt) : ce qui est repris, ce qui est créé.
+- [Import de texte](import-texte.cpt) : une ligne, une capture.
+
+L'[export complet](../../exploitation/sauvegardes/export-complet.cpt) n'est pas un format d'import.

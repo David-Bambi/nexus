@@ -1,0 +1,23 @@
+---
+title: clarify_task
+summary: "Clarifie une capture : projet, parent, type et détails"
+icon: lucide:wrench
+tags: [element]
+links: []
+related:
+  - 
+---
+
+__Rôle__ : trie une capture (ou un élément __someday__) et la passe en __refined__, rangée dans l'arbre d'un projet.
+
+__Arguments__
+- Obligatoire : `ref`.
+- Facultatifs : `title`, `project`, `parent`, `kind` (`feature` pour en faire une fonctionnalité), `body`, `context`, `size`. Un champ absent garde sa valeur ; sans `project` ni `parent`, l'élément reste dans son projet.
+
+__Règles__
+- Seulement depuis `INBOX` ou `SOMEDAY`.
+- Mêmes refus que [add_task](add-task.cpt) pour le parent ; pas de boucle.
+- Une fonctionnalité qui a des enfants ne redevient pas tâche.
+- Écriture, non destructif.
+
+__Résultat__ : l'élément clarifié, en état `REFINED`.

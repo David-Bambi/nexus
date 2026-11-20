@@ -1,0 +1,27 @@
+---
+title: Capturer
+summary: "Une phrase passée seule à nexus devient une capture dans l'inbox"
+icon: lucide:square-terminal
+tags: [ecriture]
+links: []
+related:
+  - 
+---
+
+__Syntaxe__
+
+```
+nexus "<description>"
+```
+
+__Résultat__
+- Un argument seul qui contient une espace est lu comme une phrase : il devient une __capture__ dans l'inbox, sans projet.
+- Un mot seul, sans espace, serait lu comme une clé de projet ou une référence : mettre au moins deux mots.
+- Un titre vide est refusé (code 1).
+
+__Exemple__
+
+```
+nexus "acheter un câble USB-C"
+# Created task t-… (inbox): acheter un câble USB-C
+```

@@ -1,0 +1,26 @@
+---
+title: nexus version
+summary: "Afficher la version de l'application"
+icon: lucide:square-terminal
+tags: [lecture]
+links: []
+related:
+  - 
+---
+
+__Syntaxe__
+
+```
+nexus version
+```
+
+__Résultat__
+- Affiche le numéro de version du paquet `nexus` installé, lu dans ses métadonnées ; `unknown` si le paquet n'est pas installé.
+- À ne pas confondre avec la [version calculée](../../../modele/version/version.cpt) d'un projet, que montrent `nexus projects` et le détail d'un projet.
+
+__Exemple__
+
+```
+nexus version
+# nexus X.Y.Z
+```

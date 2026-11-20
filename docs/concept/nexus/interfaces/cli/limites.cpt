@@ -1,0 +1,19 @@
+---
+title: Ce que la CLI ne fait pas
+summary: "Modifier, clarifier, déplacer, changer d'état ou gérer les critères : par le web ou le MCP"
+icon: lucide:ban
+links: []
+related:
+  - 
+---
+
+La CLI lit, capture, ajoute, importe et exporte. Elle ne fait pas le reste :
+
+- modifier, clarifier, déplacer ou réordonner un élément, changer son type ou son état ;
+- créer un projet, sauf par l'import ;
+- supprimer quoi que ce soit, archiver un projet ;
+- modifier les critères ou passer à la version majeure : elle montre la version et les critères, sans les modifier.
+
+Pour tout cela : l'[application web](../web/web.cpt), ou un assistant par le [serveur MCP](../mcp/mcp.cpt).
+
+Le titre vide : le service le refuse pour un élément ajouté dans l'arbre, mais pas pour une capture. Pour la capture, chaque porte le vérifie elle-même (CLI, import, schéma MCP, champ obligatoire du formulaire web).

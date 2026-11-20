@@ -1,0 +1,16 @@
+---
+title: Choisir et découper
+summary: "Les trois règles : prendre la plus grosse en cas de doute, découper au-delà de L, ou quand on mélange définir et faire"
+icon: lucide:scissors
+links: []
+related:
+  - 
+---
+
+Trois règles pour choisir une [taille](tailles.cpt), ou pour découper :
+
+1. Entre deux tailles, prendre __la plus grosse__.
+2. Plus gros que L : __découper__.
+3. Un élément qui mélange __définir__ et __faire__ : le découper aussi.
+
+Le même texte vit à deux endroits : le guide de la documentation (`docs/guides/task-size.md`) et le code (`SIZE_GUIDE` et `SIZE_RULES`, dans `src/services/sizes.py`), affiché sur la page [/sizes](../interfaces/web/pages/tailles.cpt). Changer les deux ensemble.

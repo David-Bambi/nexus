@@ -1,0 +1,30 @@
+---
+title: Format du document
+summary: "Le JSON d'import : projets, sous-projets, arbre d'éléments et tâches libres"
+icon: lucide:braces
+links: []
+related:
+  - 
+---
+
+Le document d'import décrit des projets, leurs sous-projets et leur arbre, plus des tâches libres.
+
+```
+{"projects": [{"key", "name", "description",
+               "version", "criteria",          # nouveau projet seulement
+               "items": [ITEM],
+               "subprojects": [{"key", "name", "description",
+                                "version", "criteria", "items": [ITEM]}]}],
+ "tasks": [{"title", "body", "context", "size", "project"}]}   # tâches libres
+
+ITEM = {"kind": "feature" | "task",            # task par défaut
+        "title", "body", "context", "size",    # size : XS, S, M ou L
+        "children": [ITEM]}                    # fonctionnalité seulement
+```
+
+- Un nouveau projet exige `name`.
+- Les éléments d'un arbre sont créés __refined__ ; les tâches libres vont dans l'__inbox__, dans leur `project` s'il est donné.
+- `version` (`"1.4"`) et `criteria` (textes, ou `{text, done}`) ne valent que pour un projet que l'import crée.
+- Un champ inconnu, ou `children` sur une tâche, est une erreur.
+
+Pourquoi : un assistant peut donner tout un découpage en un seul document, déjà clarifié.

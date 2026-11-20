@@ -1,0 +1,23 @@
+---
+title: Installer la commande
+summary: "Rendre nexus disponible partout, ou s'en passer avec uv run"
+icon: lucide:download
+links: []
+related:
+  - 
+---
+
+La commande `nexus` s'installe une fois pour être disponible partout, ou se lance sans installation.
+
+```
+scripts/install_cli.sh install     # commande nexus dans ~/.local/bin
+scripts/install_cli.sh uninstall   # la retirer
+uv run nexus <commande>            # sans installer, après uv sync
+python -m src.cli <commande>       # autre façon
+```
+
+- `install` lance `uv tool install --editable` : l'outil est __modifiable__, il suit la copie de travail. Pas besoin de réinstaller après un changement de code, seulement après avoir déplacé le dépôt.
+- Ajouter le dossier des outils de uv au `PATH` s'il manque ; le script le signale.
+- Le point d'entrée est déclaré dans `pyproject.toml` : `nexus = "src.cli:main"`.
+
+Installée ou non, la commande travaille sur la vraie base, et peut la migrer (voir [Même base que le service](meme-base.cpt)).

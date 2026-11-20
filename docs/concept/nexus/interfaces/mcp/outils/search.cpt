@@ -1,0 +1,21 @@
+---
+title: search
+summary: "Cherche un texte dans le titre ou le corps des éléments"
+icon: lucide:wrench
+tags: [lecture]
+links: []
+related:
+  - 
+---
+
+__Rôle__ : cherche un texte dans le titre ou le corps des éléments, sans tenir compte des majuscules.
+
+__Arguments__
+- Obligatoire : `term`.
+- Facultatif : `limit`.
+
+__Règles__
+- Lecture seule.
+- Les résultats vont du plus ancien au plus récent ; avec une limite, ce sont les plus anciens qui sont gardés.
+
+__Résultat__ : `{tasks, count, truncated}`, les éléments en bref.

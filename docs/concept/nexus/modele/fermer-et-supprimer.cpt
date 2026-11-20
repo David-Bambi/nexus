@@ -1,0 +1,21 @@
+---
+title: Fermer et supprimer
+summary: "Une fonctionnalité ne se ferme qu'avec ses enfants fermés ; on ne supprime que ce qui est vide"
+icon: lucide:lock
+links: []
+related:
+  - 
+---
+
+Deux gardes empêchent de fermer ou de supprimer trop tôt.
+
+__Fermer__ : terminer ou annuler une fonctionnalité est refusé tant qu'un de ses enfants n'est ni terminé ni annulé. Le message nomme les enfants encore ouverts.
+
+__Supprimer__ (depuis le web seulement) :
+- une tâche se supprime toujours ;
+- une fonctionnalité, un projet ou un sous-projet seulement s'il est __vide__ ;
+- rien ne part en cascade : il faut d'abord supprimer ou déplacer les enfants.
+
+__Archiver__ un projet le cache des listes sans rien supprimer ; __restaurer__ le fait revenir.
+
+Pourquoi : la fermeture d'une fonctionnalité sert de garde « est-ce fini ? ». Elle remplace une liste de contrôle à part, sans rien à tenir en plus de l'arbre.

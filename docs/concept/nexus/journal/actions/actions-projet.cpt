@@ -1,0 +1,30 @@
+---
+title: Actions d'un projet
+summary: "Les actions enregistrées sur un projet ou un sous-projet, et ce qu'elles contiennent"
+icon: lucide:folder
+links: []
+related:
+  - 
+---
+
+__Actions__ (sur `project`, pour un projet comme pour un sous-projet)
+- Vie du projet : `created`, `updated`, `archived`, `restored`, `deleted`.
+- [Version](../../modele/version/version.cpt) : `minor_bumped`, `major_released`, `version_set`.
+
+__Contenu__
+
+```
+created         {key, name, directory, ref, parent}   # ref et parent : sous-projet seulement
+updated         {champ: {from, to}}                    # name, description, directory
+archived        {from, to}                             # ACTIVE, ARCHIVED
+restored        {from, to}
+deleted         {key, name, ref}                       # ref : sous-projet seulement
+minor_bumped    {from, to, feature}                    # référence de la fonctionnalité terminée
+major_released  {from, to, criteria}                   # textes de la liste vidée
+version_set     {from, to}                             # import d'un nouveau projet
+```
+
+__Particularités__
+- `directory` n'apparaît dans `created` que s'il est donné.
+- Une modification qui ne change rien n'écrit rien.
+- Archiver un projet déjà archivé écrit quand même `archived` ; la page web ne propose alors pas le bouton.

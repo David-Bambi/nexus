@@ -1,0 +1,24 @@
+---
+title: Projet
+summary: "Un projet : arbre de travail, critères de majeure, modification et zone dangereuse"
+icon: lucide:folder-kanban
+image: projet.png
+links: []
+related:
+  - 
+---
+
+__Adresse__ : `/projects/<clé>`.
+
+__Ce qu'on y voit__
+- En tête : clé, statut, version, répertoire (ou celui du parent, « (from … ) »), sous-projets.
+- __Work__ : l'arbre, avec référence, état, et version de sortie d'une fonctionnalité terminée. Les éléments fermés sont cachés, sauf avec __Show closed__.
+- __Next major version__ : les critères, et le bouton __Release N+1.0__, actif quand tous sont cochés.
+
+__Ce qu'on y fait__
+- Ajouter un élément en haut ou sous une fonctionnalité (il naît __refined__) ; ↑ / ↓ pour le réordonner.
+- Gérer les critères, passer à la version majeure.
+- Modifier nom, description et répertoire (la clé ne change pas) ; créer un sous-projet (projet racine seulement) ; archiver ou restaurer.
+- __Supprimer__, dans la zone dangereuse, une fois la clé tapée ; refusé si le projet n'est pas vide.
+
+Un critère atteint par l'adresse d'un autre projet donne une page introuvable (404).

@@ -1,0 +1,16 @@
+---
+title: Projets existants et doublons
+summary: "Un projet existant est repris sans être modifié ; une tâche est toujours créée"
+icon: lucide:git-merge
+links: []
+related:
+  - 
+---
+
+L'import reprend les projets qui existent et crée toujours les éléments.
+
+- Les projets et sous-projets sont reconnus par leur __clé__. Un projet existant est __repris, jamais écrasé__ : son nom et sa description sont ignorés, `version` et `criteria` refusés. Ses éléments sont quand même créés.
+- Un projet existant ne change pas de place : un projet racine déclaré comme sous-projet, l'inverse, ou un sous-projet sous un autre parent, est une erreur.
+- Une clé déclarée deux fois dans le document, ou une clé réservée, est une erreur.
+- Pas de détection de doublon : les éléments sont __toujours créés__. Importer deux fois le même fichier les duplique.
+- Les références et les identifiants ne font pas partie du format : Nexus les crée.

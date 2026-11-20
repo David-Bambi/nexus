@@ -1,0 +1,26 @@
+---
+title: Démarrage automatique
+summary: "Le service systemd, launchd ou Windows que crée le script d'installation"
+icon: lucide:rotate-cw
+links: []
+related:
+  - 
+---
+
+Un script installe Nexus comme service qui démarre à l'ouverture de session.
+
+```
+uv run python scripts/install_service.py install     # installer et démarrer
+uv run python scripts/install_service.py uninstall   # arrêter et retirer (données gardées)
+```
+
+Selon le système, `install` crée :
+- __Linux__ : une unité systemd utilisateur, `nexus.service`, relancée en cas d'échec ;
+- __macOS__ : un agent launchd, `com.nexus.app.plist`, maintenu en vie ;
+- __Windows__ : une tâche planifiée `nexus`, relancée jusqu'à 3 fois.
+
+Le service lance `python -m src.main` par `uv run --frozen`. `NEXUS_HOME` lui est transmis s'il est défini, sauf sous Windows.
+
+Sous Linux, `loginctl enable-linger` (une fois) le démarre au boot, sans ouverture de session ; `systemctl --user status|restart|stop nexus` le pilote.
+
+Seul Linux est vérifié sur une vraie machine ; les définitions macOS et Windows ne sont que testées par le code.

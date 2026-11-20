@@ -1,0 +1,27 @@
+---
+title: Base 1.x refusée
+summary: "L'historique des migrations repart à 2.0 : une base 1.x est refusée et doit être archivée"
+icon: lucide:shield-x
+links: []
+related:
+  - 
+---
+
+L'historique des migrations repart de zéro en 2.0, avec une seule migration initiale. Une base créée par Nexus 1.x porte une révision que le code ne connaît plus : elle est __refusée__.
+
+- Avant de migrer, `create_app` lit la révision de la base. Inconnue : `UnsupportedDatabaseError`, qui nomme le fichier et renvoie au README. Sans ce contrôle, Alembic échouerait avec une erreur obscure.
+- Une base sans révision du tout est créée normalement.
+
+Archiver l'ancienne base, puis repartir sur une base vide :
+
+```
+systemctl --user stop nexus
+mkdir -p ~/.nexus/archive
+mv ~/.nexus/data.db ~/.nexus/archive/data-1.x.db
+rm -f ~/.nexus/data.db-wal ~/.nexus/data.db-shm
+systemctl --user start nexus        # crée une base 2.0 vide
+```
+
+Pourquoi aucune reprise : le modèle 2.0 n'a pas de place pour les versions planifiées ; les plaquer sur l'arbre serait deviner leur sens. On réimporte ce qui compte.
+
+La copie du démarrage passe avant ce contrôle, et le fichier archivé reste lisible. La CLI refuse une base 1.x de la même façon.

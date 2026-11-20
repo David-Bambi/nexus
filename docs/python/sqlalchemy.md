@@ -26,7 +26,7 @@ flowchart TD
     AUTOGEN --> VERSIONS["migration scripts<br/>(src/migrations/versions/)"]
     VERSIONS -->|applied to| ENGINE
 
-    SESSION --> SVC["services/*<br/>(ADR-0001)"]
+    SESSION --> SVC["services/*<br/>(services layer)"]
     SVC -->|query / add / commit| SESSION
 ```
 

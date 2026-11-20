@@ -1,0 +1,17 @@
+---
+title: Même base que le service
+summary: "La CLI appelle les services directement, sur la base SQLite du service, sans API HTTP"
+icon: lucide:database
+links: []
+related:
+  - 
+---
+
+La CLI appelle __directement__ les services, sur la même base SQLite que le service web, sans passer par une API HTTP.
+
+- `cli/session.py` construit l'application (`create_app`) seulement pour obtenir une session : la CLI trouve ainsi la même base (`NEXUS_HOME`, `NEXUS_DATABASE_URL`).
+- La base est en mode __WAL__ : un lecteur et un écrivain y travaillent côte à côte, la CLI peut donc tourner pendant le service.
+
+Pourquoi pas d'API HTTP : un outil local à un seul utilisateur n'a pas besoin d'une seconde surface réseau. Une API locale serait à concevoir, à versionner et à garder fermée au réseau ; elle demanderait aussi que le service tourne.
+
+__Conséquence__ : construire l'application applique les migrations en attente. Lancer la CLI peut donc migrer la vraie base __avant__ le redéploiement du service, et sans la copie de sauvegarde du démarrage. De même, elle refuse une [base 1.x](../../exploitation/migrations/base-1x-refusee.cpt).

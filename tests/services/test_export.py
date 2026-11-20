@@ -210,7 +210,7 @@ def test_features_export_gives_the_plan_directory_children_and_drift_events(sess
 
 
 def test_features_export_names_deleted_children_and_released_versions(session):
-    """A deleted child's events keep its ref; a shipped feature gives its version and close date."""
+    """All a deleted child's events keep its ref, not just the deletion; a shipped feature gives its version and close date."""
     projects.create(session, "nx", "Nexus")
     feature = tasks.add_to_tree(session, "Auth", project_key="nx", kind=TaskKind.FEATURE)
     gone = tasks.add_to_tree(session, "Gone", parent_ref=feature.ref)
@@ -222,7 +222,9 @@ def test_features_export_names_deleted_children_and_released_versions(session):
     (exported,) = export.features(session)["features"]
     assert (exported["released_in"], exported["plan"], exported["children"]) == ("0.1", [], [])
     assert exported["closed_at"].endswith("+00:00")
-    assert (gone_ref, "deleted") in [(e["ref"], e["action"]) for e in exported["events"]]
+    gone_events = [e["action"] for e in exported["events"] if e["ref"] == gone_ref]
+    assert gone_events == ["created", "clarified", "deleted"]
+    assert all(e["ref"] for e in exported["events"])
 
 
 def test_features_export_of_an_empty_database(session):

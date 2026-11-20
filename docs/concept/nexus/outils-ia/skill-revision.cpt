@@ -1,0 +1,21 @@
+---
+title: Skill revision
+summary: "Corriger une erreur repérée dans un artefact (spec, plan) sans le réécrire"
+icon: lucide:pencil
+links: []
+related:
+  - 
+---
+
+Le skill `revision` corrige une erreur repérée dans un artefact de `artifacts/` (une spec, un plan) __sans le réécrire__.
+
+Il se déclenche quand on dit « la spec est fausse », « corrige le plan », « X dit Y mais devrait dire Z ».
+
+Ce qu'il fait :
+1. cerner l'erreur : fichier, section, texte actuel, texte voulu ;
+2. chercher dans `artifacts/` tous les fichiers qui répètent ce fait ;
+3. vérifier que c'est bien l'artefact qui a tort, et pas le code ;
+4. corriger la plus petite portion, dans la langue de la section ;
+5. ne pas réécrire un incrément déjà livré : signaler l'écart ;
+6. consigner une ligne dans la section « Révisions » du fichier ;
+7. signaler les répercussions hors de `artifacts/`, sans les corriger ; si la correction contredit une décision d'une fiche Concept, proposer de faire mettre la fiche à jour par docs-manager.

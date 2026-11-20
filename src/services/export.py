@@ -148,9 +148,12 @@ def features(session : Session) -> dict:
         under at that moment; moving a child out is the feature's event too.
     """
     items = _all(session, Task, selectinload(Task.children))
-    refs = {item.id: item.ref for item in items}
     task_events = (session.query(Event).filter(Event.entity_type == "task")
                    .order_by(Event.at, Event.id).all())
+    # Refs of deleted items come from their "deleted" event, so all their
+    # earlier events keep naming them.
+    refs = {e.entity_id: (e.payload or {}).get("ref") for e in task_events if e.action == "deleted"}
+    refs.update({item.id: item.ref for item in items})
 
     exported = []
     for feature in (item for item in items if item.kind is TaskKind.FEATURE):
@@ -171,7 +174,7 @@ def features(session : Session) -> dict:
                          for child in feature.children],
             "events": [{"at": _utc(e.at),
                         "actor": e.actor,
-                        "ref": refs.get(e.entity_id) or (e.payload or {}).get("ref"),
+                        "ref": refs.get(e.entity_id),
                         "action": e.action,
                         "payload": e.payload}
                        for e in own],

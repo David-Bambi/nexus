@@ -1,0 +1,21 @@
+---
+title: add_criterion
+summary: "Ajoute un critère pour la prochaine version majeure"
+icon: lucide:wrench
+tags: [projet]
+links: []
+related:
+  - 
+---
+
+__Rôle__ : ajoute un critère à la liste de la prochaine [version majeure](../../../modele/version/majeure.cpt), à la fin, non coché.
+
+__Arguments__
+- Obligatoires : `project`, `text`.
+- Aucun facultatif.
+
+__Règles__
+- Un texte vide est refusé.
+- Écriture, non destructif.
+
+__Résultat__ : `{project, version, criteria}`, la liste à jour ; chaque critère : `{number, text, done}`, numéroté à partir de 1.

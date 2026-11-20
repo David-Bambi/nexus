@@ -1,0 +1,20 @@
+---
+title: inbox
+summary: "Les captures qui attendent d'être triées"
+icon: lucide:wrench
+tags: [lecture]
+links: []
+related:
+  - 
+---
+
+__Rôle__ : liste les captures qui attendent d'être triées, la plus ancienne d'abord.
+
+__Arguments__
+- Aucun obligatoire.
+- Aucun facultatif.
+
+__Règles__
+- Lecture seule. Pas de limite.
+
+__Résultat__ : `{tasks, count, truncated}`, les éléments en bref. Pour trier : [clarify_task](clarify-task.cpt).

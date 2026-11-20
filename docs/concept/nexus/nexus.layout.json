@@ -1,0 +1,30 @@
+{
+  "modele/modele.cpt": {
+    "x": 588,
+    "y": 224
+  },
+  "journal/journal.cpt": {
+    "x": 866,
+    "y": 226
+  },
+  "interfaces/interfaces.cpt": {
+    "x": 632,
+    "y": 68
+  },
+  "exploitation/exploitation.cpt": {
+    "x": 641,
+    "y": 393
+  },
+  "mesure/mesure.cpt": {
+    "x": 925,
+    "y": 361
+  },
+  "guides/guides.cpt": {
+    "x": 79,
+    "y": 220
+  },
+  "outils-ia/outils-ia.cpt": {
+    "x": 87,
+    "y": 394
+  }
+}

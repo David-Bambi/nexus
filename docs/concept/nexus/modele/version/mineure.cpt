@@ -1,0 +1,17 @@
+---
+title: Version mineure
+summary: "Chaque fonctionnalité terminée fait monter MINEUR d'un cran, une seule fois"
+icon: lucide:arrow-up
+links: []
+related:
+  - 
+---
+
+__Terminer une fonctionnalité__ fait monter MINEUR d'un cran sur son projet le plus proche (le sous-projet s'il y en a un). La fonctionnalité garde la version où elle est sortie dans `released_in` (par exemple `1.4`).
+
+- __Une seule fois__ par fonctionnalité : rouverte puis terminée de nouveau, elle garde son `released_in` et ne fait pas remonter la version.
+- Rouvrir ne fait __jamais baisser__ la version.
+- Terminer une tâche, annuler une fonctionnalité ou déplacer une fonctionnalité terminée ne change rien.
+- Une fonctionnalité sans projet ne compte pas.
+
+Pourquoi la version est stockée (`version_major`, `version_minor`) : la lire ne coûte rien, et le journal garde chaque montée (`minor_bumped`). La recalculer depuis le journal à chaque lecture serait plus coûteux. Monter à chaque nouvelle fermeture gonflerait la version dès qu'on rouvre pour corriger.

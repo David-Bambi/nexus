@@ -1,0 +1,27 @@
+---
+title: Actions d'un critère
+summary: "Les actions enregistrées sur un critère de version majeure, et ce qu'elles contiennent"
+icon: lucide:list-checks
+links: []
+related:
+  - 
+---
+
+__Actions__ (sur `criterion`, un critère de [version majeure](../../modele/version/majeure.cpt))
+- `criterion_added`, `criterion_updated`, `criterion_checked` (cocher comme décocher), `criterion_deleted`.
+
+__Contenu__
+
+```
+criterion_added    {project, text}
+criterion_updated  {project, text, previous}   # previous : l'ancien texte
+criterion_checked  {project, text, from, to}   # from, to : true ou false
+criterion_deleted  {project, text, done}
+# project : la clé du projet
+```
+
+__Particularités__
+- `criterion_checked` et `criterion_updated` s'écrivent même quand rien ne change.
+- Passer à la version majeure vide la liste sans `criterion_deleted` : les textes sont dans `major_released`.
+- Supprimer un projet vide emporte ses critères sans événement de critère.
+- À l'import, un critère déjà coché donne `criterion_added` puis `criterion_checked`.

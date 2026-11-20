@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 460" font-family="sans-serif" font-size="16">
+  <!-- Les cinq étapes du démarrage ; la copie précède les migrations. -->
+  <defs>
+    <marker id="fleche" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5c4630"/>
+    </marker>
+    <marker id="fleche-retour" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#c0392b"/>
+    </marker>
+  </defs>
+  <rect width="960" height="460" fill="#fcfaf5"/>
+
+  <g fill="#e3ebff" stroke="#1f3a93" stroke-width="2">
+    <rect x="25" y="140" width="150" height="70" rx="10"/>
+    <rect x="215" y="140" width="150" height="70" rx="10"/>
+    <rect x="405" y="140" width="150" height="70" rx="10"/>
+    <rect x="595" y="140" width="150" height="70" rx="10"/>
+    <rect x="785" y="140" width="150" height="70" rx="10"/>
+  </g>
+  <g fill="#1f3a93" font-weight="bold" text-anchor="middle">
+    <text x="100" y="181">Dossier</text>
+    <text x="290" y="181">Journal</text>
+    <text x="480" y="181">Copie</text>
+    <text x="670" y="181">Migrations</text>
+    <text x="860" y="181">Serveur</text>
+  </g>
+
+  <g stroke="#5c4630" stroke-width="2" fill="none" marker-end="url(#fleche)">
+    <line x1="175" y1="175" x2="213" y2="175"/>
+    <line x1="365" y1="175" x2="403" y2="175"/>
+    <line x1="555" y1="175" x2="593" y2="175"/>
+    <line x1="745" y1="175" x2="783" y2="175"/>
+    <line x1="480" y1="210" x2="480" y2="290"/>
+  </g>
+
+  <!-- Les copies gardées -->
+  <g fill="#fffaf0" stroke="#5c4630" stroke-width="2">
+    <rect x="471" y="292" width="50" height="64" rx="4"/>
+    <rect x="463" y="300" width="50" height="64" rx="4"/>
+    <rect x="455" y="308" width="50" height="64" rx="4"/>
+  </g>
+  <text x="488" y="400" text-anchor="middle" fill="#5c4630" font-weight="bold">backups</text>
+
+  <!-- Revenir en arrière si une migration rate -->
+  <path d="M670,210 C670,330 600,340 525,335" fill="none" stroke="#c0392b" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#fleche-retour)"/>
+</svg>

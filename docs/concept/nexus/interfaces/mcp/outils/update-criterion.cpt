@@ -1,0 +1,21 @@
+---
+title: update_criterion
+summary: "Change le texte d'un critère"
+icon: lucide:wrench
+tags: [projet]
+links: []
+related:
+  - 
+---
+
+__Rôle__ : change le texte d'un critère de la prochaine version majeure.
+
+__Arguments__
+- Obligatoires : `project`, `number` (à partir de 1, comme dans [get_project](get-project.cpt)), `text`.
+- Aucun facultatif.
+
+__Règles__
+- Un numéro hors de la liste, ou un texte vide, est refusé.
+- Écriture, idempotent, non destructif.
+
+__Résultat__ : `{project, version, criteria}`, la liste à jour.

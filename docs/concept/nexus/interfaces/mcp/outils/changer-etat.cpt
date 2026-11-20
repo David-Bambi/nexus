@@ -1,0 +1,31 @@
+---
+title: Changer l'état d'un élément
+summary: "Les 8 outils qui font avancer un élément : démarrer, terminer, bloquer, débloquer, rouvrir, annuler, restaurer, reporter"
+icon: lucide:wrench
+tags: [element]
+links: []
+related:
+  - 
+---
+
+__Rôle__ : huit outils font passer un élément d'un [état](../../../modele/etats.cpt) à un autre, un passage chacun.
+- `start_task` : refined → doing.
+- `complete_task` : doing → done.
+- `block_task` : doing → waiting.
+- `unblock_task` : waiting → doing.
+- `reopen_task` : done → doing ; une fonctionnalité garde sa version de sortie.
+- `cancel_task` : tout état ouvert → cancelled.
+- `restore_task` : cancelled → refined.
+- `defer_task` : inbox ou refined → someday.
+
+__Arguments__
+- Obligatoire pour tous : `ref`.
+- `block_task` exige aussi `reason`, ce qu'on attend.
+
+__Règles__
+- Un mauvais état de départ est refusé.
+- Terminer ou annuler une fonctionnalité est refusé tant qu'un enfant est ouvert.
+- Terminer une fonctionnalité pour la première fois fait monter la [version mineure](../../../modele/version/mineure.cpt).
+- Écriture, non destructifs. Pas de passage arbitraire d'un état à un autre.
+
+__Résultat__ : l'élément, dans son nouvel état.

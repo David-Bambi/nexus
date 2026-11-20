@@ -1,0 +1,18 @@
+{
+  "claude-md.cpt": {
+    "x": 15,
+    "y": 8
+  },
+  "agents/agents.cpt": {
+    "x": 380,
+    "y": 0
+  },
+  "skill-revision.cpt": {
+    "x": 130,
+    "y": 67
+  },
+  "conventions.cpt": {
+    "x": 15,
+    "y": 121
+  }
+}
