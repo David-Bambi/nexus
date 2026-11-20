@@ -801,6 +801,14 @@ details[open] > summary.tree-row::before {
     background: var(--state-color);
 }
 
+/* The current state's swatch: greyed out, nothing to click. */
+.state-swatch:disabled,
+.state-swatch:disabled:hover {
+    background: color-mix(in srgb, var(--state-color) 15%, transparent);
+    opacity: 0.45;
+    cursor: default;
+}
+
 /* Holds the state icons' target; nothing to show. */
 .state-icon-form {
     display: none;

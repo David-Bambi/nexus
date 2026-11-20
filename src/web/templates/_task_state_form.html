@@ -1,20 +1,26 @@
 {#
-  Form moving a task to one of its next states.
+  Form moving a task to another state; the move may chain several lifecycle
+  steps (tasks.change_state), so any of the six states below can be picked.
 
-  By default: a select, a Move button and a reason field shown for WAITING.
-  With `icons`: one small swatch button per next state, in the color of the
-  target state's column, its tooltip naming that state; the WAITING swatch
-  reveals a reason field below the swatches (app.js), sent with Enter. `return_to` is the page to come back to after
-  the move.
+  By default: a select of the other states, a Move button and a reason field
+  shown for WAITING. With `icons`: one small swatch button per state, always
+  in the same order, in the color of that state's column, its tooltip naming
+  it; the current state's swatch is greyed out and disabled. The WAITING
+  swatch reveals a reason field below the swatches (app.js), sent with Enter.
+  `return_to` is the page to come back to after the move.
 #}
-{# A capture with no project is clarified on its page first; a placed inbox item can be refined as it stands. #}
-{% set next_states = {"INBOX": ["REFINED", "CANCELLED"] if task.project else [], "REFINED": ["DOING", "CANCELLED"], "DOING": ["WAITING", "DONE", "CANCELLED"], "WAITING": ["DOING", "CANCELLED"], "DONE": ["DOING"]}[task.state.name] %}
-{% if next_states and icons %}
+{% set states = ["INBOX", "REFINED", "DOING", "WAITING", "DONE", "CANCELLED"] %}
+{# A capture with no project is clarified on its page first; someday is left with its own buttons. #}
+{% set movable = task.state.name in states and (task.state.name != "INBOX" or task.project) %}
+{% if movable and icons %}
 {% set form_id = "state-" ~ task.id %}
 {% set reason_id = "reason-" ~ task.id %}
 <div class="state-icons">
-    {% for name in next_states %}
-    {% if name == "WAITING" %}
+    {% for name in states %}
+    {% if name == task.state.name %}
+    <button type="button" class="state-swatch" data-state="{{ name }}" title="{{ name }} (current)"
+            aria-label="{{ task.title }} is {{ name }}" disabled></button>
+    {% elif name == "WAITING" %}
     <button type="button" class="state-swatch" data-state="{{ name }}" title="Move to {{ name }}" aria-label="Move {{ task.title }} to {{ name }}"
             aria-expanded="false" aria-controls="{{ reason_id }}" data-reveal="{{ reason_id }}"></button>
     {% else %}
@@ -26,17 +32,17 @@
 <form id="{{ form_id }}" class="state-icon-form" method="post" action="{{ state_action }}">
     {% if return_to %}<input type="hidden" name="return_to" value="{{ return_to }}">{% endif %}
 </form>
-{% if "WAITING" in next_states %}
+{% if task.state.name != "WAITING" %}
 <form id="{{ reason_id }}" class="state-reason" method="post" action="{{ state_action }}" hidden>
     <input type="hidden" name="state" value="WAITING">
     <input type="text" name="reason" placeholder="Reason (waiting), then Enter" aria-label="Reason (waiting)" required>
     {% if return_to %}<input type="hidden" name="return_to" value="{{ return_to }}">{% endif %}
 </form>
 {% endif %}
-{% elif next_states %}
+{% elif movable %}
 <form class="form-inline state-form" method="post" action="{{ state_action }}">
     <select name="state" aria-label="State">
-        {% for name in next_states %}
+        {% for name in states if name != task.state.name %}
         <option value="{{ name }}">{{ name }}</option>
         {% endfor %}
     </select>

@@ -868,14 +868,44 @@ def test_kanban_view_lays_tasks_out_in_lanes_and_columns(client):
 
 
 def test_kanban_card_has_the_state_form_coming_back_to_the_board(client):
-    """A refined card has an icon per next state (doing, cancelled), each naming its target,
-    posting back to the board; no select, no Move button."""
+    """A refined card has an icon per state, its own greyed out and disabled, the others naming
+    their target and posting back to the board; no select, no Move button."""
     _kanban_project(client)
     html = client.get("/projects/nexus?view=kanban").get_data(as_text=True)
     board = html.split('class="kanban"')[1].split("add-item")[0]
-    assert board.count('title="Move to DOING"') == 3
-    assert board.count('title="Move to CANCELLED"') == 3
+    for state in ("INBOX", "DOING", "WAITING", "DONE", "CANCELLED"):
+        assert board.count(f'title="Move to {state}"') == 3
+    assert board.count('title="REFINED (current)"') == 3 and board.count(" disabled>") == 3
     assert "<select" not in board and ">Move</button>" not in board
+
+
+def test_kanban_icons_keep_the_same_order_whatever_the_state(client):
+    """The six icons come in the column order, the current one in its place."""
+    refs = _kanban_project(client)
+    client.post(f"/tasks/{refs['Hash'].id}/start")
+    html = client.get("/projects/nexus?view=kanban").get_data(as_text=True)
+    card = html.split(f'id="state-{refs["Hash"].id}"')[0].rsplit('class="state-icons"', 1)[1]
+    order = [card.index(f'data-state="{state}"') for state in
+             ("INBOX", "REFINED", "DOING", "WAITING", "DONE", "CANCELLED")]
+    assert order == sorted(order) and 'title="DOING (current)"' in card
+
+
+def test_kanban_jump_from_inbox_to_done(client):
+    """An inbox card moved to DONE from the board goes through each step and leaves the board."""
+    client.post("/projects", data={"key": "nexus", "name": "Nexus"})
+    client.post("/projects/nexus/items", data={"title": "Readme"})
+    response = client.post("/tasks/1/state", data={"state": "DONE", "return_to": "/projects/nexus?view=kanban"})
+    assert response.headers["Location"] == "/projects/nexus?view=kanban"
+    assert _shown_field(client.get("/tasks/1"), "state") == "DONE"
+
+
+def test_task_page_select_offers_every_other_state(client):
+    """The task page's state select lists every state but the current one."""
+    _refined_task_in_project(client)
+    html = client.get("/tasks/1").get_data(as_text=True)
+    select = html.split('<select name="state"')[1].split("</select>")[0]
+    options = [o.split('"')[0] for o in select.split('value="')[1:]]
+    assert options == ["INBOX", "DOING", "WAITING", "DONE", "CANCELLED"]
 
 
 def test_kanban_inbox_card_can_be_refined_in_place(client):
