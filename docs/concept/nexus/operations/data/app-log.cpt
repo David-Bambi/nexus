@@ -4,10 +4,10 @@ summary: "app.log et la sortie d'erreur, partagés par l'application, Flask et w
 icon: lucide:file-text
 links: []
 related:
-  - ../../journal/journal.cpt
+  - ../../event-log/event-log.cpt
 ---
 
-Le __journal applicatif__ note ce que fait le programme (démarrage, copie, appels MCP, erreurs), pour le dépannage. À ne pas confondre avec le [journal d'événements](../../journal/journal.cpt), qui trace les modifications des données.
+Le __journal applicatif__ note ce que fait le programme (démarrage, copie, appels MCP, erreurs), pour le dépannage. À ne pas confondre avec le [journal d'événements](../../event-log/event-log.cpt), qui trace les modifications des données.
 
 - `app.log`, dans le dossier des données, tourne à 1 Mo en gardant 5 anciens fichiers.
 - Les messages vont aussi sur la sortie d'erreur ; sous Linux, `journalctl --user -u nexus` les montre.

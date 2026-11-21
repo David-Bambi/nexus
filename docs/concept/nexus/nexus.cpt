@@ -6,7 +6,7 @@ background: nexus.svg
 backgroundOpacity: 0.3
 type: carte
 links: [modele/modele.cpt,
-        journal/journal.cpt,
+        event-log/event-log.cpt,
         interfaces/interfaces.cpt,
         operations/operations.cpt,
         mesure/mesure.cpt,
@@ -22,5 +22,5 @@ Sur le fond de carte :
 - au centre : le [Modèle](modele/modele.cpt), l'arbre de travail et ses règles ;
 - en haut : les [Interfaces](interfaces/interfaces.cpt), qui appellent ces règles ;
 - en bas : l'[Exploitation](operations/operations.cpt), faire tourner le service ;
-- à droite : le [Journal](journal/journal.cpt) de chaque modification, et la [Mesure](mesure/mesure.cpt) qui en tire ses faits ;
+- à droite : le [Journal](event-log/event-log.cpt) de chaque modification, et la [Mesure](mesure/mesure.cpt) qui en tire ses faits ;
 - à gauche : les [Guides](guides/guides.cpt) et les [Outils IA](outils-ia/outils-ia.cpt).

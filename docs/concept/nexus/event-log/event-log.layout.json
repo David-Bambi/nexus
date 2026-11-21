@@ -1,17 +1,17 @@
 {
-  "ajout-seul.cpt": {
+  "append-only.cpt": {
     "x": 83,
     "y": 2
   },
-  "meme-transaction.cpt": {
+  "same-transaction.cpt": {
     "x": 329,
     "y": 4
   },
-  "acteurs.cpt": {
+  "actors.cpt": {
     "x": 208,
     "y": 106
   },
-  "entites-supprimees.cpt": {
+  "deleted-entities.cpt": {
     "x": 84,
     "y": 104
   },
@@ -19,7 +19,7 @@
     "x": 466,
     "y": 33
   },
-  "historique.cpt": {
+  "history.cpt": {
     "x": 204,
     "y": 6
   }

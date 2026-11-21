@@ -18,7 +18,7 @@ Fonctionnalités et tâches avancent dans les mêmes __sept états__, inspirés 
 - __someday__ : reporté, sans date.
 - __cancelled__ : abandonné, travail non fait.
 
-Le schéma montre les __étapes__ permises, chacune inscrite au [journal](../journal/actions/actions-element.cpt). __Changer d'état__ vers un état lointain enchaîne les étapes du plus court chemin : inbox → done écrit `clarified`, `started`, `completed`. Un saut impossible est refusé avant la première étape.
+Le schéma montre les __étapes__ permises, chacune inscrite au [journal](../event-log/actions/item-actions.cpt). __Changer d'état__ vers un état lointain enchaîne les étapes du plus court chemin : inbox → done écrit `clarified`, `started`, `completed`. Un saut impossible est refusé avant la première étape.
 
 Someday s'atteint en __reportant__, jamais par saut ; on en sort en __raffinant__ (`clarified`).
 

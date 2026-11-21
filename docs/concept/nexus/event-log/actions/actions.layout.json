@@ -1,13 +1,13 @@
 {
-  "actions-element.cpt": {
+  "item-actions.cpt": {
     "x": 0,
     "y": 242
   },
-  "actions-projet.cpt": {
+  "project-actions.cpt": {
     "x": 0,
     "y": 121
   },
-  "actions-critere.cpt": {
+  "criterion-actions.cpt": {
     "x": 0,
     "y": 3
   }

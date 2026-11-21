@@ -4,7 +4,7 @@ summary: "Chaque événement d'un élément note la fonctionnalité au-dessus de
 icon: lucide:corner-left-up
 links: []
 related:
-  - ../journal/actions/actions-element.cpt
+  - ../event-log/actions/item-actions.cpt
 ---
 
 Chaque événement d'une fonctionnalité ou d'une tâche porte `parent` : la référence de la fonctionnalité juste au-dessus __à ce moment-là__, ou `null`.

@@ -3,10 +3,10 @@ title: Actions
 summary: "Le vocabulaire des actions enregistrées, une fiche par sorte d'élément"
 icon: lucide:list
 type: liste
-gabarit: actions-element.cpt
-links: [actions-element.cpt,
-        actions-projet.cpt,
-        actions-critere.cpt]
+gabarit: item-actions.cpt
+links: [item-actions.cpt,
+        project-actions.cpt,
+        criterion-actions.cpt]
 related:
   - 
 ---
