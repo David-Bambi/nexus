@@ -3,10 +3,10 @@ title: Exploitation
 summary: "Faire tourner Nexus sur la machine : accès, service, données, sauvegardes, migrations"
 icon: lucide:server
 type: carte
-links: [acces-local.cpt,
+links: [local-access.cpt,
         service/service.cpt,
-        donnees/donnees.cpt,
-        sauvegardes/sauvegardes.cpt,
+        data/data.cpt,
+        backups/backups.cpt,
         migrations/migrations.cpt]
 related:
   - 
@@ -14,8 +14,8 @@ related:
 
 Nexus tourne seul sur la machine, comme un service local, sans administrateur.
 
-- [Accès local seulement](acces-local.cpt) : `127.0.0.1`, et pourquoi.
+- [Accès local seulement](local-access.cpt) : `127.0.0.1`, et pourquoi.
 - [Service](service/service.cpt) : démarrage automatique, étapes du démarrage, déploiement.
-- [Données](donnees/donnees.cpt) : le dossier, la configuration, le journal applicatif.
-- [Sauvegardes](sauvegardes/sauvegardes.cpt) : copie, restauration, export.
+- [Données](data/data.cpt) : le dossier, la configuration, le journal applicatif.
+- [Sauvegardes](backups/backups.cpt) : copie, restauration, export.
 - [Migrations](migrations/migrations.cpt) : l'évolution du schéma.

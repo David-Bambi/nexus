@@ -1,0 +1,17 @@
+---
+title: Sauvegardes
+summary: "Se protéger d'une mauvaise mise à jour : copie au démarrage, restauration, export complet"
+icon: lucide:save
+type: carte
+links: [startup-copy.cpt,
+        restore.cpt,
+        full-export.cpt]
+related:
+  - 
+---
+
+Trois façons de garder ses données, surtout contre une mauvaise mise à jour.
+
+- [Copie au démarrage](startup-copy.cpt) : automatique, avant les migrations.
+- [Restaurer une copie](restore.cpt) : la remettre en place.
+- [Export complet](full-export.cpt) : toute la base en JSON, à la demande.

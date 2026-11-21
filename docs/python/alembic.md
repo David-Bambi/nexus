@@ -3,7 +3,7 @@
 !!! note "History restarted in 2.0"
     The revision chain below is the 1.x one. Since 2.0 there is a single
     initial revision, `87dc79bc1cbb`
-    (Concept map: `docs/concept/nexus/exploitation/migrations/base-1x-refusee.cpt`).
+    (Concept map: `docs/concept/nexus/operations/migrations/refused-1x-database.cpt`).
 
 Alembic manages the database schema as a sequence of versioned,
 incremental changes — one revision file per change, applied in order.

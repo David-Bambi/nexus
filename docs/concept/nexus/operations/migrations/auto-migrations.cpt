@@ -12,5 +12,5 @@ Construire l'application (`create_app`) applique les __migrations__ en attente, 
 - Les révisions : le schéma initial de la 2.0 (`87dc79bc1cbb`), la version calculée (`b3c1e7a2d904`), le répertoire du projet (`c7d2f4a1e835`) la priorité du projet (`d4e8a2b6f107`, `NORMAL` pour les projets existants) et l'archive des éléments (`e5f9b3c7a218`, rien d'archivé au départ).
 - Le service le fait au démarrage, juste après la copie de sauvegarde.
 - La CLI construit aussi l'application : elle peut migrer la vraie base __avant__ le redéploiement du service, et sans copie (voir [Même base que le service](../../interfaces/cli/meme-base.cpt)).
-- `migrations/env.py` garde l'adresse de base que lui passe l'application, et ne touche pas aux réglages du [journal applicatif](../donnees/journal-applicatif.cpt).
+- `migrations/env.py` garde l'adresse de base que lui passe l'application, et ne touche pas aux réglages du [journal applicatif](../data/app-log.cpt).
 - Les tests ne passent pas par là : ils créent les tables directement, sur une base en mémoire.

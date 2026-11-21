@@ -18,4 +18,4 @@ L'import fait entrer tout un découpage d'un coup : projets, sous-projets, fonct
 - [Projets existants et doublons](correspondance.cpt) : ce qui est repris, ce qui est créé.
 - [Import de texte](import-texte.cpt) : une ligne, une capture.
 
-L'[export complet](../../exploitation/sauvegardes/export-complet.cpt) n'est pas un format d'import.
+L'[export complet](../../operations/backups/full-export.cpt) n'est pas un format d'import.

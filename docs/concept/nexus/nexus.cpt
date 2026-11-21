@@ -8,7 +8,7 @@ type: carte
 links: [modele/modele.cpt,
         journal/journal.cpt,
         interfaces/interfaces.cpt,
-        exploitation/exploitation.cpt,
+        operations/operations.cpt,
         mesure/mesure.cpt,
         guides/guides.cpt,
         outils-ia/outils-ia.cpt]
@@ -21,6 +21,6 @@ Nexus est un gestionnaire de projets __inspiré de GTD__, pour un seul utilisate
 Sur le fond de carte :
 - au centre : le [Modèle](modele/modele.cpt), l'arbre de travail et ses règles ;
 - en haut : les [Interfaces](interfaces/interfaces.cpt), qui appellent ces règles ;
-- en bas : l'[Exploitation](exploitation/exploitation.cpt), faire tourner le service ;
+- en bas : l'[Exploitation](operations/operations.cpt), faire tourner le service ;
 - à droite : le [Journal](journal/journal.cpt) de chaque modification, et la [Mesure](mesure/mesure.cpt) qui en tire ses faits ;
 - à gauche : les [Guides](guides/guides.cpt) et les [Outils IA](outils-ia/outils-ia.cpt).

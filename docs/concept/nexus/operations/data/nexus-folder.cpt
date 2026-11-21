@@ -10,11 +10,11 @@ related:
 Tout ce que Nexus écrit va dans un seul dossier, `~/.nexus` (ou celui de `NEXUS_HOME`) :
 
 - `data.db` : la base SQLite, en mode __WAL__ (les écritures passent d'abord par un fichier à part, ce qui laisse lire et écrire en même temps) ; `data.db-wal` et `data.db-shm` l'accompagnent ;
-- `app.log` : le [journal applicatif](journal-applicatif.cpt), et ses anciens fichiers ;
-- `backups/` : les [copies du démarrage](../sauvegardes/copie-au-demarrage.cpt).
+- `app.log` : le [journal applicatif](app-log.cpt), et ses anciens fichiers ;
+- `backups/` : les [copies du démarrage](../backups/startup-copy.cpt).
 
 Le dossier, et celui de la base, sont créés au besoin au premier lancement.
 
 Pourquoi SQLite : un seul fichier, simple à sauvegarder et à déplacer, sans serveur de base de données à faire tourner.
 
-Une ancienne base de développement (`instance/nexus.db`) se reprend en la copiant à la place de `data.db`, service arrêté ; une base 1.x sera [refusée](../migrations/base-1x-refusee.cpt).
+Une ancienne base de développement (`instance/nexus.db`) se reprend en la copiant à la place de `data.db`, service arrêté ; une base 1.x sera [refusée](../migrations/refused-1x-database.cpt).

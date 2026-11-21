@@ -14,4 +14,4 @@ La CLI appelle __directement__ les services, sur la même base SQLite que le ser
 
 Pourquoi pas d'API HTTP : un outil local à un seul utilisateur n'a pas besoin d'une seconde surface réseau. Une API locale serait à concevoir, à versionner et à garder fermée au réseau ; elle demanderait aussi que le service tourne.
 
-__Conséquence__ : construire l'application applique les migrations en attente. Lancer la CLI peut donc migrer la vraie base __avant__ le redéploiement du service, et sans la copie de sauvegarde du démarrage. De même, elle refuse une [base 1.x](../../exploitation/migrations/base-1x-refusee.cpt).
+__Conséquence__ : construire l'application applique les migrations en attente. Lancer la CLI peut donc migrer la vraie base __avant__ le redéploiement du service, et sans la copie de sauvegarde du démarrage. De même, elle refuse une [base 1.x](../../operations/migrations/refused-1x-database.cpt).

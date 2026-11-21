@@ -22,4 +22,4 @@ Le __journal d'événements__ garde une ligne (table `event`) pour chaque modifi
 - [Actions](actions/actions.cpt) : le vocabulaire, par sorte d'élément.
 - [Lire le journal](historique.cpt) : où on le retrouve.
 
-À ne pas confondre avec le [journal applicatif](../exploitation/donnees/journal-applicatif.cpt) (`app.log`).
+À ne pas confondre avec le [journal applicatif](../operations/data/app-log.cpt) (`app.log`).
