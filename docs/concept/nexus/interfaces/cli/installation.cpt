@@ -10,8 +10,8 @@ related:
 La commande `nexus` s'installe une fois pour être disponible partout, ou se lance sans installation.
 
 ```
-scripts/install_cli.sh install     # commande nexus dans ~/.local/bin
-scripts/install_cli.sh uninstall   # la retirer
+scripts/install-cli.sh install     # commande nexus dans ~/.local/bin
+scripts/install-cli.sh uninstall   # la retirer
 uv run nexus <commande>            # sans installer, après uv sync
 python -m src.cli <commande>       # autre façon
 ```

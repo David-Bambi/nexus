@@ -1,13 +1,13 @@
 ---
 title: Déploiement
-summary: "Comment deployer.sh branche les agents et skills de outils_ai/ dans ~/.claude"
+summary: "Comment deploy.sh branche les agents et skills d'ai-tools/ dans ~/.claude"
 icon: lucide:link
 links: []
 related:
   - 
 ---
 
-`outils_ai/deployer.sh` met les outils globaux en service dans `~/.claude` par des __liens symboliques__ : une modification dans le dépôt compte tout de suite.
+`ai-tools/deploy.sh` met les outils globaux en service dans `~/.claude` par des __liens symboliques__ : une modification dans le dépôt compte tout de suite.
 
 - `skills/<nom>` devient `~/.claude/skills/<nom>` ;
 - `agents/<nom>.md` devient `~/.claude/agents/<nom>.md`.

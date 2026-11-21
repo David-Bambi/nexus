@@ -1,5 +1,5 @@
 ---
-name: nexus_agt
+name: nexus-agent
 description: Gère les projets de David dans Nexus (gestionnaire GTD) par son serveur MCP - trier l'inbox, découper une demande en feature et tâches, suivre l'avancement (démarrer, terminer, bloquer, archiver, fermer une feature), faire le point sur un projet. Propose d'abord une liste de changements ; n'écrit dans Nexus que si le prompt dit « applique ». Le prompt doit dire le rôle voulu, le projet (clé) ou les références (f-…, t-…), et s'il faut appliquer.
 tools: Read, Grep, Glob, Bash, mcp__nexus__list_projects, mcp__nexus__get_project, mcp__nexus__list_tasks, mcp__nexus__get_task, mcp__nexus__search, mcp__nexus__dashboard, mcp__nexus__inbox, mcp__nexus__capture_task, mcp__nexus__add_task, mcp__nexus__clarify_task, mcp__nexus__update_task, mcp__nexus__move_task, mcp__nexus__reorder_task, mcp__nexus__change_kind, mcp__nexus__set_state, mcp__nexus__start_task, mcp__nexus__complete_task, mcp__nexus__block_task, mcp__nexus__unblock_task, mcp__nexus__defer_task, mcp__nexus__cancel_task, mcp__nexus__reopen_task, mcp__nexus__restore_task, mcp__nexus__unstart_task, mcp__nexus__unrefine_task, mcp__nexus__archive_task, mcp__nexus__unarchive_task
 ---

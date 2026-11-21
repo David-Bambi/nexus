@@ -3,7 +3,7 @@
 # `uv run`. The install is editable: it follows this checkout, no reinstall
 # needed after a code change (only after moving the repo).
 #
-# Usage: scripts/install_cli.sh install|uninstall
+# Usage: scripts/install-cli.sh install|uninstall
 set -euo pipefail
 
 cd "$(dirname "$0")/.."

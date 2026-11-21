@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploys the Nexus agents and skills (outils_ai/) into ~/.claude through symbolic links.
+# Deploys the Nexus agents and skills (ai-tools/) into ~/.claude through symbolic links.
 #
 #   skills/<name>/     → ~/.claude/skills/<name>
 #   agents/<name>.md   → ~/.claude/agents/<name>.md
@@ -11,7 +11,7 @@
 # it reports it, and David decides. It only removes dead links that pointed to the
 # repository (skill or agent deleted from the repository).
 #
-# Usage: outils_ai/deployer.sh [--essai]
+# Usage: ai-tools/deploy.sh [--essai]
 #   --essai   shows what would be done, without changing anything.
 # CLAUDE_DIR replaces ~/.claude (useful to test the script).
 

@@ -74,10 +74,10 @@ time out even though the service is up.
 
 ## Command line
 
-`scripts/install_cli.sh install` puts an editable `nexus` command in
+`scripts/install-cli.sh install` puts an editable `nexus` command in
 `~/.local/bin` (uv's tool bin dir), so it runs from any directory without
 `uv run`. It follows the checkout: reinstall only after moving the repo.
-`scripts/install_cli.sh uninstall` removes it. Without the install,
+`scripts/install-cli.sh uninstall` removes it. Without the install,
 `uv sync` and `uv run nexus ...` work the same. The CLI uses the same database
 as the service (`NEXUS_HOME` / `NEXUS_DATABASE_URL` apply). Root projects
 are named by key; subprojects, features and tasks have short refs (`s-…`,

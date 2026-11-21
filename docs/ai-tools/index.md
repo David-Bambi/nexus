@@ -25,12 +25,12 @@ Instructions that load automatically into context, scoped by directory:
 - `revision` — corrects an error or outdated statement in an artifact
   under `artifacts/` (spec, plan).
 
-## Global tools shipped by Nexus (`outils_ai/`)
+## Global tools shipped by Nexus (`ai-tools/`)
 
 Tools meant for all of David's projects, deployed into `~/.claude`
 (same layout as the Concept project).
 
-- `agents/nexus_agt.md` — French project-management agent working through
+- `agents/nexus-agent.md` — French project-management agent working through
   the Nexus MCP server. Triages the inbox, splits a request into a feature
   and sized tasks, tracks progress (states, closing a feature, proposing
   archiving) and reports status (version, remaining criteria, DOING/WAITING,
@@ -38,7 +38,7 @@ Tools meant for all of David's projects, deployed into `~/.claude`
   deletion, import and major releases stay with David. It proposes a list of
   changes and writes only when the prompt says « applique », so it can be
   used anywhere without surprise writes.
-- `deployer.sh [--essai]` — symlinks `skills/<name>` to
+- `deploy.sh [--essai]` — symlinks `skills/<name>` to
   `~/.claude/skills/<name>` and `agents/<name>.md` to
   `~/.claude/agents/<name>.md`. Never replaces anything that is not a link
   to the repository; removes dead links to it. `--essai` is a dry run;

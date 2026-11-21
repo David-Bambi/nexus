@@ -78,10 +78,10 @@ même si le service tourne.
 
 ## Ligne de commande
 
-`scripts/install_cli.sh install` installe une commande `nexus` éditable dans
+`scripts/install-cli.sh install` installe une commande `nexus` éditable dans
 `~/.local/bin` (le dossier des outils de uv) : elle marche depuis n'importe
 quel dossier, sans `uv run`. Elle suit la copie de travail : réinstalle-la
-seulement si tu déplaces le dépôt. `scripts/install_cli.sh uninstall` la
+seulement si tu déplaces le dépôt. `scripts/install-cli.sh uninstall` la
 retire. Sans installation, `uv sync` puis `uv run nexus ...` marchent pareil.
 La CLI utilise la même base que le service (`NEXUS_HOME` et
 `NEXUS_DATABASE_URL` s'appliquent). Les projets racines se nomment par leur
