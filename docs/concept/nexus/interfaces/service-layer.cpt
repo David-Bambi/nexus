@@ -11,7 +11,7 @@ Toutes les règles du métier vivent dans `src/services/` : des fonctions Python
 
 - `services/` n'importe ni Flask, ni la requête, ni les gabarits.
 - Le web, la CLI et le MCP ne font qu'__adapter__ : lire l'entrée, appeler un service, afficher le résultat.
-- Ni sous-processus : `src/git_history.py` lit git à part, pour tester la [part de l'IA](../mesure/part-ia.cpt) sans git.
+- Ni sous-processus : `src/git_history.py` lit git à part, pour tester la [part de l'IA](../measurement/ai-share.cpt) sans git.
 - Deux sortes de modules : les commandes par élément (`tasks`, `projects`, `versioning`) et les lectures en forme de page (`views` : inbox, recherche, tableau de bord…).
 
 Pourquoi : un assistant ne peut pas contourner une règle que le navigateur respecte. Et aucune interface ne recopie la logique, donc les règles ne divergent pas.

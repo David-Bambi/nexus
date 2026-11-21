@@ -13,6 +13,6 @@ Pourquoi :
 - c'est presque gratuit à écrire au moment où la modification a lieu, et impossible à reconstituer après coup ;
 - il donne l'__historique__ de chaque élément ;
 - il dit ce qu'un __assistant__ a modifié, grâce à l'[acteur](actors.cpt) noté sur chaque ligne ;
-- il fournit les faits de la [mesure](../mesure/mesure.cpt).
+- il fournit les faits de la [mesure](../measurement/measurement.cpt).
 
 Même la suppression d'un élément ajoute une ligne (`deleted`) au lieu d'effacer son passé (voir [Historique des éléments supprimés](deleted-entities.cpt)).

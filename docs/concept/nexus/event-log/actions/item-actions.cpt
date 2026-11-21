@@ -9,7 +9,7 @@ related:
 
 __Actions__ (sur `task`, pour une fonctionnalité comme pour une tâche)
 - Création et rangement : `created`, `clarified`, `moved`, `reordered`, `kind_changed`, `deleted`.
-- Modification : `updated`, ou `corrected` pour une [correction](../../mesure/correction.cpt).
+- Modification : `updated`, ou `corrected` pour une [correction](../../measurement/correction.cpt).
 - État et archive : `started`, `unstarted`, `unrefined`, `blocked`, `unblocked`, `completed`, `reopened`, `deferred`, `cancelled`, `restored`, `archived`, `unarchived`.
 
 __Contenu__

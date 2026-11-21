@@ -15,7 +15,7 @@ nexus export features [-o FICHIER]
 ```
 
 __Résultat__
-- Écrit l'[export nexus.features/1](../../../mesure/export-fonctionnalites.cpt), lu par metrique, en JSON sur la sortie standard.
+- Écrit l'[export nexus.features/1](../../../measurement/feature-export.cpt), lu par metrique, en JSON sur la sortie standard.
 - Avec `-o`, écrit le fichier et affiche une ligne de résumé (nombre de fonctionnalités, schéma).
 - Même contenu que l'adresse `/export/features.json`. La commande ne modifie rien.
 - La CLI est un des deux accès à cet export : metrique le lit hors ligne, sans dépendre du service.

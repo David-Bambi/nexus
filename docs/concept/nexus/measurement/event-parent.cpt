@@ -11,4 +11,4 @@ Chaque événement d'une fonctionnalité ou d'une tâche porte `parent` : la ré
 
 Le service l'ajoute de lui-même à chaque écriture au journal ; aucune interface n'a à y penser.
 
-Pourquoi : quand un enfant change de fonctionnalité, ce qui lui est arrivé avant reste attribué à l'ancienne, et ce qui suit à la nouvelle. La dérive reste ainsi attribuable après un déplacement. L'[export](evenements-exportes.cpt) s'en sert pour savoir quels événements rattacher à chaque fonctionnalité.
+Pourquoi : quand un enfant change de fonctionnalité, ce qui lui est arrivé avant reste attribué à l'ancienne, et ce qui suit à la nouvelle. La dérive reste ainsi attribuable après un déplacement. L'[export](exported-events.cpt) s'en sert pour savoir quels événements rattacher à chaque fonctionnalité.

@@ -16,7 +16,7 @@ __Arguments__
 
 __Règles__
 - Un `body`, `context` ou `size` vide efface la valeur ; un titre vide est refusé.
-- `correction: true` écrit `corrected` au lieu de `updated` au journal (voir [Correction](../../../mesure/correction.cpt)).
+- `correction: true` écrit `corrected` au lieu de `updated` au journal (voir [Correction](../../../measurement/correction.cpt)).
 - Écriture, idempotent (refaire le même appel ne change rien de plus), non destructif.
 
 __Résultat__ : l'élément modifié, avec tous ses champs.

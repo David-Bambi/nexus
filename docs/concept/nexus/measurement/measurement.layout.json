@@ -1,13 +1,13 @@
 {
-  "export-fonctionnalites.cpt": {
+  "feature-export.cpt": {
     "x": -117,
     "y": -19
   },
-  "evenements-exportes.cpt": {
+  "exported-events.cpt": {
     "x": 132,
     "y": 83
   },
-  "repertoire.cpt": {
+  "project-directory.cpt": {
     "x": -1,
     "y": 93
   },
@@ -15,11 +15,11 @@
     "x": -131,
     "y": 92
   },
-  "plan-fige.cpt": {
+  "frozen-plan.cpt": {
     "x": 136,
     "y": -8
   },
-  "parent-des-evenements.cpt": {
+  "event-parent.cpt": {
     "x": 3,
     "y": -17
   }

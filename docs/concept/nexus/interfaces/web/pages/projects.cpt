@@ -17,4 +17,4 @@ __Ce qu'on y voit__
 
 __Ce qu'on y fait__
 - Ouvrir un projet.
-- Créer un projet : clé, nom, description et [répertoire](../../../mesure/repertoire.cpt) facultatif. Une clé déjà prise ou [réservée](../../../modele/references.cpt) est refusée.
+- Créer un projet : clé, nom, description et [répertoire](../../../measurement/project-directory.cpt) facultatif. Une clé déjà prise ou [réservée](../../../modele/references.cpt) est refusée.

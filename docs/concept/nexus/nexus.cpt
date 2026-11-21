@@ -9,7 +9,7 @@ links: [modele/modele.cpt,
         event-log/event-log.cpt,
         interfaces/interfaces.cpt,
         operations/operations.cpt,
-        mesure/mesure.cpt,
+        measurement/measurement.cpt,
         guides/guides.cpt,
         outils-ia/outils-ia.cpt]
 related:
@@ -22,5 +22,5 @@ Sur le fond de carte :
 - au centre : le [Modèle](modele/modele.cpt), l'arbre de travail et ses règles ;
 - en haut : les [Interfaces](interfaces/interfaces.cpt), qui appellent ces règles ;
 - en bas : l'[Exploitation](operations/operations.cpt), faire tourner le service ;
-- à droite : le [Journal](event-log/event-log.cpt) de chaque modification, et la [Mesure](mesure/mesure.cpt) qui en tire ses faits ;
+- à droite : le [Journal](event-log/event-log.cpt) de chaque modification, et la [Mesure](measurement/measurement.cpt) qui en tire ses faits ;
 - à gauche : les [Guides](guides/guides.cpt) et les [Outils IA](outils-ia/outils-ia.cpt).

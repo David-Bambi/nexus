@@ -12,7 +12,7 @@ __Rôle__ : crée un projet racine, ou un sous-projet quand `parent` est donné.
 
 __Arguments__
 - Obligatoires : `key` (courte, unique, définitive), `name`.
-- Facultatifs : `description`, `parent` (clé d'un projet racine), `directory` (chemin absolu, `~` développé ; voir [Répertoire du projet](../../../mesure/repertoire.cpt)).
+- Facultatifs : `description`, `parent` (clé d'un projet racine), `directory` (chemin absolu, `~` développé ; voir [Répertoire du projet](../../../measurement/project-directory.cpt)).
 
 __Règles__
 - Refusé si la clé est prise ou [réservée](../../../modele/references.cpt), si le parent est lui-même un sous-projet, ou si le chemin est relatif.

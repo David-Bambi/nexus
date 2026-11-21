@@ -13,6 +13,6 @@ Le journal se lit à plusieurs endroits.
 - __Page d'un élément__ : la section __History__, dessinée en frise ; les valeurs vides sont cachées.
 - __Outil MCP__ [get_task](../interfaces/mcp/tools/get-task.cpt) : les champs de l'élément et son historique.
 - __Export complet__ (`/export.json`) : toute la table des événements.
-- __Export des fonctionnalités__ : pour chaque fonctionnalité, les événements qui la concernent (voir [Mesure](../mesure/mesure.cpt)).
+- __Export des fonctionnalités__ : pour chaque fonctionnalité, les événements qui la concernent (voir [Mesure](../measurement/measurement.cpt)).
 
 La CLI ne montre pas le journal.

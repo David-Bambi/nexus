@@ -14,4 +14,4 @@ __Ce qu'on y voit__ : pas d'écran à proprement parler.
 - `/export.json` télécharge toute la base en JSON ; c'est le lien __Export__ de la barre de navigation.
 - `/export/features.json` affiche dans le navigateur l'export des fonctionnalités lu par metrique.
 
-__Ce qu'on y fait__ : prendre une [copie complète](../../../operations/backups/full-export.cpt) à tout moment, ou vérifier ce que lit metrique (voir [Export nexus.features/1](../../../mesure/export-fonctionnalites.cpt)).
+__Ce qu'on y fait__ : prendre une [copie complète](../../../operations/backups/full-export.cpt) à tout moment, ou vérifier ce que lit metrique (voir [Export nexus.features/1](../../../measurement/feature-export.cpt)).

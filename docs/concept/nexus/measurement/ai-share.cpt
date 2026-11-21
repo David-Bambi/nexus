@@ -12,7 +12,7 @@ La __part de l'IA__ dit quelle part des lignes ajoutées dans le dépôt git d'u
 
 - Chaque fichier est rangé en __code__, __tests__ (sous `tests/`, nommé `test_*`) ou __docs__ (sous `docs/`, `.md`, `.cpt`) ; les fichiers générés (`*.lock`, `*.layout.json`) ne comptent pas.
 - Un commit co-signé « Co-Authored-By: Claude » compte __en entier__ pour l'IA.
-- Il faut un [répertoire](repertoire.cpt) propre au projet : un sous-projet qui hérite de celui de sa racine n'affiche rien, pour ne pas répéter ses chiffres.
+- Il faut un [répertoire](project-directory.cpt) propre au projet : un sous-projet qui hérite de celui de sa racine n'affiche rien, pour ne pas répéter ses chiffres.
 
 Pourquoi git : rien à saisir. L'ancienne saisie par tâche (modes IA, profil IA) pesait trop. C'est un fait affiché, pas une mesure pour metrique.
 

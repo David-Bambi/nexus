@@ -7,7 +7,7 @@ related:
   - 
 ---
 
-Un projet peut noter le __dossier__ de la machine où vit son travail (`directory`). Il sert à relier les sessions Claude Code au projet : metrique les rattache par leur dossier de travail. Nexus y lit aussi l'historique git pour la [part de l'IA](part-ia.cpt).
+Un projet peut noter le __dossier__ de la machine où vit son travail (`directory`). Il sert à relier les sessions Claude Code au projet : metrique les rattache par leur dossier de travail. Nexus y lit aussi l'historique git pour la [part de l'IA](ai-share.cpt).
 
 - Facultatif. Un chemin __absolu__ ; `~` est développé, le `/` final retiré.
 - Un chemin relatif est refusé. Le dossier peut ne pas exister.
