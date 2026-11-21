@@ -1,13 +1,13 @@
 {
-  "pile.cpt": {
+  "tech-stack.cpt": {
     "x": 17,
     "y": 11
   },
-  "styles-et-script.cpt": {
+  "styles-and-script.cpt": {
     "x": 176,
     "y": 126
   },
-  "composants.cpt": {
+  "components.cpt": {
     "x": 13,
     "y": 121
   },

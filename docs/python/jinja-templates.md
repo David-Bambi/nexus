@@ -107,7 +107,7 @@ by `task.html`. Use
 `{% with state_action=... %}` to set the variables the partial expects.
 Reusable pieces that take arguments are macros in `_components.html`
 instead, imported with `{% import "_components.html" as ui %}` (see the Concept map card
-`docs/concept/nexus/interfaces/web/composants.cpt`).
+`docs/concept/nexus/interfaces/web/components.cpt`).
 
 ## `url_for()`
 

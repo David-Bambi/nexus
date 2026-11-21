@@ -3,10 +3,10 @@ title: Application web
 summary: "Les pages servies par Flask : ce qu'on y voit et comment elles sont faites"
 icon: lucide:globe
 type: carte
-links: [pile.cpt,
-        styles-et-script.cpt,
-        couleurs-d-etat.cpt,
-        composants.cpt,
+links: [tech-stack.cpt,
+        styles-and-script.cpt,
+        state-colors.cpt,
+        components.cpt,
         navigation.cpt,
         pages/pages.cpt]
 related:
@@ -15,9 +15,9 @@ related:
 
 L'application web sert des __pages complètes__, avec des formulaires HTML classiques et presque pas de JavaScript. C'est la porte la plus complète : ce que la CLI et le MCP ne font pas (supprimer, archiver) se fait ici.
 
-- [Pile technique](pile.cpt) : Flask, Jinja, SQLAlchemy, SQLite.
-- [Styles et script](styles-et-script.cpt) : une feuille, un script, rien en ligne.
-- [Couleurs d'état](couleurs-d-etat.cpt) : une couleur par état.
-- [Composants](composants.cpt) : les macros partagées.
+- [Pile technique](tech-stack.cpt) : Flask, Jinja, SQLAlchemy, SQLite.
+- [Styles et script](styles-and-script.cpt) : une feuille, un script, rien en ligne.
+- [Couleurs d'état](state-colors.cpt) : une couleur par état.
+- [Composants](components.cpt) : les macros partagées.
 - [En-tête et navigation](navigation.cpt) : sections, capture, retour.
 - [Pages](pages/pages.cpt) : une fiche par écran.
