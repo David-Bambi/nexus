@@ -38,10 +38,10 @@ Tools meant for all of David's projects, deployed into `~/.claude`
   deletion, import and major releases stay with David. It proposes a list of
   changes and writes only when the prompt says « applique », so it can be
   used anywhere without surprise writes.
-- `deploy.sh [--essai]` — symlinks `skills/<name>` to
+- `deploy.sh [--dry-run]` — symlinks `skills/<name>` to
   `~/.claude/skills/<name>` and `agents/<name>.md` to
   `~/.claude/agents/<name>.md`. Never replaces anything that is not a link
-  to the repository; removes dead links to it. `--essai` is a dry run;
+  to the repository; removes dead links to it. `--dry-run` is a dry run;
   `CLAUDE_DIR` overrides `~/.claude` for testing. Rerun only for a new or
   removed agent/skill; an agent loads when a Claude Code session starts.
 

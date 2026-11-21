@@ -190,15 +190,15 @@ def test_import_tree_builds_subprojects_features_and_tasks(session):
     """
     result = _apply(session, TREE)
     assert (result.projects_created, result.tasks_created) == (2, 5)
-    bilan = projects.get(session, "bilan")
-    assert bilan.parent.key == "metrique" and bilan.ref.startswith("s-")
+    report = projects.get(session, "bilan")
+    assert report.parent.key == "metrique" and report.ref.startswith("s-")
     by_title = {t.title: t for t in tasks.list(session)}
     assert by_title["Top task"].project.key == "metrique" and by_title["Top task"].parent is None
     collect, sessions = by_title["Collect"], by_title["Sessions"]
-    assert collect.kind is TaskKind.FEATURE and collect.project is bilan and collect.parent is None
+    assert collect.kind is TaskKind.FEATURE and collect.project is report and collect.parent is None
     assert by_title["Read Nexus"].parent is collect and by_title["Read Nexus"].context == "@ordi"
     assert sessions.parent is collect and by_title["Parse JSONL"].parent is sessions
-    assert by_title["Parse JSONL"].project is bilan
+    assert by_title["Parse JSONL"].project is report
     assert {t.state for t in by_title.values()} == {TaskState.REFINED}
     assert [kind for kind, _, _ in result.created].count("feature") == 2
 

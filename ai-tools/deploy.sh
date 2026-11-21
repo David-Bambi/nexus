@@ -11,27 +11,27 @@
 # it reports it, and David decides. It only removes dead links that pointed to the
 # repository (skill or agent deleted from the repository).
 #
-# Usage: ai-tools/deploy.sh [--essai]
-#   --essai   shows what would be done, without changing anything.
+# Usage: ai-tools/deploy.sh [--dry-run]
+#   --dry-run   shows what would be done, without changing anything.
 # CLAUDE_DIR replaces ~/.claude (useful to test the script).
 
 set -euo pipefail
 
-depot="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 claude_dir="${CLAUDE_DIR:-$HOME/.claude}"
-essai=false
+dry_run=false
 
 case "${1:-}" in
 	"") ;;
-	--essai) essai=true ;;
-	*) echo "Usage : $0 [--essai]" >&2; exit 2 ;;
+	--dry-run) dry_run=true ;;
+	*) echo "Usage : $0 [--dry-run]" >&2; exit 2 ;;
 esac
 
-problemes=0
+problems=0
 
 # Runs the command, or only prints it in dry-run mode.
-faire() {
-	if $essai; then
+run() {
+	if $dry_run; then
 		echo "  (essai) $*"
 	else
 		"$@"
@@ -39,61 +39,61 @@ faire() {
 }
 
 # Creates the link $2 → $1, unless $2 already exists and is not a link to the repository.
-lier() {
-	local source="$1" cible="$2"
-	if [[ -L "$cible" ]]; then
-		local actuel
-		actuel="$(readlink "$cible")"
-		if [[ "$actuel" == "$source" ]]; then
-			echo "ok      $cible"
+link() {
+	local source="$1" target="$2"
+	if [[ -L "$target" ]]; then
+		local current
+		current="$(readlink "$target")"
+		if [[ "$current" == "$source" ]]; then
+			echo "ok      $target"
 			return
 		fi
-		if [[ "$actuel" == "$depot"/* ]]; then
-			echo "relié   $cible (pointait vers $actuel)"
-			faire ln -sfn "$source" "$cible"
+		if [[ "$current" == "$repo"/* ]]; then
+			echo "relié   $target (pointait vers $current)"
+			run ln -sfn "$source" "$target"
 			return
 		fi
-		echo "IGNORÉ  $cible : lien vers $actuel, hors du dépôt" >&2
-		problemes=$((problemes + 1))
-	elif [[ -e "$cible" ]]; then
-		echo "IGNORÉ  $cible : existe déjà et n'est pas un lien (à déplacer dans le dépôt ?)" >&2
-		problemes=$((problemes + 1))
+		echo "IGNORÉ  $target : lien vers $current, hors du dépôt" >&2
+		problems=$((problems + 1))
+	elif [[ -e "$target" ]]; then
+		echo "IGNORÉ  $target : existe déjà et n'est pas un lien (à déplacer dans le dépôt ?)" >&2
+		problems=$((problems + 1))
 	else
-		echo "nouveau $cible"
-		faire ln -s "$source" "$cible"
+		echo "nouveau $target"
+		run ln -s "$source" "$target"
 	fi
 }
 
 # Removes from $1 the dead links that pointed to the repository.
-nettoyer() {
-	local dossier="$1" lien actuel
-	for lien in "$dossier"/*; do
-		[[ -L "$lien" && ! -e "$lien" ]] || continue
-		actuel="$(readlink "$lien")"
-		[[ "$actuel" == "$depot"/* ]] || continue
-		echo "retiré  $lien (n'existe plus dans le dépôt)"
-		faire rm "$lien"
+prune() {
+	local dir="$1" link_path current
+	for link_path in "$dir"/*; do
+		[[ -L "$link_path" && ! -e "$link_path" ]] || continue
+		current="$(readlink "$link_path")"
+		[[ "$current" == "$repo"/* ]] || continue
+		echo "retiré  $link_path (n'existe plus dans le dépôt)"
+		run rm "$link_path"
 	done
 }
 
-faire mkdir -p "$claude_dir/skills" "$claude_dir/agents"
+run mkdir -p "$claude_dir/skills" "$claude_dir/agents"
 
 shopt -s nullglob
 
 echo "Skills"
-for skill in "$depot"/skills/*/; do
+for skill in "$repo"/skills/*/; do
 	skill="${skill%/}"
-	lier "$skill" "$claude_dir/skills/$(basename "$skill")"
+	link "$skill" "$claude_dir/skills/$(basename "$skill")"
 done
-[[ -d "$claude_dir/skills" ]] && nettoyer "$claude_dir/skills"
+[[ -d "$claude_dir/skills" ]] && prune "$claude_dir/skills"
 
 echo "Agents"
-for agent in "$depot"/agents/*.md; do
-	lier "$agent" "$claude_dir/agents/$(basename "$agent")"
+for agent in "$repo"/agents/*.md; do
+	link "$agent" "$claude_dir/agents/$(basename "$agent")"
 done
-[[ -d "$claude_dir/agents" ]] && nettoyer "$claude_dir/agents"
+[[ -d "$claude_dir/agents" ]] && prune "$claude_dir/agents"
 
-if ((problemes > 0)); then
-	echo "$problemes élément(s) ignoré(s), voir ci-dessus." >&2
+if ((problems > 0)); then
+	echo "$problems élément(s) ignoré(s), voir ci-dessus." >&2
 	exit 1
 fi

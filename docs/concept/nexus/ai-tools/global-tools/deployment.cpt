@@ -14,7 +14,7 @@ related:
 
 Il ne remplace jamais ce qui n'est pas un lien vers le dépôt : il le signale. Il retire les liens morts qui pointaient vers le dépôt.
 
-- `--essai` montre ce qui serait fait, sans rien changer ;
+- `--dry-run` montre ce qui serait fait, sans rien changer ;
 - `CLAUDE_DIR` remplace `~/.claude`, pour tester.
 
 On ne le relance que pour un nouvel agent ou skill. Un agent se charge au démarrage d'une session Claude Code.
