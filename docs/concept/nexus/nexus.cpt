@@ -11,7 +11,7 @@ links: [model/model.cpt,
         operations/operations.cpt,
         measurement/measurement.cpt,
         guides/guides.cpt,
-        outils-ia/outils-ia.cpt]
+        ai-tools/ai-tools.cpt]
 related:
   - 
 ---
@@ -23,4 +23,4 @@ Sur le fond de carte :
 - en haut : les [Interfaces](interfaces/interfaces.cpt), qui appellent ces règles ;
 - en bas : l'[Exploitation](operations/operations.cpt), faire tourner le service ;
 - à droite : le [Journal](event-log/event-log.cpt) de chaque modification, et la [Mesure](measurement/measurement.cpt) qui en tire ses faits ;
-- à gauche : les [Guides](guides/guides.cpt) et les [Outils IA](outils-ia/outils-ia.cpt).
+- à gauche : les [Guides](guides/guides.cpt) et les [Outils IA](ai-tools/ai-tools.cpt).

@@ -2,7 +2,7 @@
 
 How Claude Code is set up to work on this repository. The full
 description, in French, is in the Concept map
-(`docs/concept/nexus/outils-ia/`).
+(`docs/concept/nexus/ai-tools/`).
 
 ## CLAUDE.md files
 
