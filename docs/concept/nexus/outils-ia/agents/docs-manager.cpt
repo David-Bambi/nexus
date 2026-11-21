@@ -7,12 +7,12 @@ related:
   - 
 ---
 
-__Rôle__ : tient la documentation de `docs/`. La carte Concept (`docs/concept/nexus/`), en français, avec les skills globaux `ecrire-fiche`, `dessiner-schema` et `verifier-fiches`. Le site MkDocs (`python/`, `ai-tools/`, la référence générée), en anglais. Une décision vit dans la fiche de sa partie, avec sa raison ; quand elle change, il réécrit la fiche, git garde l'historique.
+__Rôle__ : tient la documentation de `docs/`. La carte Concept (`docs/concept/nexus/`), en français, avec les skills globaux `concept-write-card`, `concept-draw-diagram` et `concept-check-cards`. Le site MkDocs (`python/`, `ai-tools/`, la référence générée), en anglais. Une décision vit dans la fiche de sa partie, avec sa raison ; quand elle change, il réécrit la fiche, git garde l'historique.
 
 __Quand l'appeler__
 - Avant un changement : pour le contexte d'une décision passée.
 - Après une tâche : pour que `docs/` reste juste.
-- Pour vérifier les fiches (`verifier.py`) et le site (`mkdocs build --strict`).
+- Pour vérifier les fiches (`check_cards.py`) et le site (`mkdocs build --strict`).
 
 __Ce qu'il ne fait pas__
 - Toucher à `artifacts/`, qui ne fait pas foi.
