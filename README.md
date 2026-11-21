@@ -201,6 +201,10 @@ of lines added in commits co-signed by Claude.
 | Graphic assets | 🤖 AI-generated | Stylesheet, page layout, diagrams and screenshots |
 | Tools | 🤖 AI-generated | Service, CLI and deploy scripts |
 
+Claude's role in this project is **Autonomous**: it designs and implements on its
+own, end to end, then reports what it did and decided. It still asks before any
+destructive or outward-facing action (push, deletion, publication).
+
 ## Documentation
 
 `docs/` is the source of truth. The project documentation (model, event

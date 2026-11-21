@@ -210,6 +210,11 @@ part des lignes ajoutées dans des commits co-signés par Claude.
 | Assets graphiques | 🤖 Fait par l'IA | Feuille de style, mise en page, schémas et captures |
 | Outils | 🤖 Fait par l'IA | Scripts de service, de CLI et de déploiement |
 
+Le rôle de Claude dans ce projet est **Autonome** : il conçoit et implémente seul,
+de bout en bout, puis rend compte de ce qu'il a fait et décidé. Il demande quand
+même l'accord avant une action destructive ou visible de l'extérieur (push,
+suppression, publication).
+
 ## Documentation
 
 `docs/` est la source de vérité. La documentation du projet (modèle, journal

@@ -1,0 +1,26 @@
+{
+  "export-fonctionnalites.cpt": {
+    "x": -117,
+    "y": -19
+  },
+  "evenements-exportes.cpt": {
+    "x": 132,
+    "y": 83
+  },
+  "repertoire.cpt": {
+    "x": -1,
+    "y": 93
+  },
+  "correction.cpt": {
+    "x": -131,
+    "y": 92
+  },
+  "plan-fige.cpt": {
+    "x": 136,
+    "y": -8
+  },
+  "parent-des-evenements.cpt": {
+    "x": 3,
+    "y": -17
+  }
+}
