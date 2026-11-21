@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
-# Déploie les agents et skills de Nexus (outils_ai/) dans ~/.claude par liens symboliques.
+# Deploys the Nexus agents and skills (outils_ai/) into ~/.claude through symbolic links.
 #
-#   skills/<nom>/      → ~/.claude/skills/<nom>
-#   agents/<nom>.md    → ~/.claude/agents/<nom>.md
+#   skills/<name>/     → ~/.claude/skills/<name>
+#   agents/<name>.md   → ~/.claude/agents/<name>.md
 #
-# Une modification dans le dépôt est prise en compte tout de suite : on ne relance ce
-# script que pour un nouveau skill ou agent, ou après en avoir retiré un.
+# A change in the repository takes effect at once: the script only needs to be run again
+# for a new skill or agent, or after removing one.
 #
-# Le script ne remplace jamais un dossier ou un fichier qui n'est pas un lien vers le
-# dépôt : il le signale, et c'est à David de décider. Il retire seulement les liens
-# morts qui pointaient vers le dépôt (skill ou agent supprimé du dépôt).
+# The script never replaces a folder or a file that is not a link to the repository:
+# it reports it, and David decides. It only removes dead links that pointed to the
+# repository (skill or agent deleted from the repository).
 #
-# Usage : outils_ai/deployer.sh [--essai]
-#   --essai   affiche ce qui serait fait, sans rien changer.
-# CLAUDE_DIR remplace ~/.claude (utile pour tester le script).
+# Usage: outils_ai/deployer.sh [--essai]
+#   --essai   shows what would be done, without changing anything.
+# CLAUDE_DIR replaces ~/.claude (useful to test the script).
 
 set -euo pipefail
 
@@ -29,7 +29,7 @@ esac
 
 problemes=0
 
-# Exécute la commande, ou l'affiche seulement en mode essai.
+# Runs the command, or only prints it in dry-run mode.
 faire() {
 	if $essai; then
 		echo "  (essai) $*"
@@ -38,7 +38,7 @@ faire() {
 	fi
 }
 
-# Crée le lien $2 → $1, sauf si $2 existe déjà et n'est pas un lien vers le dépôt.
+# Creates the link $2 → $1, unless $2 already exists and is not a link to the repository.
 lier() {
 	local source="$1" cible="$2"
 	if [[ -L "$cible" ]]; then
@@ -64,7 +64,7 @@ lier() {
 	fi
 }
 
-# Retire de $1 les liens morts qui pointaient vers le dépôt.
+# Removes from $1 the dead links that pointed to the repository.
 nettoyer() {
 	local dossier="$1" lien actuel
 	for lien in "$dossier"/*; do
