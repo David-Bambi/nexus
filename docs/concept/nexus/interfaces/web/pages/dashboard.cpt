@@ -2,7 +2,7 @@
 title: Tableau de bord
 summary: "La page d'accueil : compteurs inbox et à affiner, projets par priorité avec leur avancement, éléments en cours et en attente"
 icon: lucide:gauge
-image: tableau-de-bord.png
+image: dashboard.png
 links: []
 related:
   - 

@@ -13,4 +13,4 @@ Trois règles pour choisir une [taille](sizes.cpt), ou pour découper :
 2. Plus gros que L : __découper__.
 3. Un élément qui mélange __définir__ et __faire__ : le découper aussi.
 
-Le même texte vit à deux endroits : le guide de la documentation (`docs/guides/task-size.md`) et le code (`SIZE_GUIDE` et `SIZE_RULES`, dans `src/services/sizes.py`), affiché sur la page [/sizes](../interfaces/web/pages/tailles.cpt). Changer les deux ensemble.
+Le même texte vit à deux endroits : le guide de la documentation (`docs/guides/task-size.md`) et le code (`SIZE_GUIDE` et `SIZE_RULES`, dans `src/services/sizes.py`), affiché sur la page [/sizes](../interfaces/web/pages/sizes.cpt). Changer les deux ensemble.

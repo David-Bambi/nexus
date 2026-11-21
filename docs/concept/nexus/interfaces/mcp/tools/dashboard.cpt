@@ -8,7 +8,7 @@ related:
   - 
 ---
 
-__Rôle__ : donne la vue d'ensemble du [tableau de bord](../../web/pages/tableau-de-bord.cpt).
+__Rôle__ : donne la vue d'ensemble du [tableau de bord](../../web/pages/dashboard.cpt).
 
 __Arguments__
 - Aucun obligatoire.

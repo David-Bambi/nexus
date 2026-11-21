@@ -2,13 +2,13 @@
 title: Projet
 summary: "Un projet, vue Backlog : arbre de travail ouvert et critères de majeure, chaque formulaire derrière une icône"
 icon: lucide:folder-kanban
-image: projet.png
+image: project.png
 links: []
 related:
   -
 ---
 
-__Adresse__ : `/projects/<clé>`. Six onglets : __Backlog__, [Kanban](kanban.cpt), quatre d'[état](onglets-etat.cpt).
+__Adresse__ : `/projects/<clé>`. Six onglets : __Backlog__, [Kanban](kanban.cpt), quatre d'[état](state-tabs.cpt).
 
 __Ce qu'on y voit__
 - En tête : clé, statut, badge de [priorité](../../../modele/arbre.cpt), version, répertoire (ou celui du parent), __Subprojects__ (projet racine).

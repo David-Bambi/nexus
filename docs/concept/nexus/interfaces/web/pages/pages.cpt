@@ -3,18 +3,18 @@ title: Pages
 summary: "Les écrans de l'application web, une fiche par page"
 icon: lucide:layout-template
 type: liste
-gabarit: tableau-de-bord.cpt
-links: [tableau-de-bord.cpt,
-        projets.cpt,
-        projet.cpt,
+gabarit: dashboard.cpt
+links: [dashboard.cpt,
+        projects.cpt,
+        project.cpt,
         kanban.cpt,
-        onglets-etat.cpt,
-        element.cpt,
-        taches.cpt,
+        state-tabs.cpt,
+        item.cpt,
+        tasks.cpt,
         inbox.cpt,
-        affiner.cpt,
-        recherche.cpt,
-        tailles.cpt,
+        refine.cpt,
+        search.cpt,
+        sizes.cpt,
         exports.cpt]
 related:
   - 

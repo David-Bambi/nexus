@@ -4,7 +4,7 @@ summary: "XS, S, M, L : des niveaux d'effort qui doublent à chaque cran, jamais
 icon: lucide:scaling
 links: []
 related:
-  - ../interfaces/web/pages/tailles.cpt
+  - ../interfaces/web/pages/sizes.cpt
 ---
 
 Une taille dit l'__effort__ d'un élément, jamais des heures : chaque cran vaut à peu près le double du précédent.
