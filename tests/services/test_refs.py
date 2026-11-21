@@ -2,33 +2,76 @@ import re
 
 import pytest
 
-from src.models.task import Task
-from src.models.version import Version
-from src.services import events, projects, refs, tasks, versions
-from src.services.errors import NotFoundError
+from src.models.project import Project
+from src.models.task import Task, TaskKind
+from src.services import projects, refs, resolve, tasks
+from src.services.errors import NotFoundError, ValidationError
 
 
-def test_generate_formats_ref_with_model_prefix(session):
+def _subproject(session, key="bilan", ref="s-abc"):
+    """Insert a root project "metrique" and a subproject under it."""
+    root = Project(key="metrique", name="Métriques")
+    session.add(root)
+    session.flush()
+    sub = Project(key=key, name=key, ref=ref, parent_id=root.id)
+    session.add(sub)
+    session.commit()
+    return sub
+
+
+def _item(session, ref, kind=TaskKind.TASK):
+    """Insert a work item with a given ref and kind."""
+    item = Task(ref=ref, kind=kind, title=ref)
+    session.add(item)
+    session.commit()
+    return item
+
+
+def test_generate_formats_ref_with_prefix(session):
     """
     Given an empty database
-    When refs are generated for a task and a version
-    Then they are prefixed "t-" / "v-" followed by a base36 code
+    When refs are generated for a subproject, a feature and a task
+    Then they are prefixed "s-" / "f-" / "t-" followed by a base36 code
     """
-    assert re.fullmatch(r"t-[0-9a-z]{3}", refs.generate(session, Task))
-    assert re.fullmatch(r"v-[0-9a-z]{3}", refs.generate(session, Version))
+    assert re.fullmatch(r"s-[0-9a-z]{3}", refs.generate(session, refs.SUBPROJECT))
+    assert re.fullmatch(r"f-[0-9a-z]{3}", refs.generate(session, refs.KIND_PREFIXES[TaskKind.FEATURE]))
+    assert re.fullmatch(r"t-[0-9a-z]{3}", refs.generate(session, refs.KIND_PREFIXES[TaskKind.TASK]))
 
 
 def test_generate_retries_on_collision(session, monkeypatch):
     """
-    Given a task already holding the first candidate ref
-    When a ref is generated
+    Given a task already holding the first candidate code
+    When a task ref is generated
     Then the taken candidate is skipped
     """
     candidates = iter("aaabbb")
     monkeypatch.setattr(refs.secrets, "choice", lambda _alphabet: next(candidates))
-    session.add(Task(ref="t-aaa", title="Existing"))
-    session.commit()
-    assert refs.generate(session, Task) == "t-bbb"
+    _item(session, "t-aaa")
+    assert refs.generate(session, "t") == "t-bbb"
+
+
+def test_features_and_tasks_share_one_code_namespace(session, monkeypatch):
+    """
+    Given a task holding code "aaa"
+    When a feature ref is generated and the first candidate is "aaa"
+    Then "f-aaa" is refused, since it would name the same code
+    """
+    candidates = iter("aaabbb")
+    monkeypatch.setattr(refs.secrets, "choice", lambda _alphabet: next(candidates))
+    _item(session, "t-aaa")
+    assert refs.generate(session, "f") == "f-bbb"
+
+
+def test_subprojects_have_their_own_namespace(session, monkeypatch):
+    """
+    Given a task holding code "aaa"
+    When a subproject ref is generated and the first candidate is "aaa"
+    Then "s-aaa" is accepted
+    """
+    candidates = iter("aaa")
+    monkeypatch.setattr(refs.secrets, "choice", lambda _alphabet: next(candidates))
+    _item(session, "t-aaa")
+    assert refs.generate(session, refs.SUBPROJECT) == "s-aaa"
 
 
 def test_generate_widens_code_when_crowded(session, monkeypatch):
@@ -37,63 +80,92 @@ def test_generate_widens_code_when_crowded(session, monkeypatch):
     When a ref is generated
     Then the code grows by one character after repeated collisions
     """
-    monkeypatch.setattr(refs, "_is_taken", lambda _s, _m, ref: len(ref) == len("t-abc"))
-    assert len(refs.generate(session, Task)) == len("t-abcd")
+    monkeypatch.setattr(refs, "_is_taken", lambda _s, _p, code: len(code) == 3)
+    assert len(refs.generate(session, "t")) == len("t-abcd")
 
 
-def test_services_assign_unique_refs(session):
+@pytest.mark.parametrize("text, expected", [
+    ("s-4k2", True), ("F-4K2", True), (" t-4k2 ", True), ("t-4k2x", True),
+    ("v-4k2", False), ("t-4k", False), ("nexus", False), ("t4k2", False),
+])
+def test_is_ref(text, expected):
     """
-    Given a project
-    When tasks and a version are created through the services
-    Then each gets its own ref, unique within its table
+    Given a string
+    When asking whether it is shaped like a ref
+    Then only s-/f-/t- followed by 3+ base36 characters match
     """
-    projects.create(session, "nexus", "Nexus", "")
-    version = versions.create(session, "nexus", "0.1.0", "First", ["Ships"])
-    captured = tasks.capture(session, "Captured")
-    planned = tasks.create_in_version(session, version.id, "Planned")
-    assert version.ref.startswith("v-")
-    assert captured.ref.startswith("t-") and planned.ref.startswith("t-")
-    assert captured.ref != planned.ref
+    assert refs.is_ref(text) is expected
 
 
-def test_get_by_ref_finds_task_and_version(session):
+def test_with_kind_keeps_the_code():
     """
-    Given a version and a task with refs
-    When looked up by ref, in any letter case
-    Then the matching rows are returned
+    Given a task ref
+    When respelled for a feature
+    Then only the prefix changes
     """
-    projects.create(session, "nexus", "Nexus", "")
-    version = versions.create(session, "nexus", "0.1.0", "First", ["Ships"])
-    task = tasks.capture(session, "Captured")
-    assert tasks.get_by_ref(session, task.ref.upper()) is task
-    assert versions.get_by_ref(session, f" {version.ref} ") is version
+    assert refs.with_kind("t-4k2", TaskKind.FEATURE) == "f-4k2"
+    assert refs.with_kind("f-4k2", TaskKind.TASK) == "t-4k2"
+
+
+def test_get_by_ref_finds_an_item_under_either_prefix(session):
+    """
+    Given a feature stored as "f-abc"
+    When looked up as "f-abc", "T-ABC" or " t-abc "
+    Then the feature is found each time
+    """
+    feature = _item(session, "f-abc", TaskKind.FEATURE)
+    for spelling in ("f-abc", "T-ABC", " t-abc "):
+        assert tasks.get_by_ref(session, spelling) is feature
 
 
 def test_get_by_ref_unknown_raises(session):
     """
     Given an empty database
-    When looking up an unknown ref
+    When looking up an unknown or malformed item ref
     Then a not-found error is raised
     """
+    for ref in ("t-zzz", "s-zzz", "nexus"):
+        with pytest.raises(NotFoundError):
+            tasks.get_by_ref(session, ref)
     with pytest.raises(NotFoundError):
-        tasks.get_by_ref(session, "t-zzz")
-    with pytest.raises(NotFoundError):
-        versions.get_by_ref(session, "v-zzz")
+        projects.get_by_ref(session, "s-zzz")
 
 
-def test_creations_record_the_given_actor(session):
+def test_projects_get_by_ref_finds_a_subproject(session):
     """
-    Given the CLI actor
-    When a project, version and tasks are created with it
-    Then their "created" events carry that actor, and default to web otherwise
+    Given a subproject "s-abc"
+    When looked up by ref, in any letter case
+    Then it is returned
     """
-    project = projects.create(session, "nexus", "Nexus", "", actor=events.ACTOR_CLI)
-    version = versions.create(session, "nexus", "0.1.0", "First", ["Ships"], actor=events.ACTOR_CLI)
-    captured = tasks.capture(session, "Captured", actor=events.ACTOR_CLI)
-    created = tasks.create(session, "Created", project_key="nexus", actor=events.ACTOR_CLI)
-    planned = tasks.create_in_version(session, version.id, "Planned", actor=events.ACTOR_CLI)
-    default = tasks.capture(session, "Default")
-    for kind, entity in (("project", project), ("version", version), ("task", captured),
-                         ("task", created), ("task", planned)):
-        assert events.history(session, kind, entity.id)[0].actor == events.ACTOR_CLI
-    assert events.history(session, "task", default.id)[0].actor == events.ACTOR_WEB
+    sub = _subproject(session)
+    assert projects.get_by_ref(session, " S-ABC ") is sub
+
+
+def test_resolve_names_each_kind(session):
+    """
+    Given a project, a subproject, a feature and a task
+    When each reference is resolved
+    Then the target kind follows the row
+    """
+    sub = _subproject(session)
+    feature = _item(session, "f-fff", TaskKind.FEATURE)
+    task = _item(session, "t-ttt")
+
+    assert resolve.resolve(session, "metrique").kind == "project"
+    assert resolve.resolve(session, "s-abc").entity is sub
+    assert resolve.resolve(session, "s-abc").kind == "subproject"
+    assert resolve.resolve(session, "f-fff").entity is feature
+    assert resolve.resolve(session, "t-fff").kind == "feature"
+    assert resolve.resolve(session, "t-ttt").entity is task
+    assert resolve.resolve(session, "t-ttt").kind == "task"
+
+
+@pytest.mark.parametrize("key", ["s-abc", "f-abc", "t-abc"])
+def test_project_keys_shaped_like_refs_are_refused(session, key):
+    """
+    Given a key shaped like a subproject, feature or task ref
+    When creating a project with it
+    Then a validation error is raised
+    """
+    with pytest.raises(ValidationError):
+        projects.create(session, key, "Name")

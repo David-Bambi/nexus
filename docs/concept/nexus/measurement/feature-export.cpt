@@ -1,0 +1,29 @@
+---
+title: Export nexus.features/1
+summary: "Le contrat stable lu par metrique : une entrée par fonctionnalité, et comment l'obtenir"
+icon: lucide:file-output
+links: []
+related:
+  - 
+---
+
+L'export `nexus.features/1` est le __contrat__ que lit metrique : une entrée par fonctionnalité, avec les faits pour la mesurer.
+
+```
+{"schema": "nexus.features/1", "exported_at",
+ "features": [{"ref", "title", "state",
+               "project",       # clé du projet le plus proche
+               "directory",     # son répertoire effectif
+               "started_at",    # premier démarrage
+               "closed_at", "released_in",
+               "plan",          # plan figé, null si jamais démarrée
+               "children": [{"ref", "kind", "title", "state", "size"}],
+               "events":   [{"at", "actor", "ref", "action", "payload"}]}]}
+```
+
+- Les fonctionnalités viennent dans l'ordre de création.
+- Les dates sont en UTC avec un `+00:00` explicite (Nexus les stocke en UTC, sans fuseau).
+- Le numéro de schéma change seulement si un champ disparaît ou change de sens ; ajouter un champ le garde.
+- On l'obtient par [nexus export features](../interfaces/cli/commands/export-features.cpt) ou à l'adresse `/export/features.json`. Pas d'outil MCP : metrique lit hors ligne, sans service lancé.
+
+Pourquoi un export versionné : Nexus peut changer ses tables tant que le contrat tient. Lire les tables SQL casserait à chaque changement de schéma.

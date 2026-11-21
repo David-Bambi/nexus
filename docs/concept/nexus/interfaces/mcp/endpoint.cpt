@@ -1,0 +1,20 @@
+---
+title: Un point d'accès du service
+summary: "POST /mcp sur le service déjà lancé : JSON-RPC sans session, écrit à la main dans Flask"
+icon: lucide:radio-tower
+links: []
+related:
+  - 
+---
+
+Le serveur MCP n'est pas un programme à part : c'est l'adresse `POST /mcp` du service déjà lancé.
+
+- __Transport__ : JSON-RPC 2.0 sur HTTP. Une requête, une réponse JSON ; ni session, ni flux.
+- __Méthodes__ : `initialize` (accord sur la version du protocole), `ping`, `tools/list`, `tools/call`. Une notification reçoit `202` ; un lot de messages est refusé ; `GET` reçoit `405`.
+- __Découpage__ : `tools.py` (les outils) et `serialize.py` (lignes en JSON) ignorent Flask ; seul `http.py` connaît HTTP. Un test le vérifie.
+
+Pourquoi : le service tourne toujours, rien de plus à lancer, pas de second processus sur la base. Écrit à la main dans Flask, il n'ajoute aucune dépendance et partage la session des pages.
+
+Écartés : le SDK officiel sous waitress (une trentaine de paquets et un contournement au démarrage) ; un sous-processus `stdio`, pour garder un serveur toujours disponible.
+
+Limite : indisponible quand le service est arrêté.

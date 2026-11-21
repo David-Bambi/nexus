@@ -103,11 +103,11 @@ each overriding `title` and `content` with its own markup.
 `{% include "_name.html" %}` renders another template in place, with the
 current variables in scope. Shared fragments are prefixed with `_`: for
 example `_task_state_form.html` (needs `task` and `state_action`) is included
-by `task.html` and by each task card in `version.html`. Use
+by `task.html`. Use
 `{% with state_action=... %}` to set the variables the partial expects.
 Reusable pieces that take arguments are macros in `_components.html`
-instead, imported with `{% import "_components.html" as ui %}` (see
-[UI conventions](../architecture/ui.md)).
+instead, imported with `{% import "_components.html" as ui %}` (see the Concept map card
+`docs/concept/nexus/interfaces/web/components.cpt`).
 
 ## `url_for()`
 

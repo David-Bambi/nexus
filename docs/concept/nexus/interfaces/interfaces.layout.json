@@ -1,0 +1,22 @@
+{
+  "service-layer.cpt": {
+    "x": 606,
+    "y": 390
+  },
+  "web/web.cpt": {
+    "x": 264,
+    "y": 85
+  },
+  "cli/cli.cpt": {
+    "x": 576,
+    "y": 82
+  },
+  "mcp/mcp.cpt": {
+    "x": 902,
+    "y": 78
+  },
+  "import/import.cpt": {
+    "x": 659,
+    "y": 232
+  }
+}

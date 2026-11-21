@@ -1,0 +1,24 @@
+---
+title: Commandes
+summary: "Les commandes de nexus, une fiche par commande"
+icon: lucide:list
+type: liste
+gabarit: add.cpt
+links: [add.cpt,
+        capture.cpt,
+        tasks.cpt,
+        projects.cpt,
+        project-detail.cpt,
+        item-detail.cpt,
+        state.cpt,
+        import.cpt,
+        export-features.cpt,
+        version.cpt]
+filters:
+  Lecture: [lecture]
+  Écriture: [ecriture]
+related:
+  - 
+---
+
+Les commandes de `nexus`, toutes sur le même plan : syntaxe, résultat, exemple. 10 entrées.

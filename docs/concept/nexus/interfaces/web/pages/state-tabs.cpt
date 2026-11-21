@@ -1,0 +1,22 @@
+---
+title: Onglets d'état d'un projet
+summary: "Les onglets Someday, Done, Cancelled et Archived de la page projet : ce qui est mis de côté, fermé ou rangé, et les boutons pour le ressortir ou l'archiver"
+icon: lucide:archive-restore
+image: state-tabs.png
+links: []
+related:
+  -
+---
+
+__Adresse__ : `/projects/<clé>?view=someday`, `done`, `cancelled` ou `archived`, quatre onglets de la page [Projet](project.cpt).
+
+__Ce qu'on y voit__
+- Les éléments du projet dans cet état, non archivés, ou les [archivés](../../../model/close-and-delete.cpt) avec leur badge d'état ; sous-projets compris, les plus récents d'abord.
+- Par ligne : titre, référence, place, version de livraison, date.
+
+__Ce qu'on y fait__
+- Ressortir : __Refine__ (someday), __Reopen__ (done), __Restore__ (cancelled), par le [changement d'état](../../../model/states.cpt).
+- Done et Cancelled : __Archive__ par ligne, __Archive all__ en tête. Archived : __Unarchive__.
+- Chaque bouton revient à l'onglet. Créer et gérer restent dans __Backlog__.
+
+Pourquoi : voir, ressortir ou ranger ce qui est fini, projet par projet, sans quitter sa page.

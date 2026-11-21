@@ -1,0 +1,17 @@
+---
+title: Correction
+summary: "Signaler qu'une modification corrige une erreur, pour que la mesure l'ignore"
+icon: lucide:spell-check
+links: []
+related:
+  - 
+---
+
+Une __correction__ est une modification qui répare une erreur (faute de frappe, mauvaise taille) sans changer le travail.
+
+- __Web__ : la case __Correction__ du formulaire de modification d'un élément.
+- __MCP__ : l'argument `correction: true` de [update_task](../interfaces/mcp/tools/update-task.cpt).
+
+Le journal écrit alors `corrected` au lieu de `updated`, avec le même contenu (les champs changés).
+
+Pourquoi : une faute de frappe n'est pas une dérive du plan. La mesure peut laisser les corrections de côté et ne compter que les vrais changements.

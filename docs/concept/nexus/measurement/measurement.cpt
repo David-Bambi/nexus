@@ -1,0 +1,28 @@
+---
+title: Mesure
+summary: "Les faits que Nexus enregistre et exporte pour que metrique mesure la dérive du plan"
+icon: lucide:ruler
+type: carte
+links: [feature-export.cpt,
+        exported-events.cpt,
+        project-directory.cpt,
+        correction.cpt,
+        frozen-plan.cpt,
+        event-parent.cpt,
+        ai-share.cpt]
+related:
+  - /home/david/projets/13_metrics/docs/metrics/metric-list/bilan-version/derive-du-plan.cpt
+  - /home/david/projets/13_metrics/docs/metrics/metric-list/bilan-version/architecture/collecte/nexus-json.cpt
+---
+
+Nexus enregistre des __faits__ ; metrique, un autre dépôt, en tire des mesures. La principale est la __dérive du plan__ : l'écart entre ce qui était prévu pour une fonctionnalité et ce qui a été fait.
+
+metrique lit un __export stable__ plutôt que les tables SQL, qui changent avec le schéma.
+
+- [Export nexus.features/1](feature-export.cpt) : le contrat, et comment l'obtenir.
+- [Événements d'une fonctionnalité](exported-events.cpt) : lesquels l'export rattache à chacune.
+- [Répertoire du projet](project-directory.cpt) : le dossier qui relie les sessions Claude Code au projet.
+- [Correction](correction.cpt) : signaler une faute plutôt qu'un changement.
+- [Plan figé](frozen-plan.cpt) : les enfants au premier démarrage.
+- [Parent dans chaque événement](event-parent.cpt) : la fonctionnalité au-dessus, à chaque instant.
+- [Part de l'IA](ai-share.cpt) : un fait affiché, lu dans git, que metrique ne reçoit pas.

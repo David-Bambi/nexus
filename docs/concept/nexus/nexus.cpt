@@ -1,0 +1,26 @@
+---
+title: Nexus
+summary: "Le gestionnaire de projets local inspiré de GTD : ses parties et comment elles s'emboîtent"
+icon: lucide:network
+background: nexus.svg
+backgroundOpacity: 0.3
+type: carte
+links: [model/model.cpt,
+        event-log/event-log.cpt,
+        interfaces/interfaces.cpt,
+        operations/operations.cpt,
+        measurement/measurement.cpt,
+        guides/guides.cpt,
+        ai-tools/ai-tools.cpt]
+related:
+  - 
+---
+
+Nexus est un gestionnaire de projets __inspiré de GTD__, pour un seul utilisateur. Il tourne sur la machine comme une application web locale (`http://127.0.0.1:8765`), avec une ligne de commande et un serveur MCP pour les assistants IA, sur une base SQLite.
+
+Sur le fond de carte :
+- au centre : le [Modèle](model/model.cpt), l'arbre de travail et ses règles ;
+- en haut : les [Interfaces](interfaces/interfaces.cpt), qui appellent ces règles ;
+- en bas : l'[Exploitation](operations/operations.cpt), faire tourner le service ;
+- à droite : le [Journal](event-log/event-log.cpt) de chaque modification, et la [Mesure](measurement/measurement.cpt) qui en tire ses faits ;
+- à gauche : les [Guides](guides/guides.cpt) et les [Outils IA](ai-tools/ai-tools.cpt).

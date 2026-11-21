@@ -4,7 +4,7 @@ import pytest
 
 from src.cli.main import EXIT_ERROR, EXIT_OK, EXIT_USAGE, main
 from src.models.task import TaskState
-from src.services import events, projects, tasks, versions
+from src.services import events, projects, tasks
 
 
 @pytest.fixture
@@ -18,10 +18,9 @@ def run(session):
 
 
 @pytest.fixture
-def version(session):
-    """A project with an open version."""
-    projects.create(session, "nx", "Nexus", "")
-    return versions.create(session, "nx", "0.1.0", "First", ["Ships"])
+def project(session):
+    """A project 'nx'."""
+    return projects.create(session, "nx", "Nexus", "")
 
 
 def _only_task(session):
@@ -30,34 +29,42 @@ def _only_task(session):
     return task
 
 
-def test_add_task_to_project_lands_in_inbox(run, session, version):
+def test_add_task_to_project_is_inbox_in_its_tree(run, session, project):
     """
     Given a project
     When running `nexus add task nx --title ...` with detail options
-    Then an inbox task is created in the project, by the cli actor
+    Then an inbox task is created at the top of the project, by the cli actor
     """
     code, out, _ = run("add", "task", "nx", "-t", "Write docs", "-c", "@ordi", "-s", "S", "-b", "More")
     task = _only_task(session)
-    assert code == EXIT_OK and task.ref in out and "(inbox)" in out
-    assert (task.title, task.state, task.project.key) == ("Write docs", TaskState.INBOX, "nx")
+    assert code == EXIT_OK and f"Created task {task.ref} (inbox, nx): Write docs" in out
+    assert (task.title, task.state, task.project.key, task.parent) == ("Write docs", TaskState.INBOX, "nx", None)
     assert (task.context, task.size, task.body) == ("@ordi", "S", "More")
-    assert events.history(session, "task", task.id)[0].actor == events.ACTOR_CLI
+    assert {e.actor for e in events.history(session, "task", task.id)} == {events.ACTOR_CLI}
 
 
-@pytest.mark.parametrize("by_ref", [False, True])
-def test_add_task_to_version_is_planned(run, session, version, by_ref):
-    """
-    Given a version
-    When running `nexus add task nx <number or ref> --title ...`
-    Then the task is created planned in that version
-    """
-    code, out, _ = run("add", "task", "nx", version.ref if by_ref else "0.1.0", "--title", "Ship")
-    task = _only_task(session)
-    assert code == EXIT_OK and "(planned)" in out
-    assert (task.state, task.version_id) == (TaskState.PLANNED, version.id)
+def test_add_feature_then_task_under_it(run, session, project):
+    """A feature is added, then a task under it with --parent."""
+    run("add", "feature", "nx", "-t", "Auth")
+    feature_ref = tasks.list(session)[0].ref
+    code, out, _ = run("add", "task", "nx", "--parent", feature_ref, "-t", "Login")
+    assert code == EXIT_OK and f"(inbox, nx > {feature_ref}): Login" in out
+    # The cli closes its session after each run: read the feature afresh.
+    feature = tasks.get_by_ref(session, feature_ref)
+    assert feature.kind.name == "FEATURE" and [c.title for c in feature.children] == ["Login"]
 
 
-def test_add_task_prompts_for_missing_title_on_a_terminal(run, session, version, monkeypatch):
+def test_add_under_a_feature_of_another_project_is_refused(run, session, project):
+    """A parent from another project is refused, and nothing is created."""
+    projects.create(session, "other", "Other")
+    run("add", "feature", "nx", "-t", "Auth")
+    feature_ref = tasks.list(session)[0].ref
+    code, _, err = run("add", "task", "other", "--parent", feature_ref, "-t", "Stray")
+    assert code == EXIT_ERROR and "isn't in project" in err
+    assert [t.title for t in tasks.list(session)] == ["Auth"]
+
+
+def test_add_task_prompts_for_missing_title_on_a_terminal(run, session, project, monkeypatch):
     """
     Given no --title and a terminal
     When running `nexus add task nx`
@@ -69,7 +76,7 @@ def test_add_task_prompts_for_missing_title_on_a_terminal(run, session, version,
     assert _only_task(session).title == "Asked title"
 
 
-def test_add_task_without_title_and_terminal_is_a_usage_error(run, session, version, monkeypatch):
+def test_add_task_without_title_and_terminal_is_a_usage_error(run, session, project, monkeypatch):
     """
     Given no --title and no terminal
     When running `nexus add task nx`
@@ -81,8 +88,9 @@ def test_add_task_without_title_and_terminal_is_a_usage_error(run, session, vers
 
 
 @pytest.mark.parametrize("argv", [["add"], ["add", "epic", "nx"], ["add", "task"],
-                                  ["add", "task", "nx", "-t", "x", "-s", "XXL"]])
-def test_add_with_a_malformed_command_line_is_a_usage_error(run, version, argv):
+                                  ["add", "task", "nx", "-t", "x", "-s", "XXL"],
+                                  ["add", "task", "nx", "0.1.0", "-t", "x"]])
+def test_add_with_a_malformed_command_line_is_a_usage_error(run, project, argv):
     """
     Given a malformed `add` command line
     When running nexus
@@ -91,17 +99,13 @@ def test_add_with_a_malformed_command_line_is_a_usage_error(run, version, argv):
     assert run(*argv)[0] == EXIT_USAGE
 
 
-def test_add_task_refused_by_the_services_is_a_domain_error(run, session, version):
+def test_add_task_refused_by_the_services_is_a_domain_error(run, session, project):
     """
-    Given a missing project, a released version and a blank title
+    Given a missing project and a blank title
     When adding tasks
     Then each is refused with exit code 1 and nothing is created
     """
-    versions.start(session, version.id)
-    versions.set_criterion_done(session, version.definition_of_done[0].id, True)
-    versions.release(session, version.id)
     for argv in (["add", "task", "ghost", "-t", "x"],
-                 ["add", "task", "nx", "0.1.0", "-t", "x"],
                  ["add", "task", "nx", "-t", "   "]):
         assert run(*argv)[0] == EXIT_ERROR
     assert tasks.list(session) == []
@@ -115,7 +119,7 @@ def test_sentence_is_captured_into_the_inbox(run, session):
     """
     code, out, _ = run("  Buy some milk ")
     task = _only_task(session)
-    assert code == EXIT_OK and "(inbox)" in out
+    assert code == EXIT_OK and "(inbox):" in out
     assert (task.title, task.state, task.project_id) == ("Buy some milk", TaskState.INBOX, None)
     assert events.history(session, "task", task.id)[0].actor == events.ACTOR_CLI
 
@@ -129,7 +133,7 @@ def test_blank_description_is_refused(run, session):
     assert run("")[0] == EXIT_ERROR and tasks.list(session) == []
 
 
-def test_single_word_is_still_a_reference(run, session, version):
+def test_single_word_is_still_a_reference(run, session, project):
     """
     Given a project key
     When running `nexus nx`
@@ -138,96 +142,43 @@ def test_single_word_is_still_a_reference(run, session, version):
     assert "Nexus" in run("nx")[1] and tasks.list(session) == []
 
 
-@pytest.mark.parametrize("by_ref", [False, True])
-def test_check_and_uncheck_a_criterion(run, session, version, by_ref):
+@pytest.mark.parametrize("argv", [("check", "1"), ("start",), ("0.1.0",)])
+def test_words_after_a_project_are_usage_errors(run, project, argv):
     """
-    Given a version with one unchecked criterion
-    When running `nexus nx 0.1.0 check 1` (or `nexus <ref> check 1`), then `uncheck 1`
-    Then the criterion is checked then unchecked, by the cli actor, and the version is shown
+    Given a project
+    When running a former version action, or a version number, after its key
+    Then it is a usage error: versions are gone
     """
-    target = [version.ref] if by_ref else ["nx", "0.1.0"]
-    code, out, _ = run(*target, "check", "1")
-    assert code == EXIT_OK and "[x] Ships" in out and version.definition_of_done[0].done
-    assert events.history(session, "version", version.id)[-1].actor == events.ACTOR_CLI
-    code, out, _ = run(*target, "uncheck", "1")
-    assert code == EXIT_OK and "[ ] Ships" in out
-    assert not versions.get_by_ref(session, version.ref).definition_of_done[0].done
+    assert run("nx", *argv)[0] == EXIT_USAGE
 
 
-@pytest.mark.parametrize("argv", [("check",), ("check", "2"), ("check", "0"), ("check", "x"), ("check", "1", "2")])
-def test_bad_criterion_number_is_a_usage_error(run, version, argv):
+# State -------------------------------------------------------------------------------------------
+
+def test_state_jumps_through_each_step_by_the_cli_actor(run, session, project):
     """
-    Given a version with one criterion
-    When running `check` with no, an out-of-range, a non-numeric or two numbers
-    Then it is a usage error and nothing changes
+    Given an inbox task in a project
+    When running `nexus state <ref> done`
+    Then it is done, each step logged by the cli actor
     """
-    assert run("nx", "0.1.0", *argv)[0] == EXIT_USAGE and not version.definition_of_done[0].done
+    task = tasks.add_to_tree(session, "Write docs", project_key="nx")
+    code, out, _ = run("state", task.ref, "done")
+    assert code == EXIT_OK and f"Task {task.ref} is now done: Write docs" in out
+    history = events.history(session, "task", task.id)
+    assert [e.action for e in history][-3:] == ["clarified", "started", "completed"]
+    assert {e.actor for e in history[1:]} == {events.ACTOR_CLI}
 
 
-@pytest.mark.parametrize("by_ref", [False, True])
-def test_add_edit_and_remove_criteria(run, session, version, by_ref):
-    """
-    Given a version with one criterion
-    When adding one, rewording the first, then removing it
-    Then the version shows each change, made by the cli actor
-    """
-    target = [version.ref] if by_ref else ["nx", "0.1.0"]
-    code, out, _ = run(*target, "add-criterion", "Docs", "written")
-    assert code == EXIT_OK and "[ ] Docs written" in out
-    code, out, _ = run(*target, "edit-criterion", "1", "Shipped")
-    assert code == EXIT_OK and "[ ] Shipped" in out and "Ships" not in out
-    code, out, _ = run(*target, "remove-criterion", "1")
-    assert code == EXIT_OK and "Shipped" not in out and "Docs written" in out
-    assert events.history(session, "version", version.id)[-1].actor == events.ACTOR_CLI
-    assert [c.description for c in versions.get_by_ref(session, version.ref).definition_of_done] == ["Docs written"]
+def test_state_waiting_takes_a_reason(run, session, project):
+    """WAITING needs --reason: refused without, kept with."""
+    task = tasks.add_to_tree(session, "Write docs", project_key="nx", refined=True)
+    code, _, err = run("state", task.ref, "WAITING")
+    assert code == EXIT_ERROR and "reason" in err
+    code, _, _ = run("state", task.ref, "WAITING", "--reason", "Review")
+    assert code == EXIT_OK and tasks.get(session, task.id).blocked_reason == "Review"
 
 
-@pytest.mark.parametrize("argv", [("add-criterion",), ("edit-criterion", "1"), ("edit-criterion", "2", "X"),
-                                  ("remove-criterion",), ("remove-criterion", "x"), ("remove-criterion", "1", "2")])
-def test_bad_criterion_edit_is_a_usage_error(run, version, argv):
-    """
-    Given a version with one criterion
-    When adding with no text, editing with no text or a bad number, or removing with no, a bad or two numbers
-    Then it is a usage error and the criterion is unchanged
-    """
-    assert run("nx", "0.1.0", *argv)[0] == EXIT_USAGE
-    assert [c.description for c in version.definition_of_done] == ["Ships"]
-
-
-def test_criterion_edits_refused_by_the_services_are_domain_errors(run, version):
-    """
-    Given a version with one criterion
-    When removing that last criterion, or setting a blank text
-    Then it is an error reported by the services and nothing changes
-    """
-    code, _, err = run("nx", "0.1.0", "remove-criterion", "1")
-    assert code == EXIT_ERROR and "at least one" in err
-    code, _, err = run("nx", "0.1.0", "edit-criterion", "1", " ")
-    assert code == EXIT_ERROR and "empty" in err
-    assert [c.description for c in version.definition_of_done] == ["Ships"]
-
-
-def test_start_and_release_a_version(run, session, version):
-    """
-    Given a planned version with one criterion
-    When starting it, releasing it too early, checking the criterion, then releasing it
-    Then it goes to IN_PROGRESS, the early release fails, and it ends RELEASED, by the cli actor
-    """
-    code, out, _ = run("nx", "0.1.0", "start")
-    assert code == EXIT_OK and "IN_PROGRESS" in out
-    code, _, err = run("nx", "0.1.0", "release")
-    assert code == EXIT_ERROR and "unchecked" in err
-    run("nx", "0.1.0", "check", "1")
-    code, out, _ = run(version.ref, "release")
-    assert code == EXIT_OK and "RELEASED" in out
-    assert {e.actor for e in events.history(session, "version", version.id)[-3:]} == {events.ACTOR_CLI}
-
-
-@pytest.mark.parametrize("argv", [("frobnicate",), ("start", "now")])
-def test_unknown_version_action_or_extra_argument_is_a_usage_error(run, version, argv):
-    """
-    Given a version
-    When running an unknown action, or `start` with an extra argument
-    Then it is a usage error
-    """
-    assert run("nx", "0.1.0", *argv)[0] == EXIT_USAGE
+@pytest.mark.parametrize("argv", [["state"], ["state", "nx", "DONE"], ["state", "t-xxx", "SOMEDAY"]])
+def test_state_usage_errors(run, project, argv):
+    """A missing argument, a project reference or a state out of the list is a usage error."""
+    code, _, _ = run(*argv)
+    assert code == EXIT_USAGE

@@ -1,0 +1,16 @@
+---
+title: Tout ou rien
+summary: "Tout est validé d'abord, puis écrit en une transaction ; l'essai à blanc ne garde rien"
+icon: lucide:check-check
+links: []
+related:
+  - 
+---
+
+Un import s'écrit __en entier ou pas du tout__.
+
+1. `validate` parcourt tout le document et liste __toutes__ les erreurs ; chacune nomme son entrée (par exemple `projects[0] ('NX') items[2]: unknown field 'titel'`).
+2. `apply` écrit tout en __une seule transaction__. Les services enregistrent après chaque appel ; l'import leur prête une session dont l'enregistrement ne fait qu'avancer, et la vraie session est enregistrée ou annulée une seule fois.
+3. L'__essai à blanc__ (`--dry-run`, `dry_run`) fait tout, puis annule : il dit ce qui serait créé, sans références, et ne garde rien.
+
+Pourquoi : un document fautif écrit par un assistant donne une liste complète d'erreurs à corriger d'un coup, jamais un import à moitié fait. Les instructions du serveur MCP conseillent l'essai à blanc avant l'import réel.

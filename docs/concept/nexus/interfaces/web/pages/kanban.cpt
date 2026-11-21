@@ -1,0 +1,20 @@
+---
+title: Kanban d'un projet
+summary: "L'onglet Kanban de la page projet : les tâches à faire, rangées par fonctionnalité et par état"
+icon: lucide:square-kanban
+image: kanban.png
+links: []
+related:
+  - 
+---
+
+__Adresse__ : `/projects/<clé>?view=kanban`, l'onglet __Kanban__ de la page [Projet](project.cpt).
+
+__Ce qu'on y voit__
+- Un __couloir__ par fonctionnalité de premier niveau, puis __No feature__ pour les tâches posées sur le projet ; ensuite ceux des sous-projets, titrés « Sous-projet / Fonctionnalité ». Les sous-fonctionnalités se fondent dans leur couloir ; un couloir vide est masqué.
+- Quatre __colonnes__ teintées, avec leur compte : INBOX, REFINED, DOING, WAITING. Done, someday, cancelled : voir les [onglets d'état](state-tabs.cpt).
+- Une __carte__ par tâche, dans l'ordre de l'arbre : titre, référence, taille, raison d'attente.
+
+__Ce qu'on y fait__
+- Changer d'état : six __pastilles__, de INBOX à CANCELLED, à la couleur de leur colonne ; celle de l'état actuel est grisée. Une autre y déplace la carte en enchaînant les étapes (INBOX → DONE : clarified, started, completed). WAITING demande une raison. Un saut impossible est refusé d'emblée.
+- Rien d'autre : le Kanban sert à déplacer ; créer et gérer restent dans __Backlog__.

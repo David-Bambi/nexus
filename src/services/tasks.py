@@ -2,44 +2,23 @@ from datetime import datetime
 
 from sqlalchemy.orm import Session
 
-from src.models.task import Task, TaskState
-from src.models.version import Version, VersionStatus
-from src.services import events, projects, refs
-from src.services.errors import InvalidTransitionError, NotFoundError, ValidationError
+from src.models.project import Project
+from src.models.task import Task, TaskKind, TaskState
+from src.services import events, projects, refs, versioning
+from src.services.errors import ConflictError, InvalidTransitionError, NotFoundError, ValidationError
 
-# Fields update() is allowed to touch; state, project/version linkage and
-# timestamps only ever change through the dedicated transition functions.
+# Fields update() is allowed to touch; state, kind, placement in the tree and
+# timestamps only ever change through the dedicated functions.
 _UPDATABLE_FIELDS = {"title", "body", "context", "size"}
+
+# States in which a work item is closed; a feature can only close once all
+# its children are in one of them.
+_CLOSED_STATES = (TaskState.DONE, TaskState.CANCELLED)
 
 
 # -----------------------------------------------------------------------------
 # Internal helpers
 # -----------------------------------------------------------------------------
-
-def _require_unreleased(version : Version) -> None:
-    """Refuse changes to a released version.
-
-    Args:
-        version: The version to check.
-
-    Raises:
-        ValidationError: If the version is already released.
-    """
-    if version.status == VersionStatus.RELEASED:
-        raise ValidationError(f"version '{version.id}' is already released.")
-
-def _require_existing_version(version : Version, version_id : int) -> None:
-    """Refuse a version lookup that found nothing.
-
-    Args:
-        version: The version returned by the lookup, or None.
-        version_id: Id that was looked up, used in the error message.
-
-    Raises:
-        NotFoundError: If version is None.
-    """
-    if version is None:
-        raise NotFoundError(f"Version '{version_id}' doesn't exist.")
 
 def _require_valid_title(title : str) -> None:
     """Refuse an empty task title.
@@ -54,6 +33,130 @@ def _require_valid_title(title : str) -> None:
         raise ValidationError("The title must be specified.")
 
 
+def _require_closed_children(task : Task) -> None:
+    """Refuse to close a feature that still has open children.
+
+    Args:
+        task: The feature (or task) about to be completed or cancelled.
+
+    Raises:
+        ConflictError: If one of its children is neither done nor cancelled.
+    """
+    open_children = [child.ref for child in task.children if child.state not in _CLOSED_STATES]
+    if open_children:
+        raise ConflictError(
+            f"feature '{task.ref}' still has open children: {', '.join(open_children)}.")
+
+def _descendants(task : Task) -> list:
+    """Return every feature and task below a work item, depth first.
+
+    Args:
+        task: The work item to walk from.
+    """
+    found = []
+    for child in task.children:
+        found.append(child)
+        found.extend(_descendants(child))
+    return found
+
+def _resolve_placement(session : Session, task : Task | None, project_key : str | None,
+                       parent_ref : str | None) -> tuple[Project | None, Task | None]:
+    """Work out and check where a work item goes in the tree.
+
+    Args:
+        session: Database session to use.
+        task: The item being placed, or None when it is being created.
+        project_key: Key of the project or subproject to place it in.
+        parent_ref: Ref of the feature to place it under. Its project is
+            used when project_key is None.
+
+    Returns:
+        The (project, parent feature) pair; either may be None.
+
+    Raises:
+        NotFoundError: If the project or the parent doesn't exist.
+        ValidationError: If the parent isn't a feature, has no project, sits
+            in another project than project_key, or is the item itself or one
+            of its descendants.
+    """
+    project = projects.get(session, project_key) if project_key else None
+    parent = get_by_ref(session, parent_ref) if parent_ref else None
+    if parent is None:
+        return project, None
+
+    if parent.kind is not TaskKind.FEATURE:
+        raise ValidationError(f"'{parent.ref}' is a task; only a feature can hold children.")
+    if parent.project is None:
+        raise ValidationError(f"feature '{parent.ref}' has no project yet.")
+    if project is not None and parent.project_id != project.id:
+        raise ValidationError(f"feature '{parent.ref}' isn't in project '{project.key}'.")
+    if task is not None and (parent is task or parent in _descendants(task)):
+        raise ValidationError(f"'{task.ref}' can't go under itself or one of its descendants.")
+    return parent.project, parent
+
+def _next_position(session : Session, project : Project | None, parent : Task | None) -> int:
+    """Return the position after the last sibling at a place in the tree.
+
+    Args:
+        session: Database session to use.
+        project: Project of the place, or None for raw captures.
+        parent: Feature of the place, or None for the top of the project.
+    """
+    siblings = session.query(Task).filter_by(project_id=project.id if project else None,
+                                             parent_id=parent.id if parent else None)
+    positions = [sibling.position for sibling in siblings]
+    return max(positions) + 1 if positions else 0
+
+def _where(task : Task) -> dict:
+    """Describe a work item's place in the tree for an event payload.
+
+    Args:
+        task: The work item.
+
+    Returns:
+        {"project": key or None, "parent": ref or None}.
+    """
+    return {"project": task.project.key if task.project else None,
+            "parent": task.parent.ref if task.parent else None}
+
+def _set_place(task : Task, project : Project | None, parent : Task | None) -> None:
+    """Put a work item at a place in the tree, its whole subtree following.
+
+    Args:
+        task: The work item to place.
+        project: Its new project, or None.
+        parent: Its new parent feature, or None.
+    """
+    task.project = project
+    task.parent = parent
+    for descendant in _descendants(task):
+        descendant.project = project
+
+def _log(session : Session, actor : str, task : Task, action : str, payload : dict | None = None) -> None:
+    """Log a change to a work item, with the ref of its parent feature at
+    that moment, so the change can be tied to the right feature later even
+    if the item moves.
+
+    Args:
+        session: Database session to use.
+        actor: Who made the change, recorded in the event log.
+        task: The work item changed.
+        action: Event action (e.g. "updated").
+        payload: Detail of the change; "parent" is added unless present.
+    """
+    payload = dict(payload or {})
+    payload.setdefault("parent", task.parent.ref if task.parent else None)
+    events.log(session, actor, "task", task.id, action, payload)
+
+def _has_started_before(session : Session, task : Task) -> bool:
+    """Tell whether a work item was already started once.
+
+    Args:
+        session: Database session to use.
+        task: The work item.
+    """
+    return any(event.action == "started" for event in events.history(session, "task", task.id))
+
 def _log_transition(session : Session, task : Task, action : str, previous : TaskState,
                     actor : str = events.ACTOR_WEB, **extra : object) -> None:
     """Log a task state change in the event log.
@@ -67,7 +170,7 @@ def _log_transition(session : Session, task : Task, action : str, previous : Tas
         **extra: Additional payload entries (e.g. reason).
     """
     payload = {"from": previous.name, "to": task.state.name, **extra}
-    events.log(session, actor, "task", task.id, action, payload)
+    _log(session, actor, task, action, payload)
 
 # -----------------------------------------------------------------------------
 # Reading
@@ -97,35 +200,42 @@ def get_by_ref(session : Session, ref : str) -> Task:
 
     Args:
         session: Database session to use.
-        ref: Ref of the task (e.g. "t-4k2"), case-insensitive.
+        ref: Ref of the feature or task (e.g. "t-4k2"), case-insensitive.
+            Either prefix finds the item, so a ref written before a task
+            became a feature still works.
 
     Returns:
         The matching Task.
 
     Raises:
-        NotFoundError: If no task has this ref.
+        NotFoundError: If no feature or task has this ref.
     """
-    task = session.query(Task).filter_by(ref=ref.strip().lower()).first()
+    task = None
+    if refs.is_ref(ref) and refs.prefix_of(ref) != refs.SUBPROJECT:
+        task = session.query(Task).filter(Task.ref.in_(refs.item_spellings(ref))).first()
     if task is None:
         raise NotFoundError(f"Task '{ref}' doesn't exist.")
     else:
         return task
 
-def list(session : Session, limit : int | None = None) -> list:
-    """List tasks.
+def list(session : Session, limit : int | None = None, include_archived : bool = True) -> list:
+    """List work items (features and tasks).
 
     Args:
         session: Database session to use.
         limit: Optional maximum number of tasks to return.
+        include_archived: False to leave archived items out.
 
     Returns:
         All tasks, ordered by creation, oldest first. With a limit, only
         the `limit` most recently created ones (still oldest first).
     """
+    query = session.query(Task)
+    if not include_archived:
+        query = query.filter(Task.archived_at.is_(None))
     if limit is None:
-        return session.query(Task).order_by(Task.created_at, Task.id).all()
-
-    recent = session.query(Task).order_by(Task.created_at.desc(), Task.id.desc()).limit(limit).all()
+        return query.order_by(Task.created_at, Task.id).all()
+    recent = query.order_by(Task.created_at.desc(), Task.id.desc()).limit(limit).all()
     return recent[::-1]
 
 # -----------------------------------------------------------------------------
@@ -143,10 +253,10 @@ def capture(session : Session, title : str, actor : str = events.ACTOR_WEB) -> T
     Returns:
         The newly created Task, in the inbox state.
     """
-    task = Task(ref=refs.generate(session, Task), title=title, state=TaskState.INBOX)
+    task = Task(ref=refs.generate(session, refs.KIND_PREFIXES[TaskKind.TASK]), title=title, state=TaskState.INBOX)
     session.add(task)
     session.flush()
-    events.log(session, actor, "task", task.id, "created", {"title": title})
+    _log(session, actor, task, "created", {"title": title})
     session.commit()
     return task
 
@@ -156,105 +266,117 @@ def create(session : Session,
            body : str | None = None,
            context : str | None = None,
            size : str | None = None,
+           parent_ref : str | None = None,
+           kind : TaskKind = TaskKind.TASK,
            actor : str = events.ACTOR_WEB) -> Task:
-    """Create a task with its detail already known.
+    """Create a feature or task with its detail already known.
 
     Args:
         session: Database session to use.
-        title: Short title for the task.
-        project_key: Optional key of the owning project.
+        title: Short title.
+        project_key: Optional key of the project or subproject it goes in.
         body: Optional free-text detail.
         context: Optional context tag (e.g. "@ordi").
         size: Optional effort size ("XS", "S", "M", "L").
+        parent_ref: Optional ref of the feature it goes under; its project is
+            used when project_key is None.
+        kind: TaskKind.TASK (default) or TaskKind.FEATURE.
         actor: Who made the change, recorded in the event log.
 
     Returns:
-        The newly created Task, in the inbox state.
+        The newly created item, in the inbox state, last among its siblings.
 
     Raises:
-        NotFoundError: If project_key is given but no project has this key.
+        NotFoundError: If the project or the parent doesn't exist.
+        ValidationError: If the title is empty, or the parent can't hold it
+            (see _resolve_placement).
     """
-    project = projects.get(session, project_key) if project_key else None
+    _require_valid_title(title)
+    project, parent = _resolve_placement(session, None, project_key, parent_ref)
 
-    task = Task(ref=refs.generate(session, Task),
+    task = Task(ref=refs.generate(session, refs.KIND_PREFIXES[kind]),
+                kind=kind,
                 title=title,
-                project_id=project.id if project else None,
+                project=project,
+                parent=parent,
+                position=_next_position(session, project, parent),
                 body=body,
                 context=context,
                 size=size,
                 state=TaskState.INBOX)
     session.add(task)
     session.flush()
-    events.log(session, actor, "task", task.id, "created", {"title": title})
+    _log(session, actor, task, "created",
+               {"title": title, "kind": kind.name, **_where(task)})
     session.commit()
     return task
 
-def create_in_version(session : Session,
-                      version_id : int,
-                      title : str,
-                      context : str | None = None,
-                      size : str | None = None,
-                      body : str | None = None,
-                      actor : str = events.ACTOR_WEB) -> Task:
-    """Create a task directly in a version, already planned.
+def add_to_tree(session : Session,
+                title : str,
+                project_key : str | None = None,
+                parent_ref : str | None = None,
+                kind : TaskKind = TaskKind.TASK,
+                body : str | None = None,
+                context : str | None = None,
+                size : str | None = None,
+                refined : bool = False,
+                actor : str = events.ACTOR_WEB) -> Task:
+    """Add a feature or task straight into a project's tree.
 
-    Skips the inbox and refine steps: the task belongs to the version and to
-    the version's project from the start.
+    Unlike a capture, the item is already placed: it is created in the inbox
+    state, at its place, waiting to be refined. With `refined`, it is also
+    clarified in place right away (e.g. an imported plan), so its history
+    shows both steps.
 
     Args:
         session: Database session to use.
-        version_id: Id of the version to create the task in.
-        title: Short title for the task.
+        title: Short title.
+        project_key: Key of the project or subproject it goes in.
+        parent_ref: Ref of the feature it goes under; its project is used
+            when project_key is None.
+        kind: TaskKind.TASK (default) or TaskKind.FEATURE.
+        body: Optional free-text detail.
         context: Optional context tag (e.g. "@ordi").
         size: Optional effort size ("XS", "S", "M", "L").
-        body: Optional free-text detail.
+        refined: True to clarify the item right away, False (default) to
+            leave it in the inbox state.
         actor: Who made the change, recorded in the event log.
 
     Returns:
-        The newly created Task, in the planned state.
+        The new item, in the inbox state (refined with `refined`), last
+        among its siblings.
 
     Raises:
-        NotFoundError: If no version has this id.
-        ValidationError: If the version is already released, or the title is empty.
+        NotFoundError: If the project or the parent doesn't exist.
+        ValidationError: If neither a project nor a parent is given, the
+            title is empty, or the parent can't hold it (e.g. a feature of
+            another project). Nothing is written then.
     """
-    version = session.query(Version).filter_by(id=version_id).first()
-    _require_existing_version(version, version_id)
-    _require_unreleased(version)
-    _require_valid_title(title)
-
-
-    task = Task(ref=refs.generate(session, Task),
-                project_id=version.project_id,
-                version_id=version_id,
-                title=title,
-                state=TaskState.PLANNED,
-                context=context,
-                size=size,
-                body=body)
-    
-    session.add(task)
-    session.flush()
-    events.log(session, 
-               actor,
-               "task",
-                task.id, 
-                "created",  
-                {"title": title, "state": "PLANNED", "version_id": version.id})
-    session.commit()
-    return task
+    if project_key is None and parent_ref is None:
+        raise ValidationError("give a project or a parent feature to add the item to.")
+    item = create(session, title, project_key=project_key, body=body, context=context, size=size,
+                  parent_ref=parent_ref, kind=kind, actor=actor)
+    if not refined:
+        return item
+    return clarify(session, item.id, item.title, body, item.project.key, context, size,
+                   parent_ref=parent_ref, actor=actor)
 
 # -----------------------------------------------------------------------------
 # Editing
 # -----------------------------------------------------------------------------
 
-def update(session : Session, task_id : int, actor : str = events.ACTOR_WEB, **fields : str | None) -> Task:
+def update(session : Session, task_id : int, actor : str = events.ACTOR_WEB, correction : bool = False,
+           **fields : str | None) -> Task:
     """Update a task's descriptive fields.
 
     Args:
         session: Database session to use.
         task_id: Id of the task.
-        **fields: Values for any of "title", "body", "context", "size".
         actor: Who made the change, recorded in the event log.
+        correction: True when the change fixes a mistake (a typo, a wrong
+            size) rather than changing the work: it is logged as "corrected"
+            instead of "updated", so plan-drift measures can leave it out.
+        **fields: Values for any of "title", "body", "context", "size".
 
     Returns:
         The updated Task.
@@ -277,7 +399,7 @@ def update(session : Session, task_id : int, actor : str = events.ACTOR_WEB, **f
         setattr(task, name, value)
 
     if changes:
-        events.log(session, actor, "task", task.id, "updated", changes)
+        _log(session, actor, task, "corrected" if correction else "updated", changes)
 
     session.commit()
     return task
@@ -289,8 +411,10 @@ def clarify(session : Session,
             project_key : str | None,
             context : str | None,
             size : str | None,
+            parent_ref : str | None = None,
+            kind : TaskKind | None = None,
             actor : str = events.ACTOR_WEB) -> Task:
-    """Clarify a captured task into a refined one, ready to be planned.
+    """Clarify a captured item into a refined one, ready to be started.
 
     Also reactivates a task deferred to someday, back into refined.
 
@@ -302,32 +426,95 @@ def clarify(session : Session,
         project_key: Optional key of the owning project.
         context: Optional context tag (e.g. "@ordi").
         size: Optional effort size ("XS", "S", "M", "L").
+        parent_ref: Optional ref of the feature it goes under.
+        kind: New kind, e.g. TaskKind.FEATURE to turn a captured task into a
+            feature; None keeps the current kind.
         actor: Who made the change, recorded in the event log.
 
     Returns:
         The clarified Task, in the refined state.
 
     Raises:
-        NotFoundError: If no task has this id, or project_key is given but
-            no project has this key.
+        NotFoundError: If no task has this id, or the project or the parent
+            doesn't exist.
         InvalidTransitionError: If the task isn't inbox or someday.
+        ValidationError: If the parent can't hold it, or a feature with
+            children would become a task.
     """
     task = get(session, task_id)
 
     if task.state not in (TaskState.INBOX, TaskState.SOMEDAY):
         raise InvalidTransitionError(f"task '{task_id}' isn't inbox or someday.")
 
-    project = projects.get(session, project_key) if project_key else None
+    project, parent = _resolve_placement(session, task, project_key, parent_ref)
+    if kind is not None and kind is not task.kind:
+        _change_kind(session, task, kind, actor)
 
     previous = task.state
+    if (project, parent) != (task.project, task.parent):
+        _set_place(task, project, parent)
+        task.position = _next_position(session, project, parent)
     task.title = title
     task.body = body
-    task.project_id = project.id if project else None
     task.context = context
     task.size = size
     task.state = TaskState.REFINED
 
-    _log_transition(session, task, "clarified", previous, actor=actor)
+    _log_transition(session, task, "clarified", previous, actor=actor, **_where(task))
+    session.commit()
+    return task
+
+def refine(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -> Task:
+    """Refine an inbox or someday item as it stands: same place, same detail.
+
+    It is a clarification that changes nothing but the state, logged as
+    "clarified" like any other.
+
+    Args:
+        session: Database session to use.
+        task_id: Id of the task.
+        actor: Who made the change, recorded in the event log.
+
+    Returns:
+        The refined Task.
+
+    Raises:
+        NotFoundError: If no task has this id.
+        InvalidTransitionError: If the task isn't inbox or someday.
+    """
+    task = get(session, task_id)
+    if task.state not in (TaskState.INBOX, TaskState.SOMEDAY):
+        raise InvalidTransitionError(f"task '{task_id}' isn't inbox or someday.")
+    return clarify(session, task.id, task.title, task.body,
+                   task.project.key if task.project else None, task.context, task.size,
+                   parent_ref=task.parent.ref if task.parent else None, actor=actor)
+
+def unrefine(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -> Task:
+    """Put a refined item back to the inbox state, to be refined again.
+
+    It keeps its place and detail: a placed item stays in its project, an
+    item with no project goes back to the global inbox.
+
+    Args:
+        session: Database session to use.
+        task_id: Id of the task.
+        actor: Who made the change, recorded in the event log.
+
+    Returns:
+        The task, back to inbox.
+
+    Raises:
+        NotFoundError: If no task has this id.
+        InvalidTransitionError: If the task isn't refined.
+    """
+    task = get(session, task_id)
+
+    if task.state != TaskState.REFINED:
+        raise InvalidTransitionError(f"task '{task_id}' isn't refined.")
+
+    task.state = TaskState.INBOX
+
+    _log_transition(session, task, "unrefined", TaskState.REFINED, actor=actor)
     session.commit()
     return task
 
@@ -335,74 +522,8 @@ def clarify(session : Session,
 # Lifecycle transitions
 # -----------------------------------------------------------------------------
 
-def plan(session : Session, task_id : int, version_id : int, actor : str = events.ACTOR_WEB) -> Task:
-    """Plan a refined task into a version.
-
-    Args:
-        session: Database session to use.
-        task_id: Id of the task.
-        version_id: Id of the version to plan the task into.
-        actor: Who made the change, recorded in the event log.
-
-    Returns:
-        The planned Task.
-
-    Raises:
-        NotFoundError: If no task or version has this id.
-        InvalidTransitionError: If the task isn't refined.
-        ValidationError: If the version is already released, or the task
-            already belongs to a different project than the version.
-    """
-    task = get(session, task_id)
-
-    if task.state != TaskState.REFINED:
-        raise InvalidTransitionError(f"task '{task_id}' isn't refined.")
-
-    version = session.query(Version).filter_by(id=version_id).first()
-    
-    _require_existing_version(version, version_id)
-    _require_unreleased(version)
-
-    if task.project_id is not None and task.project_id != version.project_id:
-        raise ValidationError(f"task '{task_id}' belongs to a different project than the version.")
-
-    task.project_id = version.project_id
-    task.version_id = version.id
-    task.state = TaskState.PLANNED
-
-    _log_transition(session, task, "planned", TaskState.REFINED, version_id=version.id, actor=actor)
-    session.commit()
-    return task
-
-def unplan(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -> Task:
-    """Unplan a planned task back to refined.
-
-    Args:
-        session: Database session to use.
-        task_id: Id of the task.
-        actor: Who made the change, recorded in the event log.
-
-    Returns:
-        The unplanned Task.
-
-    Raises:
-        NotFoundError: If no task has this id.
-        InvalidTransitionError: If the task isn't planned.
-    """
-    task = get(session, task_id)
-
-    if task.state != TaskState.PLANNED:
-        raise InvalidTransitionError(f"task '{task_id}' isn't planned.")
-
-    task.version_id = None
-    task.state = TaskState.REFINED
-
-    _log_transition(session, task, "unplanned", TaskState.PLANNED, actor=actor)
-    session.commit()
-    return task
-
 def start(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -> Task:
-    """Start a planned task.
+    """Start a refined feature or task.
 
     Args:
         session: Database session to use.
@@ -414,16 +535,21 @@ def start(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -> T
 
     Raises:
         NotFoundError: If no task has this id.
-        InvalidTransitionError: If the task isn't planned.
+        InvalidTransitionError: If the task isn't refined.
     """
     task = get(session, task_id)
 
-    if task.state != TaskState.PLANNED:
-        raise InvalidTransitionError(f"task '{task_id}' isn't planned.")
+    if task.state != TaskState.REFINED:
+        raise InvalidTransitionError(f"task '{task_id}' isn't refined.")
 
     task.state = TaskState.DOING
 
-    _log_transition(session, task, "started", TaskState.PLANNED, actor=actor)
+    extra = {}
+    if task.kind is TaskKind.FEATURE and not _has_started_before(session, task):
+        # The feature's plan, frozen at its first start: later additions,
+        # removals, cancellations, reopenings and renames are plan drift.
+        extra["plan"] = [child.ref for child in task.children]
+    _log_transition(session, task, "started", TaskState.REFINED, actor=actor, **extra)
     session.commit()
     return task
 
@@ -487,7 +613,10 @@ def unblock(session : Session, task_id : int, actor : str = events.ACTOR_WEB) ->
     return task
 
 def complete(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -> Task:
-    """Complete a task that's being worked on.
+    """Complete a feature or task that's being worked on.
+
+    A feature completed for the first time raises MINOR on its nearest
+    project and records the version it shipped in.
 
     Args:
         session: Database session to use.
@@ -500,16 +629,21 @@ def complete(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -
     Raises:
         NotFoundError: If no task has this id.
         InvalidTransitionError: If the task isn't doing.
+        ConflictError: If it is a feature with a child neither done nor
+            cancelled.
     """
     task = get(session, task_id)
 
     if task.state != TaskState.DOING:
         raise InvalidTransitionError(f"task '{task_id}' isn't doing.")
+    _require_closed_children(task)
 
     task.state = TaskState.DONE
     task.closed_at = datetime.utcnow()
 
     _log_transition(session, task, "completed", TaskState.DOING, actor=actor)
+    # A feature shipping raises MINOR on its nearest project, once.
+    versioning.bump_minor(session, task, actor=actor)
     session.commit()
     return task
 
@@ -535,8 +669,41 @@ def reopen(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -> 
 
     task.state = TaskState.DOING
     task.closed_at = None
+    # Open again, so no longer put away.
+    task.archived_at = None
 
     _log_transition(session, task, "reopened", TaskState.DONE, actor=actor)
+    session.commit()
+    return task
+
+def unstart(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -> Task:
+    """Put a started task back to refined, as if it hadn't been started.
+
+    A waiting task loses its blocked reason. The first "started" event stays
+    in the log, so a feature's frozen plan isn't taken again on a restart.
+
+    Args:
+        session: Database session to use.
+        task_id: Id of the task.
+        actor: Who made the change, recorded in the event log.
+
+    Returns:
+        The task, back to refined.
+
+    Raises:
+        NotFoundError: If no task has this id.
+        InvalidTransitionError: If the task isn't doing or waiting.
+    """
+    task = get(session, task_id)
+
+    if task.state not in (TaskState.DOING, TaskState.WAITING):
+        raise InvalidTransitionError(f"task '{task_id}' isn't doing or waiting.")
+
+    previous = task.state
+    task.state = TaskState.REFINED
+    task.blocked_reason = None
+
+    _log_transition(session, task, "unstarted", previous, actor=actor)
     session.commit()
     return task
 
@@ -567,56 +734,152 @@ def defer(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -> T
     session.commit()
     return task
 
-def move_to_version(session : Session, task_id : int, version_id : int, actor : str = events.ACTOR_WEB) -> Task:
-    """Move a planned, doing or waiting task to another version of its project.
+def move(session : Session, task_id : int, project_key : str | None = None,
+         parent_ref : str | None = None, actor : str = events.ACTOR_WEB) -> Task:
+    """Move a feature or task elsewhere in the tree; a feature takes its
+    whole subtree along.
 
-    The task keeps its state; only its version changes.
+    The item keeps its state. Given only a project, it goes to the top of
+    that project; given a parent feature, under it.
 
     Args:
         session: Database session to use.
         task_id: Id of the task.
-        version_id: Id of the version to move the task to.
+        project_key: Key of the project or subproject to move it to.
+        parent_ref: Ref of the feature to move it under.
+        actor: Who made the change, recorded in the event log.
+
+    Returns:
+        The moved Task, last among its new siblings.
+
+    Raises:
+        NotFoundError: If no task has this id, or the project or the parent
+            doesn't exist.
+        ValidationError: If neither a project nor a parent is given, the
+            item is already there, or the parent can't hold it (no cycle).
+    """
+    task = get(session, task_id)
+    if project_key is None and parent_ref is None:
+        raise ValidationError("give a project or a parent feature to move to.")
+
+    project, parent = _resolve_placement(session, task, project_key, parent_ref)
+    if (project, parent) == (task.project, task.parent):
+        raise ValidationError(f"'{task.ref}' is already there.")
+
+    previous = _where(task)
+    _set_place(task, project, parent)
+    task.position = _next_position(session, project, parent)
+
+    _log(session, actor, task, "moved", {"from": previous, "to": _where(task)})
+    session.commit()
+    return task
+
+# Directions reorder() accepts, mapped to the step taken among the siblings.
+_REORDER_STEPS = {"up": -1, "down": 1}
+
+def reorder(session : Session, task_id : int, direction : str, actor : str = events.ACTOR_WEB) -> Task:
+    """Move a work item one place up or down among its siblings.
+
+    An open item swaps with its nearest open sibling, so it never seems to
+    stay still behind a done or cancelled one hidden from the tree; a closed
+    item swaps with its nearest sibling. Sibling positions are renumbered
+    0, 1, 2… in the new order.
+
+    Args:
+        session: Database session to use.
+        task_id: Id of the task.
+        direction: "up" or "down".
         actor: Who made the change, recorded in the event log.
 
     Returns:
         The moved Task.
 
     Raises:
-        NotFoundError: If no task or version has this id.
-        InvalidTransitionError: If the task isn't planned, doing or waiting.
-        ValidationError: If the task's current version or the target version
-            is already released, the target is the task's current version, or
-            the target belongs to a different project than the task.
+        NotFoundError: If no task has this id.
+        ValidationError: If the direction is unknown, the item has no
+            project (inbox order is capture order), or it is already first
+            (up) or last (down).
+    """
+    if direction not in _REORDER_STEPS:
+        raise ValidationError(f"unknown direction '{direction}': use up or down.")
+    task = get(session, task_id)
+    if task.project is None:
+        raise ValidationError(f"'{task.ref}' has no project yet; only items in a tree can be reordered.")
+
+    siblings = sorted(
+        session.query(Task).filter_by(project_id=task.project_id, parent_id=task.parent_id),
+        key=lambda sibling: (sibling.position, sibling.id))
+    index = siblings.index(task)
+    step = _REORDER_STEPS[direction]
+    neighbour = index + step
+    if task.state not in _CLOSED_STATES:
+        while 0 <= neighbour < len(siblings) and siblings[neighbour].state in _CLOSED_STATES:
+            neighbour += step
+    if not 0 <= neighbour < len(siblings):
+        raise ValidationError(f"'{task.ref}' is already {'first' if step < 0 else 'last'}.")
+
+    previous = task.position
+    siblings.insert(neighbour, siblings.pop(index))
+    for position, sibling in enumerate(siblings):
+        sibling.position = position
+
+    _log(session, actor, task, "reordered",
+               {"from": previous, "to": task.position, "direction": direction})
+    session.commit()
+    return task
+
+def _change_kind(session : Session, task : Task, kind : TaskKind, actor : str) -> None:
+    """Turn a task into a feature or back, respelling its ref; no commit.
+
+    Args:
+        session: Database session to use.
+        task: The work item.
+        kind: Its new kind, different from the current one.
+        actor: Who made the change, recorded in the event log.
+
+    Raises:
+        ValidationError: If a feature with children would become a task.
+    """
+    if kind is TaskKind.TASK and task.children:
+        raise ValidationError(f"feature '{task.ref}' has children; a task can't hold any.")
+
+    previous_kind, previous_ref = task.kind, task.ref
+    task.kind = kind
+    task.ref = refs.with_kind(task.ref, kind)
+    _log(session, actor, task, "kind_changed",
+               {"from": previous_kind.name, "to": kind.name,
+                "ref": {"from": previous_ref, "to": task.ref}})
+
+def change_kind(session : Session, task_id : int, kind : TaskKind, actor : str = events.ACTOR_WEB) -> Task:
+    """Turn a task into a feature, or an empty feature into a task.
+
+    The ref keeps its code and takes the new kind's prefix ("t-4k2" becomes
+    "f-4k2"); either spelling still finds the item.
+
+    Args:
+        session: Database session to use.
+        task_id: Id of the task.
+        kind: The new kind.
+        actor: Who made the change, recorded in the event log.
+
+    Returns:
+        The changed Task.
+
+    Raises:
+        NotFoundError: If no task has this id.
+        ValidationError: If the item already has this kind, or a feature with
+            children would become a task.
     """
     task = get(session, task_id)
+    if task.kind is kind:
+        raise ValidationError(f"'{task.ref}' is already a {kind.name.lower()}.")
 
-    if task.state not in (TaskState.PLANNED, TaskState.DOING, TaskState.WAITING):
-        raise InvalidTransitionError(f"task '{task_id}' isn't planned, doing or waiting.")
-
-    version = session.query(Version).filter_by(id=version_id).first()
-
-    _require_existing_version(version, version_id)
-    if task.version is not None:
-        _require_unreleased(task.version)
-    _require_unreleased(version)
-
-    if task.version_id == version.id:
-        raise ValidationError(f"task '{task_id}' is already in version '{version.number}'.")
-    if task.project_id != version.project_id:
-        raise ValidationError(f"task '{task_id}' belongs to a different project than the version.")
-
-    previous_version_id = task.version_id
-    task.version = version
-
-    _log_transition(session, task, "moved", task.state,
-                    from_version_id=previous_version_id, version_id=version.id, actor=actor)
+    _change_kind(session, task, kind, actor)
     session.commit()
     return task
 
 def cancel(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -> Task:
-    """Cancel a task that won't be done.
-
-    The task keeps its version, so the version's history still shows it.
+    """Cancel a feature or task that won't be done.
 
     Args:
         session: Database session to use.
@@ -629,14 +892,14 @@ def cancel(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -> 
     Raises:
         NotFoundError: If no task has this id.
         InvalidTransitionError: If the task is already done or cancelled.
-        ValidationError: If the task's version is already released.
+        ConflictError: If it is a feature with a child neither done nor
+            cancelled.
     """
     task = get(session, task_id)
 
-    if task.state in (TaskState.DONE, TaskState.CANCELLED):
+    if task.state in _CLOSED_STATES:
         raise InvalidTransitionError(f"task '{task_id}' is already done or cancelled.")
-    if task.version is not None:
-        _require_unreleased(task.version)
+    _require_closed_children(task)
 
     previous = task.state
     task.state = TaskState.CANCELLED
@@ -648,7 +911,7 @@ def cancel(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -> 
     return task
 
 def restore(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -> Task:
-    """Bring a cancelled task back to refined, out of any version.
+    """Bring a cancelled feature or task back to refined.
 
     Args:
         session: Database session to use.
@@ -661,28 +924,107 @@ def restore(session : Session, task_id : int, actor : str = events.ACTOR_WEB) ->
     Raises:
         NotFoundError: If no task has this id.
         InvalidTransitionError: If the task isn't cancelled.
-        ValidationError: If the task's version is already released.
     """
     task = get(session, task_id)
 
     if task.state != TaskState.CANCELLED:
         raise InvalidTransitionError(f"task '{task_id}' isn't cancelled.")
-    if task.version is not None:
-        _require_unreleased(task.version)
 
     task.state = TaskState.REFINED
-    task.version_id = None
     task.closed_at = None
+    # Open again, so no longer put away.
+    task.archived_at = None
 
     _log_transition(session, task, "restored", TaskState.CANCELLED, actor=actor)
     session.commit()
     return task
 
-def change_state(session : Session, task_id : int, target : TaskState, reason : str = "", actor : str = events.ACTOR_WEB) -> Task:
-    """Move a task to a target state through the matching lifecycle transition.
+# One-step state changes, as (from, to) pairs, in the order a path search
+# tries them. Any longer move chains these steps.
+_STEPS = (
+    (TaskState.INBOX, TaskState.REFINED),
+    (TaskState.REFINED, TaskState.INBOX),
+    (TaskState.REFINED, TaskState.DOING),
+    (TaskState.DOING, TaskState.WAITING),
+    (TaskState.DOING, TaskState.DONE),
+    (TaskState.DOING, TaskState.REFINED),
+    (TaskState.WAITING, TaskState.DOING),
+    (TaskState.WAITING, TaskState.REFINED),
+    (TaskState.DONE, TaskState.DOING),
+    (TaskState.CANCELLED, TaskState.REFINED),
+    (TaskState.SOMEDAY, TaskState.REFINED),
+    (TaskState.INBOX, TaskState.CANCELLED),
+    (TaskState.REFINED, TaskState.CANCELLED),
+    (TaskState.DOING, TaskState.CANCELLED),
+    (TaskState.WAITING, TaskState.CANCELLED),
+)
 
-    Covers the working states and cancelling: planned to doing, doing to
-    waiting or done, waiting or done back to doing, any open task to cancelled.
+def _state_path(start : TaskState, target : TaskState) -> tuple | None:
+    """Find the shortest chain of one-step changes from one state to another.
+
+    Args:
+        start: The state the task is in.
+        target: The state to reach.
+
+    Returns:
+        The states to go through, target included (empty when start is the
+        target); None if the target can't be reached.
+    """
+    paths = {start: ()}
+    queue = [start]
+    while queue:
+        state = queue.pop(0)
+        if state == target:
+            return paths[state]
+        for origin, following in _STEPS:
+            if origin == state and following not in paths:
+                paths[following] = paths[state] + (following,)
+                queue.append(following)
+    return None
+
+def _step(session : Session, task : Task, target : TaskState, reason : str, actor : str) -> Task:
+    """Apply one one-step change from _STEPS to a task.
+
+    Args:
+        session: Database session to use.
+        task: The task, in the state the step starts from.
+        target: The state the step leads to.
+        reason: Why the task is blocked; only used when the target is waiting.
+        actor: Who made the change, recorded in the event log.
+
+    Returns:
+        The updated Task.
+    """
+    if target == TaskState.CANCELLED:
+        return cancel(session, task.id, actor=actor)
+    if target == TaskState.WAITING:
+        return block(session, task.id, reason, actor=actor)
+    if target == TaskState.DONE:
+        return complete(session, task.id, actor=actor)
+    if target == TaskState.INBOX:
+        return unrefine(session, task.id, actor=actor)
+    if target == TaskState.REFINED:
+        if task.state in (TaskState.INBOX, TaskState.SOMEDAY):
+            return refine(session, task.id, actor=actor)
+        if task.state == TaskState.CANCELLED:
+            return restore(session, task.id, actor=actor)
+        return unstart(session, task.id, actor=actor)
+    # Target DOING.
+    if task.state == TaskState.REFINED:
+        return start(session, task.id, actor=actor)
+    if task.state == TaskState.WAITING:
+        return unblock(session, task.id, actor=actor)
+    return reopen(session, task.id, actor=actor)
+
+def change_state(session : Session, task_id : int, target : TaskState, reason : str = "", actor : str = events.ACTOR_WEB) -> Task:
+    """Move a task to a target state, through as many lifecycle steps as needed.
+
+    The steps are the one-step changes (refine, unrefine, start, unstart,
+    block, unblock, complete, reopen, cancel, restore), chained along the
+    shortest path; each is logged as its own event, e.g. inbox to done is
+    refined, started, then completed. Someday can be left this way (it is
+    refined first) but not reached.
+    What could stop the chain halfway is checked before the first step.
 
     Args:
         session: Database session to use.
@@ -696,36 +1038,139 @@ def change_state(session : Session, task_id : int, target : TaskState, reason : 
 
     Raises:
         NotFoundError: If no task has this id.
-        InvalidTransitionError: If the task can't go from its state to the target.
-        ValidationError: If the task's version is already released, or the
-            target is waiting and the reason is empty.
+        InvalidTransitionError: If the task can't reach the target, or is
+            already in it.
+        ValidationError: If the target is waiting and the reason is empty.
+        ConflictError: If a feature with open children would be closed.
     """
     task = get(session, task_id)
 
-    if task.version is not None:
-        _require_unreleased(task.version)
-    if target == TaskState.CANCELLED:
-        return cancel(session, task_id, actor=actor)
-    if target == TaskState.WAITING:
-        return block(session, task_id, reason, actor=actor)
-    if target == TaskState.DONE:
-        return complete(session, task_id, actor=actor)
-    if target == TaskState.DOING:
-        if task.state == TaskState.PLANNED:
-            return start(session, task_id, actor=actor)
-        if task.state == TaskState.WAITING:
-            return unblock(session, task_id, actor=actor)
-        if task.state == TaskState.DONE:
-            return reopen(session, task_id, actor=actor)
-    raise InvalidTransitionError(
-        f"task '{task_id}' can't go from {task.state.name} to {target.name}.")
+    path = _state_path(task.state, target)
+    if not path:
+        raise InvalidTransitionError(
+            f"task '{task_id}' can't go from {task.state.name} to {target.name}.")
+    if target == TaskState.WAITING and not reason:
+        raise ValidationError("a blocked task requires a non-empty reason.")
+    if target in _CLOSED_STATES:
+        _require_closed_children(task)
+
+    for state in path:
+        task = _step(session, task, state, reason, actor)
+    return task
+
+# -----------------------------------------------------------------------------
+# Archiving
+# -----------------------------------------------------------------------------
+
+def _archive_tree(session : Session, task : Task, now : datetime, actor : str) -> int:
+    """Mark an item and its descendants archived, each logged.
+
+    A closed feature's descendants are all closed too.
+
+    Args:
+        session: Database session to use.
+        task: The closed item.
+        now: Archive time to record.
+        actor: Who made the change, recorded in the event log.
+
+    Returns:
+        How many items were newly archived.
+    """
+    count = 0
+    for item in (task, *_descendants(task)):
+        if item.archived_at is None:
+            item.archived_at = now
+            _log(session, actor, item, "archived")
+            count += 1
+    return count
+
+def archive(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -> Task:
+    """Put a done or cancelled item away from the lists, with its descendants.
+
+    The item keeps its state: archiving only hides it. Each item archived is
+    logged as "archived".
+
+    Args:
+        session: Database session to use.
+        task_id: Id of the task.
+        actor: Who made the change, recorded in the event log.
+
+    Returns:
+        The archived Task.
+
+    Raises:
+        NotFoundError: If no task has this id.
+        InvalidTransitionError: If the item isn't done or cancelled, or is
+            already archived.
+    """
+    task = get(session, task_id)
+    if task.state not in _CLOSED_STATES:
+        raise InvalidTransitionError(f"'{task.ref}' isn't done or cancelled.")
+    if task.archived_at is not None:
+        raise InvalidTransitionError(f"'{task.ref}' is already archived.")
+    _archive_tree(session, task, datetime.utcnow(), actor)
+    session.commit()
+    return task
+
+def unarchive(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -> Task:
+    """Bring an archived item back to the lists, with its descendants.
+
+    Args:
+        session: Database session to use.
+        task_id: Id of the task.
+        actor: Who made the change, recorded in the event log.
+
+    Returns:
+        The unarchived Task.
+
+    Raises:
+        NotFoundError: If no task has this id.
+        InvalidTransitionError: If the item isn't archived.
+    """
+    task = get(session, task_id)
+    if task.archived_at is None:
+        raise InvalidTransitionError(f"'{task.ref}' isn't archived.")
+    for item in (task, *_descendants(task)):
+        if item.archived_at is not None:
+            item.archived_at = None
+            _log(session, actor, item, "unarchived")
+    session.commit()
+    return task
+
+def archive_closed(session : Session, project : Project, state : TaskState,
+                   actor : str = events.ACTOR_WEB) -> int:
+    """Archive every done (or cancelled) item of a project at once.
+
+    Args:
+        session: Database session to use.
+        project: Project or subproject; a root project's subprojects'
+            items are archived too.
+        state: TaskState.DONE or TaskState.CANCELLED.
+        actor: Who made the change, recorded in the event log.
+
+    Returns:
+        How many items were archived, descendants included.
+
+    Raises:
+        ValidationError: If the state isn't done or cancelled.
+    """
+    if state not in _CLOSED_STATES:
+        raise ValidationError("only done or cancelled items can be archived.")
+    now = datetime.utcnow()
+    count = 0
+    for scope in (project, *project.subprojects):
+        for item in scope.tasks:
+            if item.state is state and item.archived_at is None:
+                count += _archive_tree(session, item, now, actor)
+    session.commit()
+    return count
 
 # -----------------------------------------------------------------------------
 # Deletion
 # -----------------------------------------------------------------------------
 
 def delete(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -> None:
-    """Delete a task.
+    """Delete a task, or a feature with no children.
 
     Args:
         session: Database session to use.
@@ -734,8 +1179,13 @@ def delete(session : Session, task_id : int, actor : str = events.ACTOR_WEB) -> 
 
     Raises:
         NotFoundError: If no task has this id.
+        ConflictError: If it is a feature that still has children.
     """
     task = get(session, task_id)
-    events.log(session, actor, "task", task.id, "deleted", {"title": task.title})
+    if task.children:
+        raise ConflictError(
+            f"feature '{task.ref}' isn't empty: delete or move its children first.")
+    _log(session, actor, task, "deleted",
+               {"title": task.title, "kind": task.kind.name, "ref": task.ref})
     session.delete(task)
     session.commit()

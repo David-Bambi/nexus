@@ -1,0 +1,15 @@
+---
+title: Migrations
+summary: "Comment le schéma de la base évolue, et pourquoi une base 1.x est refusée"
+icon: lucide:database-zap
+type: carte
+links: [auto-migrations.cpt,
+        refused-1x-database.cpt]
+related:
+  - 
+---
+
+__Alembic__, l'outil de migrations de SQLAlchemy, fait évoluer le schéma de la base d'une version du code à la suivante.
+
+- [Migrations au démarrage](auto-migrations.cpt) : appliquées dès que l'application est construite.
+- [Base 1.x refusée](refused-1x-database.cpt) : pourquoi, et comment repartir.

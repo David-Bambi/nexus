@@ -1,0 +1,22 @@
+---
+title: reorder_task
+summary: "Monte ou descend un élément parmi ses voisins ouverts"
+icon: lucide:wrench
+tags: [element]
+links: []
+related:
+  - 
+---
+
+__Rôle__ : monte ou descend un élément d'une place parmi ses voisins (même projet, même parent).
+
+__Arguments__
+- Obligatoires : `ref`, `direction` (`up` ou `down`).
+- Aucun facultatif.
+
+__Règles__
+- Un élément ouvert saute les voisins terminés ou annulés.
+- Refusé pour une capture sans projet, ou un élément déjà premier (ou dernier).
+- Écriture, non destructif.
+
+__Résultat__ : l'élément, à sa nouvelle place.

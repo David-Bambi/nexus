@@ -1,0 +1,23 @@
+---
+title: Pages
+summary: "Les écrans de l'application web, une fiche par page"
+icon: lucide:layout-template
+type: liste
+gabarit: dashboard.cpt
+links: [dashboard.cpt,
+        projects.cpt,
+        project.cpt,
+        kanban.cpt,
+        state-tabs.cpt,
+        item.cpt,
+        tasks.cpt,
+        inbox.cpt,
+        refine.cpt,
+        search.cpt,
+        sizes.cpt,
+        exports.cpt]
+related:
+  - 
+---
+
+Les écrans de l'application web : chacun a son adresse et affiche une page complète. 12 entrées.

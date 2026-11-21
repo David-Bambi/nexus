@@ -1,0 +1,19 @@
+---
+title: Styles et script
+summary: "Une feuille de style à jetons, un petit script, et rien en ligne dans les gabarits"
+icon: lucide:palette
+links: []
+related:
+  - 
+---
+
+Style dans `app.css`, comportement dans `app.js` ; les gabarits ne gardent que la structure.
+
+- `app.css` commence par des __jetons__ (couleurs, espacements, tailles) et un __thème sombre__ qui redéfinit les couleurs. Ailleurs, jamais de couleur ou de taille en dur.
+- `app.js` : la touche `c` met le curseur dans la barre de capture ; `data-confirm` n'active un bouton que si la valeur exacte est tapée ; `data-reveal` ouvre ou referme un champ caché (raison WAITING, formulaires du projet) ; une règle `[hidden]` globale le garde caché.
+- Aucun `style=`, `<script>` ni `onclick` dans les gabarits (testé).
+- Contraste WCAG AA des textes et badges dans les deux thèmes (testé).
+
+Pourquoi : une feuille et un script se relisent bien, les jetons font du thème sombre un bloc.
+
+Écartés : un cadriciel CSS (Pico à surcharger, Tailwind à construire) et des scripts par page.

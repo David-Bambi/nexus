@@ -1,0 +1,26 @@
+{
+  "feature-export.cpt": {
+    "x": -117,
+    "y": -19
+  },
+  "exported-events.cpt": {
+    "x": 132,
+    "y": 83
+  },
+  "project-directory.cpt": {
+    "x": -1,
+    "y": 93
+  },
+  "correction.cpt": {
+    "x": -131,
+    "y": 92
+  },
+  "frozen-plan.cpt": {
+    "x": 136,
+    "y": -8
+  },
+  "event-parent.cpt": {
+    "x": 3,
+    "y": -17
+  }
+}

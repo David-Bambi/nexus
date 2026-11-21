@@ -1,7 +1,7 @@
 import pytest
 
-from src.models.task import TaskState
-from src.services import projects, tasks, versions, views
+from src.models.task import TaskKind, TaskState
+from src.services import projects, tasks, views
 from src.services.errors import NotFoundError
 
 # Inbox --------------------------------------------------------------------------------------------
@@ -18,6 +18,19 @@ def test_inbox_returns_only_inbox_tasks(session):
 
     result = views.inbox(session)
     assert [t.id for t in result] == [inbox_task.id]
+
+def test_inbox_leaves_out_items_placed_in_a_project(session):
+    """Inbox lists only captures with no project
+    Given a capture and an inbox item added to a project's tree
+    When listing the inbox and counting it on the dashboard
+    Then only the capture is there
+    """
+    projects.create(session, "nx", "Nexus")
+    capture = tasks.capture(session, "Loose idea")
+    tasks.add_to_tree(session, "Placed", project_key="nx")
+
+    assert [t.id for t in views.inbox(session)] == [capture.id]
+    assert views.dashboard(session).inbox_count == 1
 
 def test_inbox_oldest_first(session):
     """Inbox lists tasks oldest first
@@ -42,23 +55,20 @@ def test_inbox_empty(session):
 
 # To refine ------------------------------------------------------------------------------------------
 
-def test_to_refine_returns_only_unplanned_refined_tasks(session):
-    """To-refine lists only refined tasks without a version
-    Given an inbox task, a refined task and a planned task
+def test_to_refine_returns_only_refined_tasks(session):
+    """To-refine lists only refined items, ready to start
+    Given an inbox task, a refined task and a started task
     When listing to-refine
-    Then only the refined, unplanned task is returned
+    Then only the refined task is returned
     """
-    projects.create(session, "nexus", "Nexus", "")
-    version = versions.create(session, "nexus", "0.1.0", "First version", ["Ships"])
-
     tasks.capture(session, "Still in inbox")
 
-    refined = tasks.capture(session, "Needs planning")
-    tasks.clarify(session, refined.id, "Needs planning", None, None, None, None)
+    refined = tasks.capture(session, "Ready")
+    tasks.clarify(session, refined.id, "Ready", None, None, None, None)
 
-    planned = tasks.capture(session, "Already planned")
-    tasks.clarify(session, planned.id, "Already planned", None, None, None, None)
-    tasks.plan(session, planned.id, version.id)
+    started = tasks.capture(session, "Started")
+    tasks.clarify(session, started.id, "Started", None, None, None, None)
+    tasks.start(session, started.id)
 
     result = views.to_refine(session)
     assert [t.id for t in result] == [refined.id]
@@ -162,106 +172,33 @@ def test_search_empty_term_returns_empty(session):
 
 # Dashboard ----------------------------------------------------------------------------------------
 
-def _refined_task(session, title, version=None):
-    """Capture and clarify a task, optionally planning it into a version."""
+def _refined_task(session, title):
+    """Capture and clarify a task."""
     task = tasks.capture(session, title)
-    tasks.clarify(session, task.id, title, None, None, None, None)
-    if version:
-        tasks.plan(session, task.id, version.id)
-    return task
+    return tasks.clarify(session, task.id, title, None, None, None, None)
 
 def test_dashboard_empty(session):
     """Dashboard on an empty database shows nothing
     Given no data
     When building the dashboard
-    Then there are no versions or tasks and both counters are zero
+    Then there are no tasks and both counters are zero
     """
     result = views.dashboard(session)
 
-    assert not result.versions
     assert not result.doing
     assert not result.waiting
     assert result.inbox_count == 0
     assert result.refine_count == 0
 
-def test_dashboard_only_lists_in_progress_versions(session):
-    """Dashboard lists only started, unreleased versions
-    Given a planned, an in-progress and a released version
-    When building the dashboard
-    Then only the in-progress version is listed
-    """
-    projects.create(session, "nexus", "Nexus", "")
-    versions.create(session, "nexus", "0.1.0", "Released", ["Ships"])
-    started = versions.create(session, "nexus", "0.2.0", "Started", ["Ships"])
-    versions.create(session, "nexus", "0.3.0", "Planned", ["Ships"])
-    released = versions.get(session, "nexus", "0.1.0")
-    versions.start(session, released.id)
-    versions.set_criterion_done(session, released.definition_of_done[0].id, True)
-    versions.release(session, released.id)
-    versions.start(session, started.id)
-
-    result = views.dashboard(session)
-    assert [p.version.number for p in result.versions] == ["0.2.0"]
-
-def test_dashboard_version_progress(session):
-    """Dashboard shows how many of a version's tasks are done
-    Given a started version with two planned tasks, one of them completed
-    When building the dashboard
-    Then the version reports 1 done out of 2
-    """
-    projects.create(session, "nexus", "Nexus", "")
-    version = versions.create(session, "nexus", "0.1.0", "First version", ["Ships"])
-    versions.start(session, version.id)
-    finished = _refined_task(session, "Finished", version)
-    _refined_task(session, "Pending", version)
-    tasks.start(session, finished.id)
-    tasks.complete(session, finished.id)
-
-    [progress] = views.dashboard(session).versions
-    assert (progress.done, progress.total) == (1, 2)
-
-def test_dashboard_version_without_tasks(session):
-    """Dashboard shows a started version with no tasks as 0 out of 0
-    Given a started version with no tasks
-    When building the dashboard
-    Then the version reports 0 done out of 0
-    """
-    projects.create(session, "nexus", "Nexus", "")
-    version = versions.create(session, "nexus", "0.1.0", "First version", ["Ships"])
-    versions.start(session, version.id)
-
-    [progress] = views.dashboard(session).versions
-    assert (progress.done, progress.total) == (0, 0)
-
-def test_dashboard_progress_is_per_version(session):
-    """Dashboard counts each version's tasks separately
-    Given two started versions with one and two planned tasks
-    When building the dashboard
-    Then each version reports its own total
-    """
-    projects.create(session, "nexus", "Nexus", "")
-    first = versions.create(session, "nexus", "0.1.0", "First", ["Ships"])
-    second = versions.create(session, "nexus", "0.2.0", "Second", ["Ships"])
-    versions.start(session, first.id)
-    versions.start(session, second.id)
-    _refined_task(session, "A", first)
-    _refined_task(session, "B", second)
-    _refined_task(session, "C", second)
-
-    result = views.dashboard(session)
-    assert [(p.version.number, p.total) for p in result.versions] == [("0.1.0", 1), ("0.2.0", 2)]
-
 def test_dashboard_splits_doing_and_waiting(session):
-    """Dashboard separates tasks in progress from blocked ones
-    Given a doing task, a waiting task and a merely planned task
+    """Dashboard separates items in progress from blocked ones
+    Given a doing task, a waiting task and a merely refined task
     When building the dashboard
-    Then doing and waiting hold one task each, and the planned task appears in neither
+    Then doing and waiting hold one task each, and the refined task appears in neither
     """
-    projects.create(session, "nexus", "Nexus", "")
-    version = versions.create(session, "nexus", "0.1.0", "First version", ["Ships"])
-    doing = _refined_task(session, "Doing", version)
-    waiting = _refined_task(session, "Waiting", version)
-    _refined_task(session, "Planned", version)
+    doing = _refined_task(session, "Doing")
+    waiting = _refined_task(session, "Waiting")
+    _refined_task(session, "Refined")
     tasks.start(session, doing.id)
     tasks.start(session, waiting.id)
     tasks.block(session, waiting.id, "Waiting for review")
@@ -272,16 +209,14 @@ def test_dashboard_splits_doing_and_waiting(session):
 
 def test_dashboard_counters_match_inbox_and_refine(session):
     """Dashboard counters match the inbox and refine queues
-    Given two inbox tasks, one refined unplanned task and one planned task
+    Given two inbox tasks, one refined task and one started task
     When building the dashboard
     Then the counters equal the lengths of inbox() and to_refine()
     """
-    projects.create(session, "nexus", "Nexus", "")
-    version = versions.create(session, "nexus", "0.1.0", "First version", ["Ships"])
     tasks.capture(session, "First")
     tasks.capture(session, "Second")
-    _refined_task(session, "To plan")
-    _refined_task(session, "Planned", version)
+    _refined_task(session, "Ready")
+    tasks.start(session, _refined_task(session, "Started").id)
 
     result = views.dashboard(session)
     assert result.inbox_count == len(views.inbox(session)) == 2
@@ -323,76 +258,21 @@ def test_search_limit_keeps_the_oldest_matches(session):
     result = views.search(session, "docs", limit=2)
     assert [t.id for t in result] == ids[:2]
 
-def test_dashboard_version_dod_progress(session):
-    """Dashboard shows how many of a version's DOD criteria are checked
-    Given a started version with three criteria, one of them checked
-    When building the dashboard
-    Then the version reports 1 checked out of 3
-    """
-    projects.create(session, "nexus", "Nexus", "")
-    version = versions.create(session, "nexus", "0.1.0", "First version", ["Ships", "Docs", "Tests"])
-    versions.start(session, version.id)
-    versions.set_criterion_done(session, version.definition_of_done[0].id, True)
-
-    [progress] = views.dashboard(session).versions
-    assert (progress.dod_done, progress.dod_total) == (1, 3)
-
-
-def test_dashboard_progress_ignores_cancelled_tasks(session):
-    """Dashboard progress leaves cancelled tasks out of the total
-    Given a started version with a done task and a cancelled task
-    When building the dashboard
-    Then the version reports 1 done out of 1
-    """
-    projects.create(session, "nexus", "Nexus", "")
-    version = versions.create(session, "nexus", "0.1.0", "First version", ["Ships"])
-    versions.start(session, version.id)
-    finished = _refined_task(session, "Finished", version)
-    dropped = _refined_task(session, "Dropped", version)
-    tasks.start(session, finished.id)
-    tasks.complete(session, finished.id)
-    tasks.cancel(session, dropped.id)
-
-    [progress] = views.dashboard(session).versions
-    assert (progress.done, progress.total) == (1, 1)
-
-
-
-def test_version_progress_measures_any_version_in_the_given_order(session):
-    """Version progress works for versions whatever their status, keeping their order
-    Given a planned version with a done task and a checked criterion, and an empty planned version
-    When measuring both, the empty one first, then measuring nothing
-    Then each gets its own counts in the order given, and nothing gives an empty list
-    """
-    projects.create(session, "nexus", "Nexus", "")
-    busy = versions.create(session, "nexus", "0.1.0", "Busy", ["Ships", "Docs"])
-    empty = versions.create(session, "nexus", "0.2.0", "Empty", ["Ships"])
-    finished = _refined_task(session, "Finished", busy)
-    _refined_task(session, "Pending", busy)
-    tasks.start(session, finished.id)
-    tasks.complete(session, finished.id)
-    versions.set_criterion_done(session, busy.definition_of_done[0].id, True)
-
-    result = views.version_progress(session, [empty, busy])
-    assert [(p.version.id, p.done, p.total, p.dod_done, p.dod_total) for p in result] == [
-        (empty.id, 0, 0, 0, 1), (busy.id, 1, 2, 1, 2)]
-    assert views.version_progress(session, []) == []
-
 # List tasks ---------------------------------------------------------------------------------------
 
 @pytest.fixture
 def board(session):
-    """Two projects, a version in the first, and tasks in several states and places."""
+    """Two projects, a feature in the first, and items in several states and places."""
     projects.create(session, "nx", "Nexus", "")
     projects.create(session, "other", "Other", "")
-    version = versions.create(session, "nx", "1.0", "First", ["Ships"])
     loose = tasks.capture(session, "Loose")
     in_project = tasks.create(session, "In project", project_key="nx")
-    planned = tasks.create_in_version(session, version.id, "Planned")
-    doing = tasks.create_in_version(session, version.id, "Doing")
+    feature = tasks.create(session, "Feature", project_key="nx", kind=TaskKind.FEATURE)
+    doing = tasks.create(session, "Doing", parent_ref=feature.ref)
+    tasks.clarify(session, doing.id, "Doing", None, None, None, None, parent_ref=feature.ref)
     tasks.start(session, doing.id)
     elsewhere = tasks.create(session, "Elsewhere", project_key="other")
-    return version, loose, in_project, planned, doing, elsewhere
+    return loose, in_project, feature, doing, elsewhere
 
 
 def _titles(result):
@@ -405,7 +285,7 @@ def test_list_tasks_without_filters_returns_everything_oldest_first(session, boa
     When listing without filters
     Then all come back in creation order
     """
-    assert _titles(views.list_tasks(session)) == ["Loose", "In project", "Planned", "Doing", "Elsewhere"]
+    assert _titles(views.list_tasks(session)) == ["Loose", "In project", "Feature", "Doing", "Elsewhere"]
 
 
 def test_list_tasks_filters_by_states(session, board):
@@ -415,25 +295,23 @@ def test_list_tasks_filters_by_states(session, board):
     Then a task matches if it is in any of the given states
     """
     assert _titles(views.list_tasks(session, states=[TaskState.DOING])) == ["Doing"]
-    assert _titles(views.list_tasks(session, states=[TaskState.DOING, TaskState.PLANNED])) == ["Planned", "Doing"]
+    assert _titles(views.list_tasks(session, states=[TaskState.DOING, TaskState.CANCELLED])) == ["Doing"]
+    assert len(views.list_tasks(session, states=[TaskState.DOING, TaskState.INBOX])) == 5
 
 
-def test_list_tasks_filters_by_project_and_version(session, board):
+def test_list_tasks_filters_by_project(session, board):
     """
-    Given tasks spread over projects and a version
-    When filtering by project, by version, and by both
-    Then only matching tasks are returned
+    Given items spread over projects, some under a feature
+    When filtering by project, alone and with a state
+    Then only matching items are returned, those under a feature included
     """
-    version = board[0]
-    assert _titles(views.list_tasks(session, project_key="nx")) == ["In project", "Planned", "Doing"]
-    assert _titles(views.list_tasks(session, version_id=version.id)) == ["Planned", "Doing"]
-    assert _titles(views.list_tasks(session, project_key="other", version_id=version.id)) == []
-    assert _titles(views.list_tasks(session, project_key="nx", states=[TaskState.INBOX])) == ["In project"]
+    assert _titles(views.list_tasks(session, project_key="nx")) == ["In project", "Feature", "Doing"]
+    assert _titles(views.list_tasks(session, project_key="nx", states=[TaskState.INBOX])) == ["In project", "Feature"]
 
 
 def test_list_tasks_limit_keeps_the_most_recent_oldest_first(session, board):
     """
-    Given five tasks
+    Given five items
     When listing with a limit of two
     Then the two most recently created come back, oldest first
     """
@@ -448,3 +326,258 @@ def test_list_tasks_unknown_project_raises(session, board):
     """
     with pytest.raises(NotFoundError):
         views.list_tasks(session, project_key="ghost")
+
+
+# Project tree ------------------------------------------------------------------------------------
+
+def _refined(session, title, project_key=None, parent_ref=None, kind=TaskKind.TASK):
+    """Create a refined item in a project's tree; return it."""
+    item = tasks.create(session, title, project_key=None if parent_ref else project_key,
+                        parent_ref=parent_ref, kind=kind)
+    return tasks.clarify(session, item.id, title, None, project_key, None, None, parent_ref=parent_ref)
+
+
+def _shape(nodes):
+    """Turn tree nodes into nested (title, children) pairs."""
+    return [(node.item.title, _shape(node.children)) for node in nodes]
+
+
+@pytest.fixture
+def tree(session):
+    """A project 'nx' with a feature holding a sub-feature and a task, and a top task."""
+    project = projects.create(session, "nx", "Nexus")
+    auth = _refined(session, "Auth", "nx", kind=TaskKind.FEATURE)
+    login = _refined(session, "Login", "nx", parent_ref=auth.ref, kind=TaskKind.FEATURE)
+    _refined(session, "Form", "nx", parent_ref=login.ref)
+    _refined(session, "Hash", "nx", parent_ref=auth.ref)
+    _refined(session, "Readme", "nx")
+    return project
+
+
+def test_project_tree_nests_items_in_sibling_order(session, tree):
+    """The tree gives the top items, then each feature's children, in order."""
+    assert _shape(views.project_tree(tree)) == [
+        ("Auth", [("Login", [("Form", [])]), ("Hash", [])]),
+        ("Readme", []),
+    ]
+
+
+def test_project_tree_hides_closed_items_unless_asked(session, tree):
+    """
+    Given a cancelled task and a cancelled feature
+    When building the tree
+    Then both are hidden, with the feature's subtree, unless closed items are asked for
+    """
+    by_title = {t.title: t for t in tasks.list(session)}
+    tasks.cancel(session, by_title["Hash"].id)
+    tasks.cancel(session, by_title["Form"].id)
+    tasks.cancel(session, by_title["Login"].id)
+
+    assert _shape(views.project_tree(tree)) == [("Auth", []), ("Readme", [])]
+    assert _shape(views.project_tree(tree, include_closed=True))[0] == (
+        "Auth", [("Login", [("Form", [])]), ("Hash", [])])
+
+
+def test_project_tree_leaves_out_subprojects(session, tree):
+    """A subproject's items aren't part of its parent's tree."""
+    projects.create(session, "sub", "Sub", parent_key="nx")
+    _refined(session, "Sub task", "sub")
+    assert [title for title, _ in _shape(views.project_tree(tree))] == ["Auth", "Readme"]
+
+
+def test_project_tree_counts_a_feature_subtree(session, tree):
+    """
+    Given a feature with a sub-feature, one task done and one cancelled
+    When building the tree
+    Then the feature counts done over total on its whole subtree, cancelled left out,
+    even though the done task is hidden
+    """
+    by_title = {t.title: t for t in tasks.list(session)}
+    _refined(session, "Salt", "nx", parent_ref=by_title["Login"].ref)
+    tasks.start(session, by_title["Form"].id)
+    tasks.complete(session, by_title["Form"].id)
+    tasks.cancel(session, by_title["Hash"].id)
+
+    auth = views.project_tree(tree)[0]
+    assert (auth.done, auth.total) == (1, 2)
+    login = auth.children[0]
+    assert (login.done, login.total) == (1, 2)
+    readme = views.project_tree(tree)[1]
+    assert (readme.done, readme.total, readme.sizes) == (0, 0, [])
+
+
+def test_project_tree_gives_a_feature_open_sizes_in_order(session, tree):
+    """
+    Given sized tasks under a feature, one of them done and one without a size
+    When building the tree
+    Then the feature lists the open sized tasks per size, smallest first
+    """
+    by_title = {t.title: t for t in tasks.list(session)}
+    auth = by_title["Auth"]
+    for title, size in (("Big", "L"), ("Small", "S"), ("Other", "S"), ("Done", "XS")):
+        item = _refined(session, title, "nx", parent_ref=auth.ref)
+        tasks.update(session, item.id, title=title, size=size)
+    tasks.start(session, by_title["Hash"].id)
+    done = {t.title: t for t in tasks.list(session)}["Done"]
+    tasks.start(session, done.id)
+    tasks.complete(session, done.id)
+
+    assert views.project_tree(tree)[0].sizes == [("S", 2), ("L", 1)]
+
+
+def test_item_tree_gives_a_feature_children(session, tree):
+    """The tree below a feature holds its children only."""
+    auth = next(t for t in tasks.list(session) if t.title == "Auth")
+    assert _shape(views.item_tree(auth)) == [("Login", [("Form", [])]), ("Hash", [])]
+
+
+# Project board -----------------------------------------------------------------------------------
+
+def _board(lanes):
+    """Turn board lanes into (feature, subproject, {state: [task titles]}) triples,
+    keeping only non-empty columns."""
+    return [
+        (lane.feature.title if lane.feature else None,
+         lane.subproject.key if lane.subproject else None,
+         {state.name: [task.title for task in tasks_] for state, tasks_ in lane.columns.items() if tasks_})
+        for lane in lanes
+    ]
+
+
+def _by_title(session):
+    """Map every task and feature title to its item."""
+    return {t.title: t for t in tasks.list(session)}
+
+
+def test_project_board_lays_tasks_out_by_feature(session, tree):
+    """
+    Given a feature holding a sub-feature and a task, and a loose task
+    When building the board
+    Then the feature has a lane with its tasks, sub-features included, and the loose task has
+    its own lane last; features are never cards
+    """
+    assert _board(views.project_board(tree)) == [
+        ("Auth", None, {"REFINED": ["Form", "Hash"]}),
+        (None, None, {"REFINED": ["Readme"]}),
+    ]
+
+
+def test_project_board_has_a_column_per_open_state_in_order(session, tree):
+    """Each lane holds a column per state of work still to do, in board order."""
+    lane = views.project_board(tree)[0]
+    assert list(lane.columns) == list(views.BOARD_COLUMNS)
+    assert [state.name for state in views.BOARD_COLUMNS] == ["INBOX", "REFINED", "DOING", "WAITING"]
+
+
+def test_project_board_sorts_tasks_by_state(session, tree):
+    """
+    Given a started task and a blocked task
+    When building the board
+    Then each task sits in its state's column
+    """
+    by_title = _by_title(session)
+    tasks.start(session, by_title["Hash"].id)
+    tasks.start(session, by_title["Form"].id)
+    tasks.block(session, by_title["Form"].id, "Waiting on review")
+
+    assert _board(views.project_board(tree))[0] == (
+        "Auth", None, {"DOING": ["Hash"], "WAITING": ["Form"]})
+
+
+def test_project_board_follows_tree_order(session, tree):
+    """
+    Given a task moved above the sub-feature
+    When building the board
+    Then it comes first in the column
+    """
+    tasks.reorder(session, _by_title(session)["Hash"].id, "up")
+
+    assert _board(views.project_board(tree))[0][2]["REFINED"] == ["Hash", "Form"]
+
+
+def test_project_board_leaves_out_closed_and_someday_tasks_and_empty_lanes(session, tree):
+    """
+    Given a done task, a deferred task and the only loose task cancelled
+    When building the board
+    Then none of them is on the board, and the emptied loose lane is left out
+    """
+    by_title = _by_title(session)
+    tasks.start(session, by_title["Form"].id)
+    tasks.complete(session, by_title["Form"].id)
+    tasks.defer(session, by_title["Hash"].id)
+    tasks.cancel(session, by_title["Readme"].id)
+
+    assert views.project_board(tree) == []
+
+
+def test_project_board_leaves_out_features_without_tasks(session, tree):
+    """A feature with no task below it gets no lane."""
+    _refined(session, "Empty", "nx", kind=TaskKind.FEATURE)
+    assert [lane[0] for lane in _board(views.project_board(tree))] == ["Auth", None]
+
+
+def test_project_board_adds_subproject_lanes_after(session, tree):
+    """
+    Given a subproject with a feature and a loose task
+    When building the parent's board
+    Then the subproject's lanes come after the parent's, tagged with the subproject
+    """
+    projects.create(session, "sub", "Sub", parent_key="nx")
+    api = _refined(session, "Api", "sub", kind=TaskKind.FEATURE)
+    _refined(session, "Endpoint", "sub", parent_ref=api.ref)
+    _refined(session, "Loose", "sub")
+
+    assert _board(views.project_board(tree))[2:] == [
+        ("Api", "sub", {"REFINED": ["Endpoint"]}),
+        (None, "sub", {"REFINED": ["Loose"]}),
+    ]
+
+
+def test_project_board_empty_project(session):
+    """A project without tasks has an empty board."""
+    project = projects.create(session, "void", "Void")
+    assert views.project_board(project) == []
+
+
+# Project progress --------------------------------------------------------------------------------
+
+def test_dashboard_counts_each_root_project_features_done(session):
+    """
+    Given a root with a nested feature, a done feature and a cancelled one, and a subproject feature
+    When reading the dashboard
+    Then the root shows 1 done out of 3 (cancelled left out, nested and subproject counted)
+    """
+    projects.create(session, "nx", "Nexus")
+    projects.create(session, "web", "Web", parent_key="nx")
+    outer = tasks.add_to_tree(session, "Outer", project_key="nx", kind=TaskKind.FEATURE, refined=True)
+    tasks.add_to_tree(session, "Inner", parent_ref=outer.ref, kind=TaskKind.FEATURE)
+    done = tasks.add_to_tree(session, "Done", project_key="web", kind=TaskKind.FEATURE, refined=True)
+    tasks.start(session, done.id)
+    tasks.complete(session, done.id)
+    dropped = tasks.add_to_tree(session, "Dropped", project_key="nx", kind=TaskKind.FEATURE)
+    tasks.cancel(session, dropped.id)
+    tasks.add_to_tree(session, "A task", project_key="nx")
+
+    [row] = views.dashboard(session).projects
+    assert (row.project.key, row.features_done, row.features_total) == ("nx", 1, 3)
+
+
+# Project items by state --------------------------------------------------------------------------
+
+def test_project_items_lists_one_state_with_subprojects_newest_first(session):
+    """
+    Given a root and its subproject, each with a cancelled item, and a refined one
+    When listing the root's cancelled items, then the subproject's
+    Then the root lists both, newest first; the subproject only its own
+    """
+    projects.create(session, "nx", "Nexus")
+    projects.create(session, "web", "Web", parent_key="nx")
+    old = tasks.add_to_tree(session, "Old", project_key="nx")
+    new = tasks.add_to_tree(session, "New", project_key="web")
+    tasks.add_to_tree(session, "Open", project_key="nx")
+    tasks.cancel(session, old.id)
+    tasks.cancel(session, new.id)
+
+    root = projects.get(session, "nx")
+    assert [t.title for t in views.project_items(root, TaskState.CANCELLED)] == ["New", "Old"]
+    assert [t.title for t in views.project_items(projects.get(session, "web"), TaskState.CANCELLED)] == ["New"]

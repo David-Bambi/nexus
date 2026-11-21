@@ -1,0 +1,18 @@
+---
+title: Codes de sortie
+summary: "Ce que dit le code de retour : réussi, refusé par une règle, ligne de commande fausse"
+icon: lucide:hash
+links: []
+related:
+  - 
+---
+
+Le code de retour de `nexus` dit comment la commande s'est passée.
+
+- `0` : réussie. `nexus` sans argument affiche l'aide et réussit aussi.
+- `1` : une règle des données a refusé la demande (projet inconnu, parent d'un autre projet, import invalide…). Rien n'est écrit.
+- `2` : la ligne de commande est fausse (commande inconnue, argument manquant, fichier illisible). L'aide suit le message.
+
+Les messages d'erreur (`error: …`) vont sur la __sortie d'erreur__ ; la sortie standard ne reçoit que le résultat. On peut ainsi rediriger un export sans le polluer.
+
+Pourquoi deux codes d'erreur : distinguer une commande mal tapée d'une demande refusée par les données.

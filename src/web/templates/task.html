@@ -7,6 +7,8 @@
 {% set state = task.state.name %}
 {% if next %}
 {{ ui.page_header(task.title, next, "Back") }}
+{% elif task.project %}
+{{ ui.page_header(task.title, url_for('pages.project_detail', key=task.project.key), task.project.name) }}
 {% else %}
 {{ ui.page_header(task.title, url_for('pages.tasks_list'), "Tasks") }}
 {% endif %}
@@ -15,6 +17,9 @@
 <div class="detail-main">
     {% if task.body %}
     <p class="lead">{{ task.body }}</p>
+    {% endif %}
+    {% if task.archived_at %}
+    <p class="hint" data-field="archived">Archived on {{ task.archived_at.strftime("%Y-%m-%d") }}: hidden from the lists, kept in the Archived tab of its project.</p>
     {% endif %}
     {% if state == "WAITING" %}
     <p class="blocked-reason"><strong>Blocked reason:</strong> {{ task.blocked_reason }}</p>
@@ -31,12 +36,9 @@
 
     <h2>Actions</h2>
     <div class="toolbar">
-        {% if state == "PLANNED" %}
+        {% if state == "REFINED" %}
         <form method="post" action="{{ url_for('pages.task_start', task_id=task.id, next=next) }}">
             <button class="button-primary" type="submit">Start</button>
-        </form>
-        <form method="post" action="{{ url_for('pages.task_unplan', task_id=task.id, next=next) }}">
-            <button type="submit">Unplan</button>
         </form>
         {% endif %}
 
@@ -68,6 +70,16 @@
         </form>
         {% endif %}
 
+        {% if task.archived_at %}
+        <form method="post" action="{{ url_for('pages.task_unarchive', task_id=task.id, next=next) }}">
+            <button type="submit">Unarchive</button>
+        </form>
+        {% elif state in ("DONE", "CANCELLED") %}
+        <form method="post" action="{{ url_for('pages.task_archive', task_id=task.id, next=next) }}">
+            <button type="submit">Archive</button>
+        </form>
+        {% endif %}
+
         {% if state in ("INBOX", "REFINED") %}
         <form method="post" action="{{ url_for('pages.task_defer', task_id=task.id, next=next) }}">
             <button type="submit">Defer to someday</button>
@@ -85,43 +97,53 @@
         {% endif %}
     </div>
 
-    {# Versions of the task's project that can still receive it. #}
-    {% set open_versions = versions | rejectattr("status.name", "equalto", "RELEASED") | list %}
-    {% if state == "REFINED" %}
-    <form class="form-inline" method="post" action="{{ url_for('pages.task_plan', task_id=task.id, next=next) }}">
-        {% if open_versions %}
-        <select name="version_id" aria-label="Version">
-            {% for target in open_versions %}
-            <option value="{{ target.id }}">{{ target.number }} — {{ target.title }}</option>
-            {% endfor %}
+    {% if task.kind.name == "FEATURE" %}
+    <h2 id="children" class="heading-actions">Children
+        {% if task.project %}{{ ui.reveal_button("add-child", "plus", "Add an item under " ~ task.title, expanded=open_form == "add-child") }}{% endif %}
+    </h2>
+    {% if task.project %}
+    <form id="add-child" class="form-inline add-item" method="post" action="{{ url_for('pages.task_add_child', task_id=task.id, next=next) }}"{% if open_form != "add-child" %} hidden{% endif %}>
+        <input type="text" name="title" placeholder="New item…" aria-label="Title" required>
+        <select name="kind" aria-label="Kind">
+            <option value="task">task</option>
+            <option value="feature">feature</option>
         </select>
-        {% else %}
-        <input type="number" name="version_id" placeholder="Version id" aria-label="Version id" required>
-        {% endif %}
-        <button type="submit">Plan</button>
+        <button type="submit">Add</button>
     </form>
+    {% endif %}
+    {% if children %}
+    {{ ui.work_tree(children, task.project.key) }}
+    {% else %}
+    <p class="empty">No children yet.</p>
+    {% endif %}
     {% endif %}
 
-    {% if state in ("PLANNED", "DOING", "WAITING") %}
-    {% set targets = open_versions | rejectattr("id", "equalto", task.version_id) | list %}
-    {% if targets %}
+    <h2>Place</h2>
     <form class="form-inline" method="post" action="{{ url_for('pages.task_move', task_id=task.id, next=next) }}">
-        <select name="version_id" aria-label="Version">
-            {% for target in targets %}
-            <option value="{{ target.id }}">{{ target.number }} — {{ target.title }}</option>
-            {% endfor %}
-        </select>
-        <button type="submit">Move to version</button>
+        <input type="text" name="project_key" placeholder="Project key" aria-label="Project key">
+        <input type="text" name="parent_ref" placeholder="Parent feature ref" aria-label="Parent feature ref">
+        <button type="submit">Move to</button>
     </form>
-    {% endif %}
-    {% endif %}
+    <form method="post" action="{{ url_for('pages.task_change_kind', task_id=task.id, next=next) }}">
+        {% if task.kind.name == "FEATURE" %}
+        <input type="hidden" name="kind" value="task">
+        <button type="submit">Change to task</button>
+        {% else %}
+        <input type="hidden" name="kind" value="feature">
+        <button type="submit">Change to feature</button>
+        {% endif %}
+    </form>
 
     <h2>Edit</h2>
     <form class="form-stacked" method="post" action="{{ url_for('pages.task_update', task_id=task.id, next=next) }}">
         {{ ui.field("Title", "title", task.title, required=true) }}
         {{ ui.field("Body", "body", task.body, kind="textarea") }}
         {{ ui.field("Context", "context", task.context) }}
-        {{ ui.field("Size", "size", task.size) }}
+        {{ ui.size_select(task.size) }}
+        <label class="field-check">
+            <input type="checkbox" name="correction" value="1">
+            Correction: this fixes a mistake (typo, wrong size), the work itself doesn't change
+        </label>
         <div class="form-actions"><button class="button-primary" type="submit">Save</button></div>
     </form>
 
@@ -144,8 +166,14 @@
         <dd>{{ ui.ref_chip(task.ref) }}</dd>
         <dt>Project</dt>
         <dd>{% if task.project %}<a href="{{ url_for('pages.project_detail', key=task.project.key) }}">{{ task.project.name }}</a>{% else %}—{% endif %}</dd>
-        <dt>Version</dt>
-        <dd data-field="version">{% if task.version %}<a href="{{ url_for('pages.version_detail', key=task.version.project.key, number=task.version.number) }}">{{ task.version.number }}</a>{% else %}—{% endif %}</dd>
+        <dt>Kind</dt>
+        <dd data-field="kind">{{ task.kind.name | lower }}</dd>
+        <dt>Parent</dt>
+        <dd data-field="parent">{% if task.parent %}<a href="{{ url_for('pages.task_detail', task_id=task.parent.id) }}">{{ task.parent.title }}</a>{% else %}—{% endif %}</dd>
+        {% if task.kind.name == "FEATURE" %}
+        <dt>Released in</dt>
+        <dd data-field="released_in">{% if task.released_in %}v{{ task.released_in }}{% else %}—{% endif %}</dd>
+        {% endif %}
         <dt>Context</dt>
         <dd>{{ task.context or "—" }}</dd>
         <dt>Size</dt>

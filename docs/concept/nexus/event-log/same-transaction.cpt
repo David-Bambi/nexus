@@ -1,0 +1,15 @@
+---
+title: Même transaction
+summary: "L'événement est enregistré avec la modification, ou pas du tout"
+icon: lucide:link
+links: []
+related:
+  - 
+---
+
+Un événement est enregistré __avec__ la modification qu'il décrit : les deux sont gardés, ou aucun.
+
+- `events.log` ajoute la ligne à la session de base de données sans l'écrire ; le service qui fait la modification les enregistre ensemble (`commit`).
+- Un appel refusé (champ invalide, passage d'état interdit) lève son erreur __avant__ d'écrire : aucun événement.
+- La session n'écrit rien d'elle-même (`autoflush=False`). Pour un événement `created`, le service force l'écriture (`flush`) afin d'obtenir l'identifiant du nouvel élément.
+- Quand un import ou un outil MCP est refusé en cours de route, toute la transaction est annulée, événements compris.

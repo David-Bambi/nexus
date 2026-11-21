@@ -1,0 +1,30 @@
+{
+  "model/model.cpt": {
+    "x": 588,
+    "y": 224
+  },
+  "event-log/event-log.cpt": {
+    "x": 866,
+    "y": 226
+  },
+  "interfaces/interfaces.cpt": {
+    "x": 632,
+    "y": 68
+  },
+  "operations/operations.cpt": {
+    "x": 641,
+    "y": 393
+  },
+  "measurement/measurement.cpt": {
+    "x": 925,
+    "y": 361
+  },
+  "guides/guides.cpt": {
+    "x": 79,
+    "y": 220
+  },
+  "ai-tools/ai-tools.cpt": {
+    "x": 87,
+    "y": 394
+  }
+}

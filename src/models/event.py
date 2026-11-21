@@ -13,13 +13,17 @@ class Event(Base):
 
     __tablename__ = "event"
     # Keeps history lookups (one entity's events) fast as the log grows.
-    __table_args__ = (Index("ix_event_entity", "entity_type", "entity_id"),)
+    __table_args__ = (
+        Index("ix_event_entity", "entity_type", "entity_id"),
+        # AUTOINCREMENT: event ids keep growing, like the log itself.
+        {"sqlite_autoincrement": True},
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     
     at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
     
-    # "web" in v1; will later distinguish "cli" / "agent".
+    # Who made the change: "web", "cli" or "mcp".
     actor: Mapped[str] = mapped_column(String, nullable=False)
     # No FK on purpose: an append-only log that references any entity type
     # by name + id, so an entry survives even if the entity is later deleted.

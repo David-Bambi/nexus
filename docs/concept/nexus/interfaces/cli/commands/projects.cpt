@@ -1,0 +1,29 @@
+---
+title: nexus projects
+summary: "Le tableau des projets et sous-projets, avec leur version"
+icon: lucide:square-terminal
+tags: [lecture]
+links: []
+related:
+  - 
+---
+
+__Syntaxe__
+
+```
+nexus projects
+```
+
+__Résultat__
+- Un tableau des projets actifs : `KEY`, `REF`, `VERSION`, `STATUS`, `PRIORITY`, `NAME`, par [priorité](../../../model/tree.cpt) (`HIGH` d'abord).
+- Chaque sous-projet actif suit son projet racine, la clé en retrait ; un projet racine n'a pas de référence (tiret). Un sous-projet montre la priorité de sa racine.
+- Les projets archivés sont cachés.
+
+__Exemple__
+
+```
+nexus projects
+# KEY      REF  VERSION  STATUS  PRIORITY  NAME
+# NX       -    2.3      ACTIVE  HIGH      Nexus
+#   NX-WEB s-…  0.4      ACTIVE  HIGH      Web UI
+```

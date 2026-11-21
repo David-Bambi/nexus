@@ -1,0 +1,21 @@
+---
+title: create_project
+summary: "Crée un projet, ou un sous-projet sous un projet racine"
+icon: lucide:wrench
+tags: [projet]
+links: []
+related:
+  - 
+---
+
+__Rôle__ : crée un projet racine, ou un sous-projet quand `parent` est donné.
+
+__Arguments__
+- Obligatoires : `key` (courte, unique, définitive), `name`.
+- Facultatifs : `description`, `parent` (clé d'un projet racine), `directory` (chemin absolu, `~` développé ; voir [Répertoire du projet](../../../measurement/project-directory.cpt)).
+
+__Règles__
+- Refusé si la clé est prise ou [réservée](../../../model/references.cpt), si le parent est lui-même un sous-projet, ou si le chemin est relatif.
+- Écriture, non destructif.
+
+__Résultat__ : le projet créé, en version `0.0` ; un sous-projet reçoit sa référence `s-…`.

@@ -1,5 +1,11 @@
 # Cascade behavior: what happens to children on delete
 
+!!! note "1.x examples"
+    The examples below use the 1.x `Version` and `DefinitionOfDoneCriterion`
+    models, removed in 2.0
+    (Concept map: `docs/concept/nexus/model/tree.cpt`). The concept still applies;
+    the current model is in the Concept map (`docs/concept/nexus/model/`).
+
 `session.delete(parent)` doesn't have one universal effect on the parent's
 children — SQLAlchemy does exactly what each `relationship()` declares,
 and `src/models/` deliberately declares two different things.
@@ -63,7 +69,7 @@ Per the spec (§4.2), `project_id IS NULL` means "raw capture" — an
 un-triaged inbox item. A task orphaned by a project deletion falls into
 that same state, even though it may have real work behind it (e.g. still
 sitting in a `doing` state per the task state machine in
-`docs/architecture/overview.md`). Nothing currently forces it back to
+`docs/concept/nexus/model/states.cpt`). Nothing currently forces it back to
 `inbox` on orphaning. `services/tasks.py` now implements the full task
 lifecycle (capture through delete) but has no hook on project/version
 deletion — the gap is still open, to be closed with a deliberate rule,

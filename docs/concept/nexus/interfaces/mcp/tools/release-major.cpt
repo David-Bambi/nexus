@@ -1,0 +1,22 @@
+---
+title: release_major
+summary: "Passe à la version majeure suivante quand tous les critères sont cochés"
+icon: lucide:wrench
+tags: [projet]
+links: []
+related:
+  - 
+---
+
+__Rôle__ : passe un projet à sa version majeure suivante : MAJEUR + 1, MINEUR à 0, liste de critères vidée.
+
+__Arguments__
+- Obligatoire : `project`.
+- Aucun facultatif.
+
+__Règles__
+- Refusé si la liste est vide ou si un critère n'est pas coché.
+- MINEUR n'est jamais fixé par un outil : il monte seul quand une fonctionnalité est terminée.
+- Écriture, non destructif.
+
+__Résultat__ : `{project, version, criteria}`, avec la nouvelle version et une liste vide.

@@ -1,0 +1,25 @@
+---
+title: Journal d'événements
+summary: "La trace immuable de chaque modification : quoi, sur quel élément, par qui et quand"
+icon: lucide:scroll-text
+type: carte
+links: [append-only.cpt,
+        same-transaction.cpt,
+        actors.cpt,
+        deleted-entities.cpt,
+        actions/actions.cpt,
+        history.cpt]
+related:
+  - 
+---
+
+Le __journal d'événements__ garde une ligne (table `event`) pour chaque modification : quelle __action__, sur quel élément, par quel __acteur__, à quel moment, avec un petit contenu JSON qui dit ce qui a changé.
+
+- [Ajout seul](append-only.cpt) : rien n'est jamais modifié ni effacé, et pourquoi.
+- [Même transaction](same-transaction.cpt) : l'événement est gardé avec sa modification, ou pas du tout.
+- [Acteurs](actors.cpt) : web, CLI ou assistant.
+- [Historique des éléments supprimés](deleted-entities.cpt) : pourquoi le journal survit à une suppression.
+- [Actions](actions/actions.cpt) : le vocabulaire, par sorte d'élément.
+- [Lire le journal](history.cpt) : où on le retrouve.
+
+À ne pas confondre avec le [journal applicatif](../operations/data/app-log.cpt) (`app.log`).

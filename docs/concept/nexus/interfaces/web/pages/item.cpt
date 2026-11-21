@@ -1,0 +1,26 @@
+---
+title: Élément
+summary: "Une fonctionnalité ou une tâche : actions, place, modification et historique"
+icon: lucide:file-text
+image: item.png
+links: []
+related:
+  - 
+---
+
+__Adresse__ : `/tasks/<numéro>`, pour une fonctionnalité comme pour une tâche.
+
+__Ce qu'on y voit__
+- À gauche : les actions, la modification et l'__History__, dessinée en frise.
+- À droite, un panneau fixe (en haut sur écran étroit) : état, référence, type, projet, parent, version de sortie.
+
+__Ce qu'on y fait__
+- __Clarify__ un élément inbox ou someday.
+- Changer d'état : un bouton par passage (Start, Complete, Block…), ou le menu __State__ vers tout autre état, étapes enchaînées comme au [Kanban](kanban.cpt). Sauf capture sans projet ou someday.
+- Pour une fonctionnalité : ses __Children__ (tout le sous-arbre, fermés compris, avec ↑ / ↓ et un + par sous-fonctionnalité) ; un + près du titre ajoute un enfant (projet requis).
+- __Place__ : déplacer, changer en tâche ou en fonctionnalité.
+- __Edit__ : titre, corps, contexte, taille, et la case [Correction](../../../measurement/correction.cpt).
+- __Archive__ un élément fermé ; archivé : __Archived on…__ et __Unarchive__.
+- Supprimer.
+
+Un refus réaffiche la page, formulaire rouvert.

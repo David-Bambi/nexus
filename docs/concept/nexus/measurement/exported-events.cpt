@@ -1,0 +1,18 @@
+---
+title: Événements d'une fonctionnalité
+summary: "Quels événements l'export rattache à une fonctionnalité, même après un déplacement"
+icon: lucide:git-branch
+links: []
+related:
+  - 
+---
+
+Dans l'export, chaque fonctionnalité porte les événements qui la concernent, du plus ancien au plus récent :
+
+- les __siens__ ;
+- ceux d'un __enfant qui était sous elle__ à ce moment-là (son `parent` le dit), même s'il a été déplacé depuis ;
+- le `moved` d'un enfant qui __sort__ d'elle.
+
+Ainsi un déplacement ne fait pas passer le passé d'un enfant d'une fonctionnalité à l'autre. Seuls les événements des fonctionnalités et des tâches comptent, pas ceux des projets ni des critères.
+
+__Enfant supprimé__ : tous ses événements gardent sa référence. L'élément n'existe plus, alors l'export la reprend dans son événement `deleted`.

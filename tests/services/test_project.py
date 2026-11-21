@@ -1,8 +1,9 @@
 import pytest
 
 from src.services import events, projects
-from src.models.project import ProjectStatus
-from src.services.errors import ConflictError, NotFoundError
+from src.models.project import ProjectPriority, ProjectStatus
+from src.models.task import Task
+from src.services.errors import ConflictError, NotFoundError, ValidationError
 
 # Create ------------------------------------------------------------------------------------------
 
@@ -132,6 +133,93 @@ def test_delete_project_not_found(session):
         projects.delete(session, "nexus")
 
 
+def test_delete_refuses_a_project_with_a_subproject(session):
+    """A project holding a subproject can't be deleted
+    Given a project 'metrique' with a subproject 'bilan'
+    When deleting 'metrique'
+    Then a conflict error is raised and both projects remain
+    """
+    projects.create(session, "metrique", "Métriques")
+    projects.create(session, "bilan", "Bilan", parent_key="metrique")
+    with pytest.raises(ConflictError):
+        projects.delete(session, "metrique")
+    assert projects.get(session, "metrique") and projects.get(session, "bilan")
+
+def test_delete_refuses_a_project_with_items(session):
+    """A project holding a feature or task can't be deleted
+    Given a project 'nexus' holding a task
+    When deleting 'nexus'
+    Then a conflict error is raised and no event is logged for it
+    """
+    project = projects.create(session, "nexus", "Nexus")
+    session.add(Task(ref="t-aaa", title="Work", project_id=project.id))
+    session.commit()
+    with pytest.raises(ConflictError):
+        projects.delete(session, "nexus")
+    assert [e.action for e in events.history(session, "project", project.id)] == ["created"]
+
+def test_delete_an_empty_subproject(session):
+    """An empty subproject can be deleted, then its parent too
+    Given a project 'metrique' with an empty subproject 'bilan'
+    When deleting 'bilan', then 'metrique'
+    Then both are gone
+    """
+    projects.create(session, "metrique", "Métriques")
+    projects.create(session, "bilan", "Bilan", parent_key="metrique")
+    projects.delete(session, "bilan")
+    projects.delete(session, "metrique")
+    assert projects.list(session, include_archived=True) == []
+
+
+# Subprojects -------------------------------------------------------------------------------------
+
+def test_create_subproject_under_a_root_project(session):
+    """A subproject hangs under a root project and gets an s- ref
+    Given a root project 'metrique'
+    When creating 'bilan' with 'metrique' as parent
+    Then 'bilan' has 'metrique' as parent, an s- ref, and shows in its subprojects
+    """
+    root = projects.create(session, "metrique", "Métriques")
+    sub = projects.create(session, "bilan", "Bilan", parent_key="metrique")
+    assert sub.parent is root
+    assert sub.ref.startswith("s-")
+    assert root.subprojects == [sub]
+    assert root.ref is None
+
+def test_create_subproject_under_a_subproject_is_refused(session):
+    """Only one level of subprojects
+    Given a subproject 'bilan' under 'metrique'
+    When creating a subproject under 'bilan'
+    Then a validation error is raised and nothing is created
+    """
+    projects.create(session, "metrique", "Métriques")
+    projects.create(session, "bilan", "Bilan", parent_key="metrique")
+    with pytest.raises(ValidationError):
+        projects.create(session, "deep", "Deep", parent_key="bilan")
+    with pytest.raises(NotFoundError):
+        projects.get(session, "deep")
+
+def test_create_subproject_under_a_missing_parent(session):
+    """The parent must exist
+    Given no project 'ghost'
+    When creating a subproject under 'ghost'
+    Then a not-found error is raised
+    """
+    with pytest.raises(NotFoundError):
+        projects.create(session, "bilan", "Bilan", parent_key="ghost")
+
+def test_create_subproject_logs_its_ref_and_parent(session):
+    """The created event of a subproject names its ref and parent
+    Given a root project 'metrique'
+    When creating the subproject 'bilan'
+    Then its created event carries key, name, ref and parent key
+    """
+    projects.create(session, "metrique", "Métriques")
+    sub = projects.create(session, "bilan", "Bilan", parent_key="metrique")
+    assert _history(session, sub.id) == [
+        ("created", {"key": "bilan", "name": "Bilan", "ref": sub.ref, "parent": "metrique"})]
+
+
 # Events ------------------------------------------------------------------------------------------
 
 def _history(session, project_id):
@@ -181,3 +269,158 @@ def test_delete_logs_deleted_and_keeps_history(session):
     projects.delete(session, "nexus")
 
     assert [action for action, _ in _history(session, project_id)] == ["created", "deleted"]
+
+
+# Update and restore ------------------------------------------------------------------------------
+
+def _actions(session, project):
+    """Return a project's logged (action, payload) pairs, oldest first."""
+    return [(e.action, e.payload) for e in events.history(session, "project", project.id)]
+
+
+def test_update_changes_name_and_description_and_logs_only_changes(session):
+    """
+    Given a project
+    When its name changes and its description stays the same
+    Then only the name is updated in the log, and the key is kept
+    """
+    project = projects.create(session, "nexus", "Nexus", "Manager")
+    projects.update(session, "nexus", " Nexus 2 ", "Manager")
+
+    assert (project.key, project.name, project.description) == ("nexus", "Nexus 2", "Manager")
+    assert _actions(session, project)[-1] == ("updated", {"name": {"from": "Nexus", "to": "Nexus 2"}})
+
+
+def test_update_blank_description_clears_it(session):
+    """A blank description is stored as none."""
+    project = projects.create(session, "nexus", "Nexus", "Manager")
+    projects.update(session, "nexus", "Nexus", "  ")
+    assert project.description is None
+
+
+def test_update_without_change_logs_nothing(session):
+    """Saving the same values records no event."""
+    project = projects.create(session, "nexus", "Nexus")
+    projects.update(session, "nexus", "Nexus", None)
+    assert [action for action, _ in _actions(session, project)] == ["created"]
+
+
+def test_update_refuses_an_empty_name_or_missing_project(session):
+    """An empty name or an unknown project is refused."""
+    projects.create(session, "nexus", "Nexus")
+    with pytest.raises(ValidationError):
+        projects.update(session, "nexus", " ", None)
+    with pytest.raises(NotFoundError):
+        projects.update(session, "missing", "Name", None)
+
+
+def test_restore_an_archived_project(session):
+    """
+    Given an archived project
+    When it is restored
+    Then it is active again and the change is logged
+    """
+    project = projects.create(session, "nexus", "Nexus")
+    projects.archive(session, "nexus")
+    projects.restore(session, "nexus")
+
+    assert project.status is ProjectStatus.ACTIVE
+    assert _actions(session, project)[-1] == ("restored", {"from": "ARCHIVED", "to": "ACTIVE"})
+
+
+def test_restore_an_active_project_is_refused(session):
+    """Only an archived project can be restored."""
+    projects.create(session, "nexus", "Nexus")
+    with pytest.raises(ConflictError):
+        projects.restore(session, "nexus")
+
+
+# Directory ---------------------------------------------------------------------------------------
+
+def test_create_with_a_directory_normalises_and_logs_it(session):
+    """
+    Given a directory typed with ~ and a trailing slash
+    When creating a project with it
+    Then the absolute, normalised path is stored and logged
+    """
+    import os
+
+    project = projects.create(session, "nexus", "Nexus", directory="~/projets/nexus/")
+    expected = os.path.join(os.path.expanduser("~"), "projets", "nexus")
+    assert project.directory == expected
+    assert _actions(session, project)[0][1]["directory"] == expected
+
+
+def test_relative_directory_is_refused(session):
+    """A relative path is refused, on creation and on update, and nothing is written."""
+    with pytest.raises(ValidationError, match="absolute"):
+        projects.create(session, "nexus", "Nexus", directory="projets/nexus")
+    assert projects.list(session) == []
+    projects.create(session, "nexus", "Nexus")
+    with pytest.raises(ValidationError, match="absolute"):
+        projects.update(session, "nexus", "Nexus", None, directory="./here")
+
+
+def test_update_sets_keeps_and_clears_the_directory(session):
+    """A directory is set and logged, kept when not given, cleared when blank."""
+    project = projects.create(session, "nexus", "Nexus")
+    projects.update(session, "nexus", "Nexus", None, directory="/srv/nexus")
+    assert _actions(session, project)[-1] == ("updated", {"directory": {"from": None, "to": "/srv/nexus"}})
+
+    projects.update(session, "nexus", "Nexus 2", None)
+    assert project.directory == "/srv/nexus"
+
+    projects.update(session, "nexus", "Nexus 2", None, directory=" ")
+    assert project.directory is None
+
+
+def test_directory_of_falls_back_to_the_parent(session):
+    """A subproject without a directory uses its parent's; its own wins when set."""
+    projects.create(session, "nexus", "Nexus", directory="/srv/nexus")
+    sub = projects.create(session, "web", "Web", parent_key="nexus")
+    assert projects.directory_of(sub) == "/srv/nexus"
+    projects.update(session, "web", "Web", None, directory="/srv/nexus-web")
+    assert projects.directory_of(sub) == "/srv/nexus-web"
+    assert projects.directory_of(None) is None
+
+
+# Priority ----------------------------------------------------------------------------------------
+
+def test_a_new_project_is_normal_priority_and_its_subprojects_follow_it(session):
+    """A new root is NORMAL; a subproject shows its root's priority."""
+    root = projects.create(session, "nexus", "Nexus")
+    sub = projects.create(session, "web", "Web", parent_key="nexus")
+    projects.update(session, "nexus", "Nexus", None, priority=ProjectPriority.HIGH)
+
+    assert (root.priority, sub.effective_priority) == (ProjectPriority.HIGH, ProjectPriority.HIGH)
+    assert _actions(session, root)[-1] == ("updated", {"priority": {"from": "NORMAL", "to": "HIGH"}})
+
+
+def test_update_refuses_a_priority_for_a_subproject(session):
+    """A subproject's priority can't be set; leaving it as is stays allowed."""
+    projects.create(session, "nexus", "Nexus")
+    projects.create(session, "web", "Web", parent_key="nexus")
+    with pytest.raises(ValidationError, match="follows its root"):
+        projects.update(session, "web", "Web", None, priority=ProjectPriority.LOW)
+    projects.update(session, "web", "Web 2", None, priority=ProjectPriority.NORMAL)
+
+
+def test_list_sorts_by_priority_then_creation_with_subprojects_after_their_root(session):
+    """
+    Given a normal, a low and a high project, the low one with a subproject
+    When listing projects
+    Then they come high, normal, low, the subproject right after its root
+    """
+    for key in ("normal", "low", "high"):
+        projects.create(session, key, key.capitalize())
+    projects.create(session, "lowsub", "Low sub", parent_key="low")
+    projects.update(session, "low", "Low", None, priority=ProjectPriority.LOW)
+    projects.update(session, "high", "High", None, priority=ProjectPriority.HIGH)
+
+    assert [p.key for p in projects.list(session)] == ["high", "normal", "low", "lowsub"]
+
+
+def test_state_is_a_reserved_key(session):
+    """`state` is a CLI command, so no project can take it as key."""
+    with pytest.raises(ValidationError):
+        projects.create(session, "state", "State")

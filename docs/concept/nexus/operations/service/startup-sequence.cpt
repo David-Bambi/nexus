@@ -1,0 +1,21 @@
+---
+title: Au démarrage
+summary: "Dossier, journal, sauvegarde, migrations, puis serveur : dans cet ordre, et pourquoi"
+icon: lucide:list-ordered
+image: startup-sequence.svg
+links: []
+related:
+  - 
+---
+
+Au démarrage, `src/main.py` enchaîne cinq étapes, dans cet ordre :
+
+1. créer le dossier des données ;
+2. configurer le [journal applicatif](../data/app-log.cpt) ;
+3. faire une [copie de la base](../backups/startup-copy.cpt) ;
+4. construire l'application, ce qui applique les [migrations](../migrations/auto-migrations.cpt) ;
+5. servir sur `127.0.0.1` avec waitress.
+
+La copie passe __avant__ les migrations : une migration ratée a toujours une copie d'avant la mise à jour pour revenir en arrière.
+
+Une copie ratée est notée au journal, et le démarrage continue : que l'application soit disponible compte plus qu'une copie manquante.

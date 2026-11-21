@@ -1,0 +1,18 @@
+---
+title: Capturer, clarifier, ajouter
+summary: "Les trois façons de faire entrer du travail : capture dans l'inbox, clarification, ajout direct dans l'arbre"
+icon: lucide:inbox
+links: []
+related:
+  - 
+---
+
+Le travail entre dans Nexus de trois façons.
+
+1. __Capturer__ : un titre seul, sans projet, arrive dans l'__inbox__ globale (barre de capture, `nexus "…"`, `capture_task`).
+2. __Ajouter dans l'arbre__ : l'élément naît à sa place (projet, fonctionnalité parente), en __inbox__ : on sait où il va, pas encore comment (formulaire __Add__, + sous une fonctionnalité, `nexus add`, `add_task`). Il reste dans son projet.
+3. __Clarifier__ : l'élément passe en __refined__, avec corps, __contexte__ (comme `@ordi`), taille, et au besoin place et type. Sans projet donné, celui du parent est pris. Un élément placé peut aussi être __raffiné__ tel quel. Clarifier ramène aussi un élément __someday__.
+
+Exception : l'[import](../interfaces/import/format.cpt) crée un arbre déjà __refined__.
+
+Pourquoi l'ajout naît en inbox, pas en refined : séparer les captures à trier des éléments placés mais à raffiner. __refined__ veut dire raffiné, voire découpé.

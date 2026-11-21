@@ -1,0 +1,18 @@
+---
+title: Copie au démarrage
+summary: "Une copie de la base à chaque démarrage, avant les migrations ; les 14 plus récentes sont gardées"
+icon: lucide:copy
+links: []
+related:
+  - 
+---
+
+À chaque démarrage, avant les migrations, Nexus copie la base dans `backups/`, sous le nom `data-AAAAmmjj-HHMMSS.db`.
+
+- La copie passe par l'__API de sauvegarde en ligne__ de SQLite, pas par une copie de fichier : en mode WAL, une copie de fichier peut manquer ce qui dort encore dans le fichier `-wal`.
+- Les __14__ plus récentes sont gardées. Les autres fichiers du dossier ne sont jamais effacés.
+- Au tout premier lancement, il n'y a rien à copier.
+
+Limites :
+- rien entre deux démarrages : une machine qui reste allumée des semaines n'a pas de nouvelle copie. L'[export complet](full-export.cpt) sert alors de copie à la demande ;
+- une boucle de plantages fait une copie par redémarrage, et peut chasser les anciennes. La limite de redémarrages de systemd la borne.

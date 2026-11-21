@@ -1,0 +1,21 @@
+---
+title: Restaurer une copie
+summary: "Arrêter le service, remettre une copie à la place de la base, redémarrer"
+icon: lucide:undo-2
+links: []
+related:
+  - 
+---
+
+Pour revenir à une copie : arrêter le service, remettre la copie à la place de la base, redémarrer.
+
+```
+systemctl --user stop nexus                       # ou arrêter le processus au premier plan
+cp ~/.nexus/backups/data-AAAAmmjj-HHMMSS.db ~/.nexus/data.db
+rm -f ~/.nexus/data.db-wal ~/.nexus/data.db-shm   # restes de la base remplacée
+systemctl --user start nexus                      # les migrations en attente s'appliquent
+```
+
+Pourquoi effacer `-wal` et `-shm` : ce sont les fichiers de travail de l'ancienne base ; ils ne correspondent pas à la copie remise en place.
+
+Au redémarrage, une nouvelle copie est prise, comme à chaque démarrage.

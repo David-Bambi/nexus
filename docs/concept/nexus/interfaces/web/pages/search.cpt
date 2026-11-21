@@ -1,0 +1,15 @@
+---
+title: Recherche
+summary: "Chercher un texte dans les éléments"
+icon: lucide:search
+image: search.png
+links: []
+related:
+  - 
+---
+
+__Adresse__ : `/search`, le texte cherché dans `?q=`.
+
+__Ce qu'on y voit__ : les éléments dont le titre ou le corps contient le texte, sans tenir compte des majuscules, avec leur référence, leur état et leur place. Les 100 premiers résultats au plus.
+
+__Ce qu'on y fait__ : taper un texte, chercher, ouvrir un résultat. Un texte vide ne renvoie rien.

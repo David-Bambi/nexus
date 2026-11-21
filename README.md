@@ -1,6 +1,13 @@
 # Nexus
 
+*[Version française](README.fr.md)*
+
 A single-user, GTD-inspired project manager served as a local web app.
+
+Work is a tree: project → subprojects (one level) → features (any depth) →
+tasks. Each project has a computed version `MAJOR.MINOR`: the minor number
+goes up by itself when a feature is done; the major number goes up by hand
+once all its major criteria are checked.
 
 ## Requirements
 
@@ -17,7 +24,9 @@ uv run pytest                                    # run the test suite
 ```
 
 Without `NEXUS_DATABASE_URL`, `flask run` uses the real database in
-`~/.nexus/`. Migrations are applied automatically at startup.
+`~/.nexus/`. Migrations are applied automatically at startup. The
+development database must be a fresh one: an `instance/nexus.db` left by
+1.x is refused (see "Upgrade from 1.x"); delete it and start again.
 
 ## Running as a service
 
@@ -65,37 +74,44 @@ time out even though the service is up.
 
 ## Command line
 
-`scripts/install_cli.sh install` puts an editable `nexus` command in
+`scripts/install-cli.sh install` puts an editable `nexus` command in
 `~/.local/bin` (uv's tool bin dir), so it runs from any directory without
 `uv run`. It follows the checkout: reinstall only after moving the repo.
-`scripts/install_cli.sh uninstall` removes it. Without the install,
+`scripts/install-cli.sh uninstall` removes it. Without the install,
 `uv sync` and `uv run nexus ...` work the same. The CLI uses the same database
-as the service (`NEXUS_HOME` / `NEXUS_DATABASE_URL` apply). Tasks and versions
-have short refs (`t-4k2`, `v-9xa`), shown in the web UI too. The examples
-below use `uv run`; drop it if `nexus` is installed.
+as the service (`NEXUS_HOME` / `NEXUS_DATABASE_URL` apply). Root projects
+are named by key; subprojects, features and tasks have short refs (`s-…`,
+`f-…`, `t-…`), shown in the web UI too. The examples below use `uv run`;
+drop it if `nexus` is installed.
 
 ```bash
-uv run nexus tasks                          # also: versions, projects, version
-uv run nexus NX                             # project detail (by key)
-uv run nexus NX 1.0                         # version detail, tasks, definition of done
-uv run nexus NX 1.0 check 2                 # also: uncheck <n>, start, release, add-/edit-/remove-criterion (or after a v- ref)
-uv run nexus t-4k2                          # task detail (or a v- ref)
-uv run nexus add task NX 1.0 -t "Title" -s S  # planned task; omit the version for the inbox
+uv run nexus projects                       # active projects and subprojects, with their version
+uv run nexus tasks                          # every feature and task
+uv run nexus NX --all                       # project detail (key or s- ref): version, criteria, work tree
+uv run nexus f-4k2                          # feature or task detail (f- or t- ref)
+uv run nexus add feature NX -t "Title"      # also: add task NX -p f-4k2 -t "Title" -s S
 uv run nexus "buy a USB-C cable"            # capture into the inbox
-uv run nexus import plan.json --dry-run     # import projects/versions/tasks, all or nothing
+uv run nexus state t-4k2 done               # move to a state, through each step (--reason for waiting)
+uv run nexus import plan.json --dry-run     # import projects and their trees, all or nothing
 uv run nexus import - --text < ideas.txt    # one inbox task per line
+uv run nexus export features -o features.json  # feature export read by metrique (nexus.features/1)
+uv run nexus version                        # installed package version
 ```
 
 Exit codes: 0 ok, 1 refused by a data rule, 2 wrong command line. The CLI
-cannot edit or change task states (the MCP server can). It applies pending migrations when it
-starts, so it can upgrade the real database before the service is
-redeployed. Import format and details: `docs/functional/cli.md`.
+reads, captures, adds, changes state, imports and exports; it cannot edit or
+move items, nor edit criteria or release a major version (the web UI and the
+MCP server can). It applies pending migrations when it starts, so it
+can upgrade the real database before the service is redeployed. Import
+format and details: `docs/concept/nexus/interfaces/cli/` and
+`docs/concept/nexus/interfaces/import/`.
 
 ## MCP server
 
 The running service also speaks the Model Context Protocol, so an AI
-assistant can read and update your projects (25 tools: list, get, search,
-capture, add, update, plan, start, complete, block, release, DoD editing, import...). Register it
+assistant can read and update your projects (35 tools: list, get, search,
+dashboard, capture, add, clarify, move, reorder, change kind, update, state
+changes, archiving, project and criteria editing, major release, import). Register it
 once in Claude Code:
 
 ```bash
@@ -103,10 +119,11 @@ claude mcp add --transport http nexus http://127.0.0.1:8765/mcp
 ```
 
 Read-only tools can be auto-allowed; write tools prompt for approval, and
-their events are logged with actor `mcp`. Deleting tasks, versions or projects and
-archiving stay in the web UI. Security: the endpoint has no authentication and relies on the
-loopback binding plus a Host/Origin/Content-Type check; it is unavailable
-while the service is down. Tools and rules: `docs/functional/mcp.md`.
+their events are logged with actor `mcp`. Deleting items or projects and
+archiving projects stay in the web UI. Security: the endpoint has no authentication
+and relies on the loopback binding plus a Host/Origin/Content-Type check; it
+is unavailable while the service is down. Tools and rules:
+`docs/concept/nexus/interfaces/mcp/`.
 
 ## Configuration
 
@@ -133,8 +150,8 @@ A backup is taken each time the app starts, before migrations are applied,
 so a bad upgrade can always be undone. Backups happen **only at startup**: a
 machine that stays up for weeks gets no new snapshot in between. For a copy
 at any time, download `http://127.0.0.1:8765/export.json` (the whole
-database as JSON; each version's `definition_of_done` is a list of
-`{"description", "done"}` objects).
+database as JSON: projects with their version, features and tasks, tags,
+major criteria and events). It is a backup, not an import format.
 
 ### Restore a backup
 
@@ -145,19 +162,58 @@ rm -f ~/.nexus/data.db-wal ~/.nexus/data.db-shm  # leftovers of the replaced dat
 systemctl --user start nexus                     # pending migrations are applied on start
 ```
 
-### Move data from the development database
+### Upgrade from 1.x
 
-Data created before `~/.nexus` existed lives in `instance/nexus.db`. With no
-server running:
+Nexus 2.0 replaced planned versions with a project / feature / task tree and
+restarted its migration history: it refuses to start on a 1.x database and
+says so. Archive the old database, then start again on an empty one:
 
 ```bash
-mkdir -p ~/.nexus && cp instance/nexus.db ~/.nexus/data.db
+systemctl --user stop nexus
+mkdir -p ~/.nexus/archive
+mv ~/.nexus/data.db ~/.nexus/archive/data-1.x.db
+rm -f ~/.nexus/data.db-wal ~/.nexus/data.db-shm
+systemctl --user start nexus                     # creates an empty 2.0 database
 ```
+
+Nothing is migrated: the 1.x data stays readable in the archived file (and
+in a JSON export taken before the upgrade).
+
+## Use of AI
+
+This project was made with an AI assistant, Claude (Anthropic), through
+Claude Code, from September to November 2026. The table below shows how much
+each part relies on it. The project page also shows, per category, the share
+of lines added in commits co-signed by Claude.
+
+- 🤖 **AI-generated**: the AI produced the content; I directed it and reviewed it.
+- 🤝 **AI-assisted**: I did the work; the AI proposed, explained, reviewed or fixed.
+- ✋ **No AI**: done entirely by me.
+
+| Area | Level | In practice |
+|---|---|---|
+| Project management | 🤖 AI-generated | Specs, plans, features, tasks and criteria |
+| Design and architecture | 🤖 AI-generated | Layering, data model and the decisions in the Concept map |
+| Code | 🤖 AI-generated | Web app, services, CLI and MCP server |
+| Code comments | 🤖 AI-generated | Docstrings and comments |
+| Tests | 🤖 AI-generated | The pytest suite |
+| Documentation and README | 🤖 AI-generated | Concept map, MkDocs site and these READMEs |
+| Graphic assets | 🤖 AI-generated | Stylesheet, page layout, diagrams and screenshots |
+| Tools | 🤖 AI-generated | Service, CLI and deploy scripts |
+
+Claude's role in this project is **Autonomous**: it designs and implements on its
+own, end to end, then reports what it did and decided. It still asks before any
+destructive or outward-facing action (push, deletion, publication).
 
 ## Documentation
 
-`docs/` is the source of truth (architecture, ADRs, functional mockups,
-reference). Build/serve it locally:
+`docs/` is the source of truth. The project documentation (model, event
+log, interfaces, operations, measurement, guides) is a Concept map in
+French, in `docs/concept/` (root `docs/concept/nexus/nexus.cpt`): open it in
+Concept, entry "Nexus".
+
+The MkDocs site only covers the code (Python explainers, AI tools, API
+reference generated from docstrings). Build/serve it locally:
 
 ```bash
 uv run mkdocs serve

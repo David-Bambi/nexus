@@ -14,10 +14,11 @@ PAIRS = [
     ("danger", "bg"), ("danger", "surface"),
     ("warning", "bg"), ("warning", "surface"),
     ("success", "bg"), ("success", "surface"),
+    ("info", "bg"), ("info", "surface"),
 ]
 
 # Badge colors, drawn on a 12% tint of themselves mixed with the surface color (whatever lies behind).
-BADGES = ["text-muted", "accent", "warning", "success", "danger"]
+BADGES = ["text-muted", "info", "accent", "warning", "success", "danger"]
 
 # WCAG AA minimum contrast for normal text.
 MINIMUM = 4.5

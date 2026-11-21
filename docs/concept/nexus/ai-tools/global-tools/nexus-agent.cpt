@@ -1,0 +1,20 @@
+---
+title: Agent nexus-agent
+summary: "L'agent global de gestion de projet : ses quatre rôles, ses outils MCP et sa règle d'autonomie"
+icon: lucide:clipboard-list
+links: []
+related:
+  - 
+---
+
+`nexus-agent` est un agent global, en français, qui gère les projets de David en passant par le __serveur MCP Nexus__. Il est défini dans `ai-tools/agents/nexus-agent.md`.
+
+Ses quatre rôles :
+- __trier l'inbox__ ;
+- __découper une demande__ en feature et tâches, avec leurs tailles ;
+- __suivre l'avancement__ : changer les états, fermer une feature, proposer l'archivage ;
+- __faire le point__ : version, critères restants, éléments DOING et WAITING, INBOX, prochaine tâche.
+
+Il lit et écrit des éléments. Critères, projets, suppression, import et version majeure restent à David.
+
+__Autonomie__ : il propose une liste de changements et n'écrit que si le prompt dit « applique ». Pourquoi : utilisable dans tous les projets, sans écriture surprise.

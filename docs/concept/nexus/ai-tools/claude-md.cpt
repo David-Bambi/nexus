@@ -1,0 +1,18 @@
+---
+title: Fichiers CLAUDE.md
+summary: "Les instructions que Claude Code charge d'office, à la racine et dans docs/"
+icon: lucide:file-cog
+links: []
+related:
+  - 
+---
+
+Claude Code charge d'office les fichiers `CLAUDE.md` du dossier où il travaille.
+
+- `CLAUDE.md`, à la racine :
+  - répondre en français, écrire les nouveaux documents en français ; le code et ses commentaires restent en anglais ;
+  - tout ce que Claude produit va dans `artifacts/` ; `docs/` fait foi et se tient à jour à chaque tâche ;
+  - passer par l'agent [docs-manager](agents/docs-manager.cpt) pour documenter, et pour lire les fiches de la carte Concept (où vivent les décisions) avant de toucher aux couches, à la pile, au journal, au réseau ou au modèle ;
+  - commenter chaque variable, classe et fonction ;
+  - les commandes : installer, tester, lancer, installer le service, construire la doc.
+- `docs/CLAUDE.md` : les règles de la documentation. Sa structure (`concept/`, `python/`, `ai-tools/`, `reference/` générée), les commandes MkDocs et de vérification des fiches, et un faux avertissement « properdocs » à ignorer.

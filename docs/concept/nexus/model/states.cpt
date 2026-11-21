@@ -1,0 +1,27 @@
+---
+title: États
+summary: "Les sept états GTD d'un élément, les étapes permises entre eux et les sauts qui les enchaînent"
+icon: lucide:workflow
+image: states.svg
+links: []
+related:
+  - 
+---
+
+Fonctionnalités et tâches avancent dans les mêmes __sept états__, inspirés de GTD.
+
+- __inbox__ : à clarifier ; capture sans projet, ou élément placé à raffiner.
+- __refined__ : clarifié, prêt à démarrer.
+- __doing__ : en cours.
+- __waiting__ : bloqué, avec une __raison__.
+- __done__ : terminé.
+- __someday__ : reporté, sans date.
+- __cancelled__ : abandonné, travail non fait.
+
+Le schéma montre les __étapes__ permises, chacune inscrite au [journal](../event-log/actions/item-actions.cpt). __Changer d'état__ vers un état lointain enchaîne les étapes du plus court chemin : inbox → done écrit `clarified`, `started`, `completed`. Un saut impossible est refusé avant la première étape.
+
+Someday s'atteint en __reportant__, jamais par saut ; on en sort en __raffinant__ (`clarified`).
+
+Pourquoi des étapes plutôt qu'un seul événement : le journal et les métriques restent cohérents. Revenir en refined garde le premier démarrage (plan figé) ; en inbox, la place.
+
+Pas d'état « planifié » : on ne range pas le travail par version. Règles : [couche services](../interfaces/service-layer.cpt).

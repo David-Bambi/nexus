@@ -1,0 +1,26 @@
+---
+title: Configuration
+summary: "Les variables d'environnement, toutes facultatives, et leurs valeurs par défaut"
+icon: lucide:settings
+links: []
+related:
+  - 
+---
+
+Nexus se règle par des variables d'environnement, toutes facultatives :
+
+- `NEXUS_HOME` : le dossier des données, `~/.nexus` par défaut.
+- `NEXUS_DATABASE_URL` : l'adresse complète de la base ; par défaut, `data.db` dans ce dossier.
+- `NEXUS_PORT` : le port d'écoute, `8765` par défaut. L'adresse, elle, ne se règle pas.
+- `NEXUS_SECRET_KEY` : la clé de signature de Flask, `dev` par défaut ; rien de sensible n'est signé.
+
+`.env.example` les décrit, mais n'est pas chargé tout seul : exporter les variables dans son shell. Elles valent pour le service comme pour la CLI.
+
+Pour développer sur une base à part :
+
+```
+NEXUS_DATABASE_URL=sqlite:///instance/nexus.db \
+  FLASK_APP=src.app:create_app uv run flask run    # port 5000
+```
+
+Sans `NEXUS_DATABASE_URL`, `flask run` travaille sur la vraie base.

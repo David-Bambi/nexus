@@ -1,0 +1,21 @@
+---
+title: get_project
+summary: "Un projet : version, critères, sous-projets et arbre de travail"
+icon: lucide:wrench
+tags: [lecture]
+links: []
+related:
+  - 
+---
+
+__Rôle__ : montre un projet ou un sous-projet : sa version, ses critères, ses sous-projets et son arbre de travail.
+
+__Arguments__
+- Obligatoire : `project` (clé).
+- Facultatif : `include_closed` (faux par défaut).
+
+__Règles__
+- Lecture seule.
+- Sans `include_closed`, les éléments terminés et annulés sont cachés, avec tout ce qu'il y a sous eux.
+
+__Résultat__ : les champs du projet (dont `priority`, effective), plus `criteria` (`{number, text, done}`), `subprojects` (avec leur version) et `tree` : les éléments en bref, chacun avec ses `children` imbriqués.

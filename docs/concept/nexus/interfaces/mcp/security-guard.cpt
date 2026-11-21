@@ -1,0 +1,19 @@
+---
+title: Garde de sécurité
+summary: "Les contrôles faits avant de lire une requête MCP, faute d'authentification"
+icon: lucide:shield
+links: []
+related:
+  - 
+---
+
+Nexus n'a pas d'authentification, et un navigateur ouvert sur la machine peut joindre `127.0.0.1`. Chaque requête MCP passe donc une __garde__ avant d'être lue.
+
+- __Host__ : `127.0.0.1`, `localhost` ou `::1`, sinon `421`. Empêche le _DNS rebinding_ (un site qui se fait passer pour une adresse locale).
+- __Origin__, s'il est présent : exactement l'adresse du serveur, sinon `403`. Bloque les autres sites, même sur un autre port local ; Claude Code n'envoie pas d'Origin.
+- __Content-Type__ `application/json`, sinon `415` : un formulaire d'un autre site ne peut pas l'envoyer sans demande préalable, que le serveur n'accorde jamais.
+- __Taille__ : 1 Mo au plus, sinon `413`.
+
+Après la poignée de main, un en-tête `MCP-Protocol-Version` inconnu est refusé (`400`). Claude Code essaie d'abord une version plus récente, reçoit `400`, puis recommence : c'est normal.
+
+Les formulaires web n'ont pas non plus de protection CSRF.

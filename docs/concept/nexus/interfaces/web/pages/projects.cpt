@@ -1,0 +1,20 @@
+---
+title: Projets
+summary: "La liste des projets et de leurs sous-projets, par priorité, avec leur version"
+icon: lucide:folders
+image: projects.png
+links: []
+related:
+  - 
+---
+
+__Adresse__ : `/projects`.
+
+__Ce qu'on y voit__
+- Les projets racines par [priorité](../../../model/tree.cpt), chacun suivi de ses sous-projets en retrait.
+- Pour chacun : nom, clé, référence `s-…` d'un sous-projet, version `vX.Y`, statut, description, et le badge de priorité d'un projet racine (__High__ rouge, __Normal__ violet, __Low__ gris).
+- Les projets archivés sont cachés.
+
+__Ce qu'on y fait__
+- Ouvrir un projet.
+- Créer un projet : clé, nom, description et [répertoire](../../../measurement/project-directory.cpt) facultatif. Une clé déjà prise ou [réservée](../../../model/references.cpt) est refusée.

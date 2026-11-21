@@ -1,0 +1,26 @@
+{
+  "append-only.cpt": {
+    "x": 83,
+    "y": 2
+  },
+  "same-transaction.cpt": {
+    "x": 329,
+    "y": 4
+  },
+  "actors.cpt": {
+    "x": 208,
+    "y": 106
+  },
+  "deleted-entities.cpt": {
+    "x": 84,
+    "y": 104
+  },
+  "actions/actions.cpt": {
+    "x": 466,
+    "y": 33
+  },
+  "history.cpt": {
+    "x": 204,
+    "y": 6
+  }
+}

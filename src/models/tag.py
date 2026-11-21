@@ -17,6 +17,8 @@ class Tag(Base):
     """A free-form label a user can attach to any number of tasks."""
 
     __tablename__ = "tag"
+    # AUTOINCREMENT: a deleted id is never handed out again.
+    __table_args__ = {"sqlite_autoincrement": True}
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String, unique=True, nullable=False)

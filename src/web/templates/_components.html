@@ -3,10 +3,18 @@
   Import with: {% import "_components.html" as ui %}
 #}
 
-{# Heading of a page, with an optional link back to its parent page. #}
+{#
+  Heading of a page, with an optional link back to its parent page. Called
+  with {% call %}, the block's content (e.g. icon buttons) follows the title
+  on the same line.
+#}
 {% macro page_header(title, back_url=none, back_label=none) %}
 {% if back_url %}<p class="back"><a href="{{ back_url }}">← {{ back_label }}</a></p>{% endif %}
+{% if caller is defined %}
+<h1 class="heading-actions">{{ title }} {{ caller() }}</h1>
+{% else %}
 <h1>{{ title }}</h1>
+{% endif %}
 {% endmacro %}
 
 {#
@@ -24,6 +32,23 @@
 </label>
 {% endmacro %}
 
+{# A task's size, with what each size means. A value outside the list stays selectable. #}
+{% macro size_select(value) %}
+<label class="field">
+    <span class="field-label">Size</span>
+    <select name="size">
+        <option value="">—</option>
+        {% if value and value not in size_guide %}
+        <option value="{{ value }}" selected>{{ value }}</option>
+        {% endif %}
+        {% for size, guide in size_guide.items() %}
+        <option value="{{ size }}"{% if size == value %} selected{% endif %}>{{ size }} — {{ guide.short }}</option>
+        {% endfor %}
+    </select>
+    <span class="hint">In doubt, take the bigger size; split anything bigger than L. <a href="{{ url_for('pages.sizes_guide') }}">Size guide</a></span>
+</label>
+{% endmacro %}
+
 {# An error message, shown only when there is one. #}
 {% macro error_message(error) %}
 {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
@@ -34,12 +59,18 @@
 <li class="empty">{{ text }}</li>
 {% endmacro %}
 
-{# A task state, version status or project status, e.g. DOING or RELEASED. #}
+{# A task state or project status, e.g. DOING or ARCHIVED. #}
 {% macro badge(name) %}
 <span class="badge badge-{{ name | lower }}">{{ name }}</span>
 {% endmacro %}
 
-{# A short reference such as t-4k2 or v-9xa. #}
+{# A project's priority badge: its root's for a subproject. #}
+{% macro priority(project) %}
+{% set level = project.effective_priority.name %}
+<span class="badge badge-priority-{{ level | lower }}" data-field="priority" title="Priority">{{ level | capitalize }}</span>
+{% endmacro %}
+
+{# A short reference such as t-4k2, f-4k2 or s-4k2. #}
 {% macro ref_chip(ref) %}
 <code class="ref">{{ ref }}</code>
 {% endmacro %}
@@ -47,26 +78,6 @@
 {# Link to a task page; `next` is the page to come back to after an action there. #}
 {% macro task_link(task, next=none) %}
 <a href="{{ url_for('pages.task_detail', task_id=task.id, next=next) }}">{{ task.title }}</a>
-{% endmacro %}
-
-{# Task and definition-of-done progress of a version (a VersionProgress). #}
-{% macro version_progress(progress) %}
-<span class="progress">
-    {{ progress.done }}/{{ progress.total }} done
-    <progress value="{{ progress.done }}" max="{{ progress.total or 1 }}"></progress>
-    DOD {{ progress.dod_done }}/{{ progress.dod_total }}
-    <progress value="{{ progress.dod_done }}" max="{{ progress.dod_total or 1 }}"></progress>
-</span>
-{% endmacro %}
-
-{# One version in a project's list: link, status and progress (a VersionProgress). #}
-{% macro version_row(progress) %}
-{% set version = progress.version %}
-<li class="version-row">
-    <a href="{{ url_for('pages.version_detail', key=version.project.key, number=version.number) }}">{{ version.number }} — {{ version.title }}</a>
-    {{ badge(version.status.name) }}
-    {{ version_progress(progress) }}
-</li>
 {% endmacro %}
 
 {# A count with its label, linking to the page that lists the counted items. #}
@@ -77,36 +88,222 @@
 </a>
 {% endmacro %}
 
-{# Where a task belongs: its project key and, if planned, a link to its version. #}
+{# Where a work item sits: its project key and, under a feature, a link to that feature. #}
 {% macro task_place(task) %}
 <span class="task-place">
     {% if task.project %}{{ ref_chip(task.project.key) }}{% endif %}
-    {% if task.version %}
-    <a href="{{ url_for('pages.version_detail', key=task.version.project.key, number=task.version.number) }}">{{ task.version.number }}</a>
+    {% if task.parent %}
+    <a href="{{ url_for('pages.task_detail', task_id=task.parent.id) }}">{{ task.parent.ref }}</a>
     {% endif %}
 </span>
 {% endmacro %}
 
-{# A version as a card: project, title, then task and definition-of-done progress (a VersionProgress). #}
-{% macro version_card(progress) %}
-{% set version = progress.version %}
-<article class="card">
-    <p class="card-kicker">{{ version.project.name }}</p>
-    <h3 class="card-title">
-        <a href="{{ url_for('pages.version_detail', key=version.project.key, number=version.number) }}">{{ version.number }} — {{ version.title }}</a>
-    </h3>
-    <dl class="meter-list">
-        <dt>Tasks</dt>
-        <dd>{{ progress.done }}/{{ progress.total }} done
-            <progress value="{{ progress.done }}" max="{{ progress.total or 1 }}"></progress></dd>
-        <dt>Definition of done</dt>
-        <dd>{{ progress.dod_done }}/{{ progress.dod_total }}
-            <progress value="{{ progress.dod_done }}" max="{{ progress.dod_total or 1 }}"></progress></dd>
-    </dl>
+{#
+  Form adding a feature or task to a project's tree, under `parent_ref` when
+  given. With `form_id`, it starts hidden, opened by its reveal button,
+  unless `open_form` names it (a refused add shown again).
+#}
+{% macro add_item_form(project_key, parent_ref=none, form_id=none, open_form=none) %}
+<form class="form-inline add-item"{% if form_id %} id="{{ form_id }}"{% if form_id != open_form %} hidden{% endif %}{% endif %} method="post" action="{{ url_for('pages.project_add_item', key=project_key) }}">
+    {% if parent_ref %}<input type="hidden" name="parent_ref" value="{{ parent_ref }}">{% endif %}
+    <input type="text" name="title" placeholder="New item…" aria-label="Title" required>
+    <select name="kind" aria-label="Kind">
+        <option value="task">task</option>
+        <option value="feature">feature</option>
+    </select>
+    <button type="submit">Add</button>
+</form>
+{% endmacro %}
+
+{# Up / down buttons moving an item among its siblings, then back to this page. #}
+{% macro reorder_buttons(item) %}
+{% set back = request.full_path.rstrip("?") %}
+<span class="reorder">
+    <form method="post" action="{{ url_for('pages.task_reorder', task_id=item.id, next=back) }}">
+        <input type="hidden" name="direction" value="up">
+        <button type="submit" aria-label="Move {{ item.title }} up" title="Move up">↑</button>
+    </form>
+    <form method="post" action="{{ url_for('pages.task_reorder', task_id=item.id, next=back) }}">
+        <input type="hidden" name="direction" value="down">
+        <button type="submit" aria-label="Move {{ item.title }} down" title="Move down">↓</button>
+    </form>
+</span>
+{% endmacro %}
+
+{#
+  A feature's overview: tasks done over total in its subtree (cancelled left
+  out), then its open sized tasks per size, e.g. "2/5 · 2 S · 1 M".
+#}
+{% macro feature_summary(node) %}
+{% if node.total %}
+<span class="tree-summary" title="Done tasks / tasks, then open tasks per size">{{ node.done }}/{{ node.total }}{% for size, count in node.sizes %} · {{ count }} {{ size }}{% endfor %}</span>
+{% endif %}
+{% endmacro %}
+
+{#
+  A work tree: nested lists of features (collapsible, with an overview and a
+  "+" opening an add form under the row) and tasks. Each row has an anchor
+  (item-<ref>) and up / down buttons shown on hover. `nodes` come from
+  views.project_tree() or views.item_tree(); `open_form` is the id of an add
+  form to show open.
+#}
+{% macro work_tree(nodes, project_key, open_form=none) %}
+<ul class="tree">
+    {% for node in nodes %}
+    {% set item = node.item %}
+    <li class="tree-item tree-{{ item.kind.name | lower }}" id="item-{{ item.ref }}">
+        {% if item.kind.name == "FEATURE" %}
+        <details open>
+            <summary class="tree-row">
+                {{ task_link(item) }} {{ ref_chip(item.ref) }} {{ badge(item.state.name) }}
+                {% if item.released_in %}<span class="hint">v{{ item.released_in }}</span>{% endif %}
+                {{ feature_summary(node) }}
+                {{ reveal_button("add-" ~ item.ref, "plus", "Add an item under " ~ item.title, expanded=open_form == "add-" ~ item.ref) }}
+                {{ reorder_buttons(item) }}
+            </summary>
+            {{ add_item_form(project_key, item.ref, "add-" ~ item.ref, open_form) }}
+            {% if node.children %}{{ work_tree(node.children, project_key, open_form) }}{% endif %}
+        </details>
+        {% else %}
+        <div class="tree-row">
+            {{ task_link(item) }} {{ ref_chip(item.ref) }} {{ badge(item.state.name) }}
+            {{ reorder_buttons(item) }}
+        </div>
+        {% endif %}
+    </li>
+    {% endfor %}
+</ul>
+{% endmacro %}
+
+{#
+  A small inline SVG icon drawn in the text color: plus, pencil, trash,
+  save or close. Decorative: the button around it carries the label.
+#}
+{% macro icon(name) %}
+<svg class="icon" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+    {%- if name == "plus" %}<path d="M5 12h14"/><path d="M12 5v14"/>
+    {%- elif name == "pencil" %}<path d="M21.17 6.81a1 1 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z"/><path d="m15 5 4 4"/>
+    {%- elif name == "trash" %}<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+    {%- elif name == "save" %}<path d="M20 6 9 17l-5-5"/>
+    {%- elif name == "close" %}<path d="M18 6 6 18"/><path d="m6 6 12 12"/>
+    {%- endif %}
+</svg>
+{% endmacro %}
+
+{#
+  Icon button opening or closing the hidden element `target_id` (app.js,
+  data-reveal); `label` is its tooltip and accessible name. With `expanded`,
+  the target starts open (e.g. a refused form shown again).
+#}
+{% macro reveal_button(target_id, icon_name, label, expanded=false) %}
+<button type="button" class="icon-button" title="{{ label }}" aria-label="{{ label }}"
+        aria-expanded="{{ 'true' if expanded else 'false' }}" aria-controls="{{ target_id }}" data-reveal="{{ target_id }}">{{ icon(icon_name) }}</button>
+{% endmacro %}
+
+{# Events, oldest first; with `show_entity`, each row names its entity and links tasks. Empty payload values are left out. #}
+{#
+  Tabs switching a project's work between the backlog (tree) and the kanban
+  board.
+#}
+{% macro view_tabs(project_key, view) %}
+<nav class="view-tabs" aria-label="Work views">
+    <a href="{{ url_for('pages.project_detail', key=project_key) }}"{% if view == "backlog" %} aria-current="true"{% endif %}>Backlog</a>
+    {% for name in ("kanban", "someday", "done", "cancelled", "archived") %}
+    <a href="{{ url_for('pages.project_detail', key=project_key, view=name) }}"{% if view == name %} aria-current="true"{% endif %}>{{ name | capitalize }}</a>
+    {% endfor %}
+</nav>
+{% endmacro %}
+
+{#
+  The items of a project in one closed or set-aside state (someday, done,
+  cancelled), or archived, newest first: each with its place, its date, a
+  feature's release, and its buttons, which come back to this view. Someday,
+  done and cancelled items have the way back to work (Refine, Reopen or
+  Restore); done and cancelled ones also Archive, with an Archive all above;
+  archived ones have Unarchive.
+#}
+{% macro state_items(items, view, project_key) %}
+{% set back = request.full_path.rstrip("?") %}
+{% set action = {"someday": ("REFINED", "Refine"), "done": ("DOING", "Reopen"), "cancelled": ("REFINED", "Restore"), "archived": none}[view] %}
+{% set archivable = view in ("done", "cancelled") %}
+{% if items and archivable %}
+<form class="form-inline archive-all" method="post" action="{{ url_for('pages.project_archive_closed', key=project_key) }}">
+    <input type="hidden" name="state" value="{{ view | upper }}">
+    <button type="submit">Archive all</button>
+</form>
+{% endif %}
+{% if items %}
+<ul class="list state-items">
+    {% for item in items %}
+    <li>
+        {{ task_link(item, back) }} {{ ref_chip(item.ref) }} {{ task_place(item) }}
+        {% if view == "archived" %}{{ badge(item.state.name) }}{% endif %}
+        {% if item.released_in %}<span class="version">v{{ item.released_in }}</span>{% endif %}
+        <span class="hint">{{ (item.closed_at or item.updated_at).strftime("%Y-%m-%d") }}</span>
+        {% if action %}
+        <form class="form-inline" method="post" action="{{ url_for('pages.task_state', task_id=item.id) }}">
+            <input type="hidden" name="state" value="{{ action[0] }}">
+            <input type="hidden" name="return_to" value="{{ back }}">
+            <button type="submit">{{ action[1] }}</button>
+        </form>
+        {% endif %}
+        {% if archivable or view == "archived" %}
+        <form class="form-inline" method="post" action="{{ url_for('pages.task_archive' if archivable else 'pages.task_unarchive', task_id=item.id) }}">
+            <input type="hidden" name="return_to" value="{{ back }}">
+            <button type="submit">{{ "Archive" if archivable else "Unarchive" }}</button>
+        </form>
+        {% endif %}
+    </li>
+    {% endfor %}
+</ul>
+{% else %}
+<p class="empty">No {{ view }} items.</p>
+{% endif %}
+{% endmacro %}
+
+{#
+  A kanban board: a lane per top-level feature (then loose tasks), a column
+  per state. `lanes` come from views.project_board(), `columns` is
+  views.BOARD_COLUMNS.
+#}
+{% macro kanban_board(lanes, columns) %}
+{% set back = request.full_path.rstrip("?") %}
+<div class="kanban">
+    {% for lane in lanes %}
+    <section class="kanban-lane">
+        <h3 class="kanban-lane-title">
+            {% if lane.subproject %}<span class="kanban-subproject">{{ lane.subproject.name }} /</span>{% endif %}
+            {% if lane.feature %}{{ task_link(lane.feature, back) }} {{ ref_chip(lane.feature.ref) }}{% else %}No feature{% endif %}
+        </h3>
+        <div class="kanban-columns">
+            {% for state in columns %}
+            {% set cards = lane.columns[state] %}
+            <div class="kanban-column" data-state="{{ state.name }}">
+                <h4 class="kanban-column-title">{{ badge(state.name) }} <span class="hint">{{ cards | length }}</span></h4>
+                {% for task in cards %}{{ kanban_card(task, back) }}{% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endfor %}
+</div>
+{% endmacro %}
+
+{#
+  One kanban card: the task, its size, its blocked reason, and the state
+  color swatches (the WAITING one asks for a reason first), which come back to `back`.
+#}
+{% macro kanban_card(task, back) %}
+<article class="kanban-card">
+    <p class="kanban-card-title">{{ task_link(task, back) }} {{ ref_chip(task.ref) }}</p>
+    {% if task.size %}<p class="kanban-meta"><span class="size">{{ task.size }}</span></p>{% endif %}
+    {% if task.state.name == "WAITING" and task.blocked_reason %}<p class="blocked-reason">{{ task.blocked_reason }}</p>{% endif %}
+    {% with state_action = url_for('pages.task_state', task_id=task.id), return_to = back, icons = true %}
+    {% include "_task_state_form.html" %}
+    {% endwith %}
 </article>
 {% endmacro %}
 
-{# Events, oldest first; with `show_entity`, each row names its entity and links tasks. #}
 {% macro event_list(events, show_entity=false) %}
 <ul class="events">
     {% for e in events %}
@@ -119,7 +316,7 @@
         {% endif %}
         {% if e.payload %}
         {% if 'from' in e.payload and 'to' in e.payload %}: {{ e.payload['from'] }} → {{ e.payload['to'] }}{% endif %}
-        {% for key, value in e.payload.items() if key not in ('from', 'to') %}
+        {% for key, value in e.payload.items() if key not in ('from', 'to') and value is not none %}
         · {{ key }}:
         {% if value is mapping %}{{ value['from'] }} → {{ value['to'] }}{% elif value is iterable and value is not string %}{{ value | join(', ') }}{% else %}{{ value }}{% endif %}
         {% endfor %}

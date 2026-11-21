@@ -1,0 +1,20 @@
+---
+title: get_task
+summary: "Un élément : tous ses champs, son historique et ses enfants directs"
+icon: lucide:wrench
+tags: [lecture]
+links: []
+related:
+  - 
+---
+
+__Rôle__ : montre une fonctionnalité ou une tâche en entier, avec son historique.
+
+__Arguments__
+- Obligatoire : `ref` ; les deux écritures (`t-…`, `f-…`) d'un élément qui a changé de type le trouvent.
+- Aucun facultatif.
+
+__Règles__
+- Lecture seule.
+
+__Résultat__ : tous les champs (dont `body`, `blocked_reason`, dates, `archived_at`), plus `history` : les événements du [journal](../../../event-log/event-log.cpt), `{at, actor, action, payload}`, du plus ancien au plus récent. Une fonctionnalité ajoute ses `children` directs, fermés compris.

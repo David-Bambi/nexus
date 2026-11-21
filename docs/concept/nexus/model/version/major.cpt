@@ -1,0 +1,16 @@
+---
+title: Version majeure
+summary: "Une liste de critères à cocher avant de passer à N+1.0"
+icon: lucide:flag
+links: []
+related:
+  - 
+---
+
+MAJEUR monte à la main, quand le projet remplit sa __liste de critères__ : ce qui doit être vrai avant la version N+1.0.
+
+- Les critères s'ajoutent, se modifient, se cochent, se décochent et se retirent depuis la page du projet ou le MCP. Ils sont numérotés à partir de 1, dans l'ordre de la liste.
+- __Passer à N+1.0__ est refusé si la liste est vide ou si un critère n'est pas coché.
+- Sinon : MAJEUR + 1, MINEUR revient à 0, et la liste se vide (les textes restent dans le journal).
+- À l'import d'un __nouveau__ projet, on peut donner directement sa version (`"version": "1.4"`) et ses critères. Refusé sur un projet existant.
+- La CLI montre la version et les critères, sans les modifier.

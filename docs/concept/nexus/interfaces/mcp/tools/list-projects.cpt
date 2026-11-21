@@ -1,0 +1,20 @@
+---
+title: list_projects
+summary: "Liste les projets et sous-projets, avec leur version"
+icon: lucide:wrench
+tags: [lecture]
+links: []
+related:
+  - 
+---
+
+__Rôle__ : liste les projets et les sous-projets, chacun avec sa version, par [priorité](../../../model/tree.cpt) (`HIGH` d'abord), chaque sous-projet après sa racine.
+
+__Arguments__
+- Aucun obligatoire.
+- Facultatif : `include_archived` (faux par défaut).
+
+__Règles__
+- Lecture seule.
+
+__Résultat__ : `{projects, count, truncated}`. Chaque projet : `key`, `ref`, `parent`, `name`, `description`, `status`, `priority` (effective), `version`, `directory`, `effective_directory`.

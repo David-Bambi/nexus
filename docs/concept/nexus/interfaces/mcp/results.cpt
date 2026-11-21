@@ -1,0 +1,19 @@
+---
+title: Résultats et erreurs
+summary: "Ce que renvoie un outil : du JSON sans identifiant interne, un refus annulé ou une erreur interne"
+icon: lucide:message-square-warning
+links: []
+related:
+  - 
+---
+
+Ce que renvoie un outil, et comment il dit non.
+
+- __Identification__ : un projet par sa clé, un élément par sa référence, un critère par son numéro (à partir de 1). Jamais d'identifiant interne dans un résultat.
+- __Schéma strict__ : un argument inconnu est refusé, les textes sont nettoyés de leurs espaces ; un texte facultatif vide veut dire « effacer ».
+- __Réussite__ : `content` (le JSON en texte) et `structuredContent`.
+- __Refus__ (référence inconnue, passage interdit, fonctionnalité aux enfants ouverts…) : un résultat `isError: true` avec le message. La modification est annulée.
+- __Erreur inattendue__ : `isError` avec « internal error, see the server log » ; le détail est dans `app.log`.
+- __Outil inconnu__ : erreur JSON-RPC `-32602`.
+- __Listes__ : `limit` vaut 100 par défaut, 500 au plus, sans autre pagination ; `truncated` dit si la liste est coupée.
+- __Collision__ : deux écrivains simultanés peuvent, très rarement, tirer la même référence. Erreur interne : réessayer.

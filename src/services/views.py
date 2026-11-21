@@ -1,60 +1,312 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Optional
 
-from sqlalchemy import case, func
 from sqlalchemy.orm import Session, joinedload
 
-from src.models.definition_of_done import DefinitionOfDoneCriterion
-from src.models.task import Task, TaskState
-from src.models.version import Version, VersionStatus
+from src.models.project import Project
+from src.models.task import Task, TaskKind, TaskState
 from src.services import projects
+from src.services.sizes import SIZE_GUIDE
 from src.services.errors import NotFoundError
 
 
 @dataclass
-class VersionProgress:
-    """A version with how far its tasks and its definition of done have got."""
+class ProjectProgress:
+    """How far a root project has got, in features."""
 
-    # The version itself, with its project loaded.
-    version: Version
-    # Number of the version's tasks that are done.
-    done: int
-    # Number of tasks planned into the version, cancelled ones excepted.
-    total: int
-    # Number of the version's definition-of-done criteria that are checked.
-    dod_done: int
-    # Number of definition-of-done criteria of the version.
-    dod_total: int
+    # The root project.
+    project: Project
+    # Features done, the root's and its subprojects', at any depth.
+    features_done: int
+    # Features not cancelled, the root's and its subprojects', at any depth.
+    features_total: int
 
 
 @dataclass
 class DashboardView:
     """Everything the overview page shows, gathered in one read."""
 
-    # In-progress versions with their progress.
-    versions: list
     # Tasks currently being worked on.
     doing: list
     # Tasks blocked on a third party or a prerequisite.
     waiting: list
-    # Number of captured tasks still to triage.
+    # Number of captured tasks (no project) still to triage.
     inbox_count: int
-    # Number of refined tasks still to plan into a version.
+    # Number of refined items, ready to be started.
     refine_count: int
+    # ProjectProgress of each active root project, by priority (high
+    # first), then creation order.
+    projects: list
+
+
+@dataclass
+class TreeNode:
+    """One feature or task of a project tree, with the nodes below it."""
+
+    # The feature or task.
+    item: Task
+    # Nodes of its children, in sibling order; always empty for a task.
+    children: list
+    # Done tasks in a feature's whole subtree; always 0 for a task.
+    done: int = 0
+    # Tasks in a feature's whole subtree, cancelled ones left out; always 0
+    # for a task.
+    total: int = 0
+    # (size, count) pairs of the open sized tasks in a feature's subtree,
+    # smallest size first; always empty for a task.
+    sizes: list = field(default_factory=list)
+
+
+# States hidden from a project tree unless closed items are asked for.
+_CLOSED_STATES = (TaskState.DONE, TaskState.CANCELLED)
+
+
+def _subtree_tasks(feature : Task):
+    """Yield every task below a feature, whatever its state.
+
+    Args:
+        feature: The feature whose subtree is walked.
+
+    Yields:
+        Each task of the subtree, sub-features walked through.
+    """
+    for child in feature.children:
+        if child.kind == TaskKind.FEATURE:
+            yield from _subtree_tasks(child)
+        else:
+            yield child
+
+
+def _size_rank(size : str) -> tuple:
+    """Sort key putting the guide's sizes in order, other values after.
+
+    Args:
+        size: A task size, from the guide or not.
+
+    Returns:
+        A key sorting XS, S, M, L first, then any other size by name.
+    """
+    order = list(SIZE_GUIDE)
+    return (order.index(size), "") if size in order else (len(order), size)
+
+
+def _node(item : Task, include_closed : bool) -> TreeNode:
+    """Build the tree node of one item, with its overview when a feature.
+
+    Args:
+        item: Feature or task.
+        include_closed: Whether done and cancelled children are kept.
+
+    Returns:
+        The item's TreeNode. A feature's done/total count every task of its
+        subtree but cancelled ones, closed or hidden; its sizes count the
+        open (neither done nor cancelled) tasks that have a size.
+    """
+    node = TreeNode(item, _nodes(item.children, include_closed))
+    if item.kind == TaskKind.FEATURE:
+        counts = {}
+        for task in _subtree_tasks(item):
+            if task.state == TaskState.CANCELLED:
+                continue
+            node.total += 1
+            if task.state == TaskState.DONE:
+                node.done += 1
+            elif task.size:
+                counts[task.size] = counts.get(task.size, 0) + 1
+        node.sizes = [(size, counts[size]) for size in sorted(counts, key=_size_rank)]
+    return node
+
+
+def _nodes(items : list, include_closed : bool) -> list:
+    """Build the tree nodes of sibling items, recursively.
+
+    Args:
+        items: Sibling features and tasks.
+        include_closed: Whether done and cancelled items are kept; a
+            hidden feature hides its whole subtree.
+
+    Returns:
+        A TreeNode per kept item, in sibling order.
+    """
+    kept = [item for item in items if include_closed or item.state not in _CLOSED_STATES]
+    return [_node(item, include_closed)
+            for item in sorted(kept, key=lambda item: (item.position, item.id))]
+
+
+def project_tree(project : Project, include_closed : bool = False) -> list:
+    """Give a project's work tree, ready to render.
+
+    Args:
+        project: Project or subproject; its subprojects' trees aren't
+            included.
+        include_closed: Whether done and cancelled items are shown.
+
+    Returns:
+        A TreeNode per item at the top of the project, in sibling order.
+    """
+    top = [item for item in project.tasks if item.parent_id is None]
+    return _nodes(top, include_closed)
+
+
+# States a project page lists in a tab of their own, by the view name.
+# "archived" lists the archived items, whatever their state.
+STATE_VIEWS = {"someday": TaskState.SOMEDAY, "done": TaskState.DONE, "cancelled": TaskState.CANCELLED,
+               "archived": None}
+
+
+def project_items(project : Project, state : TaskState | None) -> list:
+    """List a project's features and tasks in one state, or archived, newest first.
+
+    Args:
+        project: Project or subproject; a root project's subprojects'
+            items are included.
+        state: The state to list, archived items left out; None to list
+            the archived items instead.
+
+    Returns:
+        The matching items, the most recently changed (or closed) first.
+    """
+    items = [item for scope in (project, *project.subprojects) for item in scope.tasks
+             if (item.archived_at is not None if state is None
+                 else item.state is state and item.archived_at is None)]
+    return sorted(items, key=lambda item: item.closed_at or item.updated_at, reverse=True)
+
+
+# Kanban columns, left to right: one per state of work still to do. Done,
+# someday and cancelled tasks stay off the board.
+BOARD_COLUMNS = (
+    TaskState.INBOX,
+    TaskState.REFINED,
+    TaskState.DOING,
+    TaskState.WAITING,
+)
+
+
+@dataclass
+class KanbanLane:
+    """One swimlane of a kanban board: a top-level feature's tasks, or the
+    tasks sitting right under a project."""
+
+    # Top-level feature of the lane; None for the project's loose tasks.
+    feature: Optional[Task]
+    # Subproject the lane belongs to; None for the board's own project.
+    subproject: Optional[Project]
+    # Tasks per state, in BOARD_COLUMNS order, every state present.
+    columns: dict
+
+
+def _sorted(items : list) -> list:
+    """Sort sibling items in tree order.
+
+    Args:
+        items: Sibling features and tasks.
+
+    Returns:
+        The items by position, then creation order.
+    """
+    return sorted(items, key=lambda item: (item.position, item.id))
+
+
+def _board_tasks(items : list):
+    """Walk sibling items depth first and yield the tasks shown on a board.
+
+    Args:
+        items: Sibling features and tasks.
+
+    Yields:
+        Each task whose state has a column, in tree order; features are
+        walked through, never shown.
+    """
+    for item in _sorted(items):
+        if item.kind == TaskKind.FEATURE:
+            yield from _board_tasks(item.children)
+        elif item.state in BOARD_COLUMNS:
+            yield item
+
+
+def _lane(feature : Optional[Task], subproject : Optional[Project], items : list) -> KanbanLane:
+    """Build one swimlane from the items it holds.
+
+    Args:
+        feature: Top-level feature of the lane, or None for loose tasks.
+        subproject: Subproject the lane belongs to, or None.
+        items: Items right under the lane's feature (or loose tasks).
+
+    Returns:
+        The lane, with its tasks sorted into state columns.
+    """
+    columns = {state: [] for state in BOARD_COLUMNS}
+    for task in _board_tasks(items):
+        columns[task.state].append(task)
+    return KanbanLane(feature, subproject, columns)
+
+
+def _project_lanes(project : Project, subproject : Optional[Project]) -> list:
+    """Build the swimlanes of a single project, without its subprojects.
+
+    Args:
+        project: Project or subproject whose items are laid out.
+        subproject: The same project when it is a subproject of the board,
+            None for the board's own project.
+
+    Returns:
+        A lane per top-level feature in tree order, then the lane of loose
+        tasks; lanes without a task are left out.
+    """
+    top = _sorted([item for item in project.tasks if item.parent_id is None])
+    lanes = [_lane(item, subproject, item.children)
+             for item in top if item.kind == TaskKind.FEATURE]
+    loose = [item for item in top if item.kind == TaskKind.TASK]
+    lanes.append(_lane(None, subproject, loose))
+    return [lane for lane in lanes if any(lane.columns.values())]
+
+
+def project_board(project : Project) -> list:
+    """Give a project's kanban board, ready to render.
+
+    Args:
+        project: Project or subproject; a root project's subprojects are
+            laid out after its own lanes.
+
+    Returns:
+        A KanbanLane per non-empty swimlane: the project's own lanes, then
+        each subproject's.
+    """
+    lanes = _project_lanes(project, None)
+    for subproject in project.subprojects:
+        lanes.extend(_project_lanes(subproject, subproject))
+    return lanes
+
+
+def item_tree(item : Task, include_closed : bool = False) -> list:
+    """Give the tree below a feature, ready to render.
+
+    Args:
+        item: Feature (or task, whose tree is empty).
+        include_closed: Whether done and cancelled items are shown.
+
+    Returns:
+        A TreeNode per child, in sibling order.
+    """
+    return _nodes(item.children, include_closed)
 
 
 def inbox(session : Session) -> list:
     """List captured tasks still waiting to be triaged.
 
+    An inbox item already placed in a project isn't a capture: it waits to
+    be refined in its project, so it is left out.
+
     Args:
         session: Database session to use.
 
     Returns:
-        Inbox-state tasks, oldest first (the order they should be
-        processed in, one at a time).
+        Inbox-state tasks with no project, oldest first (the order they
+        should be processed in, one at a time).
     """
     return (
         session.query(Task)
-        .filter(Task.state == TaskState.INBOX)
+        .filter(Task.state == TaskState.INBOX, Task.project_id.is_(None))
         .order_by(Task.created_at)
         .all()
     )
@@ -62,7 +314,7 @@ def inbox(session : Session) -> list:
 
 def to_refine(session : Session, context : str | None = None, project_key : str | None = None,
               limit : int | None = None) -> list:
-    """List refined tasks that still need to be planned into a version.
+    """List refined items, ready to be started.
 
     Args:
         session: Database session to use.
@@ -72,11 +324,11 @@ def to_refine(session : Session, context : str | None = None, project_key : str 
         limit: Optional maximum number of tasks to return.
 
     Returns:
-        Refined, unplanned tasks matching the given filters, oldest first
+        Refined items matching the given filters, oldest first
         (the oldest `limit` of them when a limit is given).
     """
     query = session.query(Task).options(joinedload(Task.project)).filter(
-        Task.state == TaskState.REFINED, Task.version_id.is_(None)
+        Task.state == TaskState.REFINED
     )
 
     if context:
@@ -96,14 +348,13 @@ def to_refine(session : Session, context : str | None = None, project_key : str 
 
 
 def list_tasks(session : Session, states : list[TaskState] | None = None, project_key : str | None = None,
-               version_id : int | None = None, limit : int | None = None) -> list:
+               limit : int | None = None) -> list:
     """List tasks matching any combination of filters.
 
     Args:
         session: Database session to use.
         states: Optional states to keep; a task matches if it is in any of them.
         project_key: Optional project key to filter on.
-        version_id: Optional id of the version to filter on.
         limit: Optional maximum number of tasks to return.
 
     Returns:
@@ -113,14 +364,12 @@ def list_tasks(session : Session, states : list[TaskState] | None = None, projec
     Raises:
         NotFoundError: If project_key is given but no project has this key.
     """
-    query = session.query(Task).options(joinedload(Task.project), joinedload(Task.version))
+    query = session.query(Task).options(joinedload(Task.project), joinedload(Task.parent))
 
     if states:
         query = query.filter(Task.state.in_(states))
     if project_key:
         query = query.filter(Task.project_id == projects.get(session, project_key).id)
-    if version_id is not None:
-        query = query.filter(Task.version_id == version_id)
 
     if limit is None:
         return query.order_by(Task.created_at, Task.id).all()
@@ -156,42 +405,19 @@ def search(session : Session, term : str, limit : int | None = None) -> list:
     return query.all()
 
 
-def version_progress(session : Session, versions : list) -> list:
-    """Count how far each version's tasks and definition of done have got.
+def _progress(session : Session, root : Project) -> ProjectProgress:
+    """Count a root project's features, done and not cancelled.
 
     Args:
         session: Database session to use.
-        versions: The versions to measure.
-
-    Returns:
-        One VersionProgress per version, in the same order. Cancelled tasks
-        are left out of both task counts.
+        root: The root project; its subprojects' features count too.
     """
-    ids = [v.id for v in versions]
-
-    counts = {
-        version_id: (done, total)
-        for version_id, done, total in session.query(
-            Task.version_id,
-            func.sum(case((Task.state == TaskState.DONE, 1), else_=0)),
-            func.count(Task.id),
-        )
-        .filter(Task.version_id.in_(ids), Task.state != TaskState.CANCELLED)
-        .group_by(Task.version_id)
-    }
-
-    dod_counts = {
-        version_id: (done, total)
-        for version_id, done, total in session.query(
-            DefinitionOfDoneCriterion.version_id,
-            func.sum(case((DefinitionOfDoneCriterion.done.is_(True), 1), else_=0)),
-            func.count(DefinitionOfDoneCriterion.id),
-        )
-        .filter(DefinitionOfDoneCriterion.version_id.in_(ids))
-        .group_by(DefinitionOfDoneCriterion.version_id)
-    }
-
-    return [VersionProgress(v, *counts.get(v.id, (0, 0)), *dod_counts.get(v.id, (0, 0))) for v in versions]
+    project_ids = [root.id, *(sub.id for sub in root.subprojects)]
+    states = [state for (state,) in session.query(Task.state).filter(
+        Task.kind == TaskKind.FEATURE, Task.project_id.in_(project_ids))]
+    return ProjectProgress(project=root,
+                           features_done=states.count(TaskState.DONE),
+                           features_total=len(states) - states.count(TaskState.CANCELLED))
 
 
 def dashboard(session : Session) -> DashboardView:
@@ -201,35 +427,26 @@ def dashboard(session : Session) -> DashboardView:
         session: Database session to use.
 
     Returns:
-        A DashboardView with the in-progress versions and their progress
-        (tasks and definition of done),
-        the doing and waiting tasks (oldest first), and the inbox and
-        refine counters (same definitions as inbox() and to_refine()).
+        A DashboardView with the doing and waiting items (oldest first),
+        the inbox and refine counters (same definitions as inbox() and
+        to_refine()), and the progress of the active root projects, by
+        priority.
     """
-    started = (
-        session.query(Version)
-        .options(joinedload(Version.project))
-        .filter(Version.status == VersionStatus.IN_PROGRESS)
-        .order_by(Version.project_id, Version.position, Version.id)
-        .all()
-    )
-
     def in_state(state : TaskState) -> list:
         """List the tasks in the given state, oldest first."""
         return (
             session.query(Task)
-            .options(joinedload(Task.project), joinedload(Task.version))
+            .options(joinedload(Task.project), joinedload(Task.parent))
             .filter(Task.state == state)
             .order_by(Task.created_at)
             .all()
         )
 
     return DashboardView(
-        versions=version_progress(session, started),
         doing=in_state(TaskState.DOING),
         waiting=in_state(TaskState.WAITING),
-        inbox_count=session.query(Task).filter(Task.state == TaskState.INBOX).count(),
-        refine_count=session.query(Task).filter(
-            Task.state == TaskState.REFINED, Task.version_id.is_(None)
-        ).count(),
+        inbox_count=session.query(Task).filter(Task.state == TaskState.INBOX,
+                                               Task.project_id.is_(None)).count(),
+        refine_count=session.query(Task).filter(Task.state == TaskState.REFINED).count(),
+        projects=[_progress(session, p) for p in projects.list(session) if p.parent_id is None],
     )

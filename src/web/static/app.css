@@ -23,6 +23,7 @@
     --color-success: #226f31;
     --color-warning: #8f4a00;
     --color-danger: #c92a2a;
+    --color-info: #6741d9;
     --color-focus: #4c6ef5;
 
     /* Spacing scale, in rem so it follows the user's font size. */
@@ -68,6 +69,7 @@
         --color-success: #69db7c;
         --color-warning: #ffa94d;
         --color-danger: #ff6b6b;
+        --color-info: #b197fc;
         --color-focus: #91a7ff;
         --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
     }
@@ -93,6 +95,12 @@ figure {
 fieldset {
     padding: 0;
     border: 0;
+}
+
+/* A hidden element stays hidden whatever display its class gives it (e.g. a
+   form-inline form waiting for its reveal button). */
+[hidden] {
+    display: none !important;
 }
 
 img,
@@ -304,6 +312,14 @@ button:disabled {
     color: var(--color-text-muted);
 }
 
+/* A checkbox with its label on the same line. */
+.field-check {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-sm);
+}
+
 .form-actions {
     display: flex;
     gap: var(--space-2);
@@ -331,7 +347,7 @@ form {
 
 /* Lists, badges and ref chips ----------------------------------------------------------------- */
 
-/* A list of rows (tasks, versions, projects...) on a surface, one bordered row per item. */
+/* A list of rows (tasks, projects...) on a surface, one bordered row per item. */
 .list {
     padding: 0;
     list-style: none;
@@ -358,37 +374,9 @@ form {
     border-top: 1px solid var(--color-border);
 }
 
-/* A list inside a row (e.g. a project's versions): full width, lighter frame. */
-.list-nested {
-    flex-basis: 100%;
-    margin-block: 0;
-    background: var(--color-surface-muted);
-}
-
-.list-nested > li {
-    padding-block: var(--space-2);
-}
-
 .empty {
     color: var(--color-text-muted);
     font-style: italic;
-}
-
-/* Progress figures of a version; pushed to the right end of its row. */
-.progress {
-    display: inline-flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-2);
-    margin-left: auto;
-    font-size: var(--text-sm);
-    color: var(--color-text-muted);
-}
-
-progress {
-    width: 6rem;
-    height: 0.5rem;
-    accent-color: var(--color-accent);
 }
 
 /* Event history: compact rows, no frame (drawn as a timeline further down). */
@@ -417,8 +405,11 @@ progress {
     background: color-mix(in srgb, var(--badge-color) 12%, var(--color-surface));
 }
 
-.badge-doing,
-.badge-in_progress {
+.badge-refined {
+    --badge-color: var(--color-info);
+}
+
+.badge-doing {
     --badge-color: var(--color-accent);
 }
 
@@ -427,16 +418,27 @@ progress {
 }
 
 .badge-done,
-.badge-released,
 .badge-active {
     --badge-color: var(--color-success);
+}
+
+.badge-priority-high {
+    --badge-color: var(--color-danger);
+}
+
+.badge-priority-normal {
+    --badge-color: var(--color-info);
+}
+
+.badge-priority-low {
+    --badge-color: var(--color-text-muted);
 }
 
 .badge-cancelled {
     --badge-color: var(--color-danger);
 }
 
-/* A t-/v- reference or a project key. */
+/* A s-/f-/t- reference or a project key. */
 .ref {
     padding: 0 var(--space-1);
     border-radius: var(--radius-sm);
@@ -480,13 +482,6 @@ progress {
     color: var(--color-text-muted);
 }
 
-/* Cards laid out in as many columns as fit. */
-.cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
-    gap: var(--space-4);
-}
-
 .card {
     display: grid;
     align-content: start;
@@ -509,31 +504,6 @@ progress {
     font-size: var(--text-base);
 }
 
-/* Labelled progress bars, one per line. */
-.meter-list {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: var(--space-1) var(--space-3);
-    margin: 0;
-    font-size: var(--text-sm);
-}
-
-.meter-list dt {
-    color: var(--color-text-muted);
-}
-
-.meter-list dd {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    margin: 0;
-}
-
-.meter-list progress {
-    flex: 1;
-    width: auto;
-}
-
 .task-place {
     display: inline-flex;
     align-items: center;
@@ -547,7 +517,362 @@ progress {
     color: var(--color-warning);
 }
 
-/* Version page -------------------------------------------------------------------------------- */
+/* A subproject row sits indented under its root project. */
+.list > li.subproject {
+    padding-left: var(--space-7);
+}
+
+/* A project's computed version, e.g. v1.4. */
+.version {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+}
+
+/* A root project's progress on the dashboard: a thin bar of features done, then the count. */
+.progress {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-left: auto;
+}
+
+.progress progress {
+    appearance: none;
+    width: 8rem;
+    height: 0.5rem;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: var(--color-border);
+    overflow: hidden;
+}
+
+.progress progress::-webkit-progress-bar {
+    background: var(--color-border);
+}
+
+.progress progress::-webkit-progress-value {
+    background: var(--color-success);
+}
+
+.progress progress::-moz-progress-bar {
+    background: var(--color-success);
+}
+
+.progress-count {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+}
+
+/* Work tree: nested features and tasks, each level indented under its feature. */
+.tree {
+    list-style: none;
+    padding-left: 0;
+    margin-block: var(--space-2);
+}
+
+.tree .tree {
+    padding-left: var(--space-5);
+    border-left: 1px solid var(--color-border);
+}
+
+.tree-item {
+    padding-block: var(--space-1);
+}
+
+.tree-item summary {
+    cursor: pointer;
+}
+
+/* One line of the tree: the item, its overview and its up / down buttons. */
+.tree-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+/* A feature's row keeps its fold marker, drawn here since the flex layout
+   drops the browser's own: pointing right when folded, down when open. */
+summary.tree-row {
+    list-style: none;
+}
+
+summary.tree-row::-webkit-details-marker {
+    display: none;
+}
+
+summary.tree-row::before {
+    content: "▸";
+    color: var(--color-text-muted);
+    transition: transform 0.1s;
+}
+
+details[open] > summary.tree-row::before {
+    transform: rotate(90deg);
+}
+
+/* A feature's overview, e.g. "2/5 · 2 S · 1 M". */
+.tree-summary {
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+}
+
+/* Up / down buttons of a tree item, small and on the item's line; shown
+   only while the row is hovered or holds the keyboard focus, except on
+   touch screens, which can't hover. */
+.reorder {
+    display: inline-flex;
+    gap: var(--space-1);
+    visibility: hidden;
+}
+
+.tree-row:hover > .reorder,
+.tree-row:focus-within > .reorder {
+    visibility: visible;
+}
+
+@media (hover: none) {
+    .reorder {
+        visibility: visible;
+    }
+}
+
+.reorder form {
+    display: inline;
+    margin: 0;
+}
+
+.reorder button {
+    padding: 0 var(--space-2);
+    font-size: var(--text-sm);
+}
+
+/* The add form opened under a feature sits indented like its children. */
+.tree .add-item {
+    padding-left: var(--space-5);
+    margin-block: var(--space-1);
+}
+
+/* A section title with its icon buttons on the same line. */
+.heading-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+/* Icon buttons: a small square button around an inline SVG icon, opening
+   a hidden form (data-reveal) or sending one. */
+.icon-button {
+    display: inline-grid;
+    place-items: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+    border-color: transparent;
+    background: transparent;
+    color: var(--color-text-muted);
+}
+
+.icon-button:hover,
+.icon-button[aria-expanded="true"] {
+    border-color: var(--color-border);
+    background: var(--color-surface-muted);
+    color: var(--color-text);
+}
+
+.icon {
+    width: 1rem;
+    height: 1rem;
+}
+
+/* A removal icon button turns red when hovered. */
+.icon-button-danger:hover {
+    color: var(--color-danger);
+}
+
+/* A criterion row: its text takes the whole line, the save and delete icons
+   at its end. */
+.criteria > li {
+    flex-wrap: nowrap;
+}
+
+.criterion-text {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: var(--space-1);
+    min-width: 0;
+}
+
+.criterion-text input[type="text"] {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Work views: Backlog / Kanban tabs above a project's work. */
+.view-tabs {
+    display: flex;
+    gap: var(--space-1);
+    margin-bottom: var(--space-3);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.view-tabs a {
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 2px solid transparent;
+    color: var(--color-text-muted);
+    text-decoration: none;
+}
+
+.view-tabs a:hover {
+    color: var(--color-text);
+}
+
+/* The view being shown. */
+.view-tabs a[aria-current="true"] {
+    border-bottom-color: var(--color-accent);
+    color: var(--color-text);
+    font-weight: 600;
+}
+
+/* Kanban board: lanes stacked, four state columns per lane, within the
+   page's content width; scrolls sideways only when the window is too
+   narrow for four columns. */
+.kanban {
+    display: grid;
+    gap: var(--space-4);
+    overflow-x: auto;
+    padding-bottom: var(--space-2);
+}
+
+.kanban-lane-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    margin: 0 0 var(--space-2);
+    font-size: var(--text-base);
+}
+
+.kanban-subproject {
+    color: var(--color-text-muted);
+    font-weight: normal;
+}
+
+.kanban-columns {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(8rem, 1fr));
+    gap: var(--space-2);
+}
+
+.kanban-column {
+    display: grid;
+    align-content: start;
+    gap: var(--space-2);
+    padding: var(--space-2);
+    border-radius: var(--radius);
+    background: var(--color-surface-muted);
+}
+
+.kanban-column-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 0;
+    font-size: var(--text-sm);
+}
+
+.kanban-column .hint {
+    margin: 0;
+}
+
+.kanban-card {
+    display: grid;
+    gap: var(--space-1);
+    padding: var(--space-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    box-shadow: var(--shadow);
+    font-size: var(--text-sm);
+}
+
+.kanban-card p {
+    margin: 0;
+}
+
+.kanban-card-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-1);
+}
+
+/* The blocked reason sits on its own line on a card, not pushed right. */
+.kanban-card .blocked-reason {
+    margin-left: 0;
+}
+
+/* Color of each state, shared by a column's tint and the buttons moving a card there. */
+[data-state="INBOX"] { --state-color: var(--color-text-muted); }
+[data-state="REFINED"] { --state-color: var(--color-info); }
+[data-state="DOING"] { --state-color: var(--color-accent); }
+[data-state="WAITING"] { --state-color: var(--color-warning); }
+[data-state="DONE"] { --state-color: var(--color-success); }
+[data-state="CANCELLED"] { --state-color: var(--color-danger); }
+
+/* A column is tinted with its state's color. */
+.kanban-column[data-state] {
+    background: color-mix(in srgb, var(--state-color) 14%, transparent);
+}
+
+/* State buttons of a card: small swatches of the target column's color, on one line. */
+.state-icons {
+    display: flex;
+    gap: var(--space-2);
+}
+
+.state-swatch {
+    width: 1.25rem;
+    height: 1.25rem;
+    padding: 0;
+    border: 1px solid var(--state-color);
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--state-color) 55%, transparent);
+    cursor: pointer;
+}
+
+.state-swatch:hover,
+.state-swatch[aria-expanded="true"] {
+    background: var(--state-color);
+}
+
+/* The current state's swatch: greyed out, nothing to click. */
+.state-swatch:disabled,
+.state-swatch:disabled:hover {
+    background: color-mix(in srgb, var(--state-color) 15%, transparent);
+    opacity: 0.45;
+    cursor: default;
+}
+
+/* Holds the state icons' target; nothing to show. */
+.state-icon-form {
+    display: none;
+}
+
+/* Reason field revealed by the WAITING icon, under the icons. */
+.state-reason {
+    margin: 0;
+}
+
+.state-reason input[type="text"] {
+    width: 100%;
+    min-width: 0;
+}
+
+/* Detail pages -------------------------------------------------------------------------------- */
 
 .meta {
     display: flex;
@@ -572,90 +897,6 @@ progress {
     gap: var(--space-2);
 }
 
-/* Task board: one column per state, as many side by side as fit. */
-.board {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-    gap: var(--space-3);
-    align-items: start;
-}
-
-.board-column {
-    display: grid;
-    gap: var(--space-2);
-    padding: var(--space-3);
-    border-radius: var(--radius);
-    background: var(--color-surface-muted);
-}
-
-.board-column h3 {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    margin: 0;
-    font-size: var(--text-base);
-}
-
-.count {
-    font-size: var(--text-sm);
-    color: var(--color-text-muted);
-}
-
-.board-card {
-    display: grid;
-    gap: var(--space-2);
-    padding: var(--space-3);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    background: var(--color-surface);
-    box-shadow: var(--shadow);
-}
-
-.board-card-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-/* Grid children may shrink below their content width, so long titles and inputs stay inside the column. */
-.board-column,
-.board-card {
-    min-width: 0;
-}
-
-.board-card a {
-    overflow-wrap: anywhere;
-}
-
-.board-card input,
-.board-card select {
-    width: 100%;
-    min-width: 0;
-}
-
-/* The state form inside a card: select and button on one line, the reason on its own line below. */
-.board-card .state-form {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: var(--space-1);
-    margin: 0;
-}
-
-.board-card .state-form input[name="reason"] {
-    grid-column: 1 / -1;
-}
-
-.board-card .state-form select,
-.board-card .state-form input,
-.board-card .state-form button {
-    padding-block: var(--space-1);
-    font-size: var(--text-sm);
-}
-
-.board-card .blocked-reason {
-    margin: 0;
-}
-
 .size {
     padding: 0 var(--space-2);
     border: 1px solid var(--color-border);
@@ -664,26 +905,10 @@ progress {
     color: var(--color-text-muted);
 }
 
-/* Definition-of-done checklist. */
-.checklist .grow {
-    flex: 1;
-}
-
-.checklist .grow input[type="text"] {
-    flex: 1;
-}
-
-.checklist .checked {
-    color: var(--color-text-muted);
-}
-
-.checklist .checked input[type="text"] {
-    text-decoration: line-through;
-}
-
 /* Irreversible actions, set apart at the bottom of a page. */
+/* Delete confirmation, opened by the trash icon under the project's name. */
 .danger-zone {
-    margin-top: var(--space-7);
+    margin-block: var(--space-3) var(--space-5);
     padding: var(--space-4);
     border: 1px solid var(--color-danger);
     border-radius: var(--radius);
@@ -807,20 +1032,6 @@ progress {
     font-weight: 600;
 }
 
-.dod-rows {
-    display: grid;
-    gap: var(--space-2);
-    margin-bottom: var(--space-2);
-}
-
-.dod-row {
-    display: flex;
-}
-
-.dod-row input {
-    flex: 1;
-}
-
 /* Buttons inside a stacked field keep their own width instead of stretching. */
 .field > button {
     justify-self: start;
@@ -848,4 +1059,29 @@ progress {
 /* The main region receives focus from the skip link; no outline needed there. */
 main:focus {
     outline: none;
+}
+
+/* Task sizes page ----------------------------------------------------------------------------- */
+
+.table-scroll {
+    overflow-x: auto;
+}
+
+.size-guide {
+    border-collapse: collapse;
+    font-size: var(--text-sm);
+    background: var(--color-surface);
+}
+
+.size-guide th,
+.size-guide td {
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid var(--color-border);
+    text-align: left;
+    vertical-align: top;
+}
+
+.size-guide thead th {
+    color: var(--color-text-muted);
+    font-weight: 600;
 }

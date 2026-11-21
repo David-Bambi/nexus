@@ -1,28 +1,66 @@
 # AI tools
 
-How Claude Code is configured to work in this repository.
+How Claude Code is set up to work on this repository. The full
+description, in French, is in the Concept map
+(`docs/concept/nexus/ai-tools/`).
 
 ## CLAUDE.md files
 
 Instructions that load automatically into context, scoped by directory:
 
-- `CLAUDE.md` (root) — project overview, stack, architecture constraints
-  (ADR-001 to ADR-004), domain model, increment plan.
-- `docs/CLAUDE.md` — rules specific to editing the documentation tree.
+- `CLAUDE.md` (root) — project state, languages, commands, where the
+  documentation lives.
+- `docs/CLAUDE.md` — rules for editing the documentation tree (`concept/`,
+  `python/`, `ai-tools/`, generated `reference/`).
 
-## Subagents (`.claude/agents/`)
+## Project agents (`.claude/agents/`)
 
 | Agent | Purpose |
 | --- | --- |
-| `docs-manager` | Reads `docs/` for context before changes, writes/updates it after a task, builds/serves the MkDocs site. Never edits `artifacts/specs/` or hand-writes `docs/reference/`. |
+| `docs-manager` | Keeps `docs/`: the Concept map (French cards, via the global Concept skills) and the MkDocs site (English). Reads it for context before changes, updates it after a task, runs the card check and `mkdocs build --strict`, reports screenshots to retake. Never hand-writes `docs/reference/`. |
+| `git-manager` | Reviews, stages and commits changes, local branching/merging/rebasing. Asks before any push; never force-pushes or skips hooks. |
 
-## Conventions Claude follows here
+## Project skill (`.claude/skills/`)
 
-- **Source of truth is `docs/`.** `artifacts/specs/` is background only; on
-  conflict `docs/` wins.
-- **Generated artifacts** (specs, exploratory output) go in `artifacts/`,
-  never committed as authoritative documentation.
+- `revision` — corrects an error or outdated statement in an artifact
+  under `artifacts/` (spec, plan).
+
+## Global tools shipped by Nexus (`ai-tools/`)
+
+Tools meant for all of David's projects, deployed into `~/.claude`
+(same layout as the Concept project).
+
+- `agents/nexus-agent.md` — French project-management agent working through
+  the Nexus MCP server. Triages the inbox, splits a request into a feature
+  and sized tasks, tracks progress (states, closing a feature, proposing
+  archiving) and reports status (version, remaining criteria, DOING/WAITING,
+  INBOX, next task). It reads and writes items only; criteria, projects,
+  deletion, import and major releases stay with David. It proposes a list of
+  changes and writes only when the prompt says « applique », so it can be
+  used anywhere without surprise writes.
+- `deploy.sh [--dry-run]` — symlinks `skills/<name>` to
+  `~/.claude/skills/<name>` and `agents/<name>.md` to
+  `~/.claude/agents/<name>.md`. Never replaces anything that is not a link
+  to the repository; removes dead links to it. `--dry-run` is a dry run;
+  `CLAUDE_DIR` overrides `~/.claude` for testing. Rerun only for a new or
+  removed agent/skill; an agent loads when a Claude Code session starts.
+
+## Global tools used for the Concept map
+
+The Concept skills (`concept-write-card`, `concept-draw-diagram`, `concept-check-cards`,
+`concept-plan-map`) are global, not part of this repository. `docs-manager`
+follows them to keep the map in `docs/concept/`; the global `concept-agent`
+agent was used to write it first.
+
+## Conventions
+
+- **Source of truth is `docs/`**: the Concept map for the project, MkDocs
+  for the code. `artifacts/specs/` is background only; on conflict `docs/`
+  wins.
+- **Decisions live in the Concept card of their part**, with their reason.
+  When one changes, the card is rewritten; git keeps the history. There are
+  no ADR files.
+- **Generated artifacts** (specs, plans) go in `artifacts/`.
 - **`docs/reference/`** is generated at build time from `src/` docstrings —
   never hand-edited.
-- Every task that changes behavior is expected to update `docs/` in the
-  same pass, per the root `CLAUDE.md`.
+- Every task that changes behavior updates `docs/` in the same pass.

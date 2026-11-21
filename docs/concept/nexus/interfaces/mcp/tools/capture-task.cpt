@@ -1,0 +1,21 @@
+---
+title: capture_task
+summary: "Capture un titre dans l'inbox"
+icon: lucide:wrench
+tags: [element]
+links: []
+related:
+  - 
+---
+
+__Rôle__ : capture un titre dans l'__inbox__, sans projet ni détail, à trier plus tard.
+
+__Arguments__
+- Obligatoire : `title`.
+- Aucun facultatif.
+
+__Règles__
+- Un titre vide est refusé par le schéma.
+- Écriture, non destructif.
+
+__Résultat__ : la tâche créée, en état `INBOX`, avec sa référence.

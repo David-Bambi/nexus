@@ -1,0 +1,16 @@
+---
+title: Journal applicatif
+summary: "app.log et la sortie d'erreur, partagés par l'application, Flask et waitress"
+icon: lucide:file-text
+links: []
+related:
+  - ../../event-log/event-log.cpt
+---
+
+Le __journal applicatif__ note ce que fait le programme (démarrage, copie, appels MCP, erreurs), pour le dépannage. À ne pas confondre avec le [journal d'événements](../../event-log/event-log.cpt), qui trace les modifications des données.
+
+- `app.log`, dans le dossier des données, tourne à 1 Mo en gardant 5 anciens fichiers.
+- Les messages vont aussi sur la sortie d'erreur ; sous Linux, `journalctl --user -u nexus` les montre.
+- Les deux sorties sont posées sur le journal racine : l'application, Flask et waitress écrivent au même endroit.
+- Les migrations ne remplacent pas ces réglages : lancées par l'application, elles sautent la configuration de journal d'Alembic.
+- Le serveur MCP y note une ligne par appel (l'outil, réussi ou non), jamais les arguments ; une erreur interne y laisse sa trace complète.

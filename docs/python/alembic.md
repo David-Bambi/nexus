@@ -1,5 +1,10 @@
 # Alembic in Nexus
 
+!!! note "History restarted in 2.0"
+    The revision chain below is the 1.x one. Since 2.0 there is a single
+    initial revision, `87dc79bc1cbb`
+    (Concept map: `docs/concept/nexus/operations/migrations/refused-1x-database.cpt`).
+
 Alembic manages the database schema as a sequence of versioned,
 incremental changes — one revision file per change, applied in order.
 The models in `src/models/` describe the schema Nexus *wants*; Alembic's

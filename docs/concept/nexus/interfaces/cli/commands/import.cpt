@@ -1,0 +1,29 @@
+---
+title: nexus import
+summary: "Importer un document ou une liste de titres, tout ou rien"
+icon: lucide:square-terminal
+tags: [ecriture]
+links: []
+related:
+  - 
+---
+
+__Syntaxe__
+
+```
+nexus import <fichier|-> [--dry-run] [--text]     # - : lire l'entrée standard
+```
+
+__Résultat__
+- Importe un document JSON (voir [Format du document](../../import/format.cpt)), ou, avec `--text`, une liste de titres un par ligne.
+- Tout ou rien : toutes les erreurs sont listées, et rien n'est écrit s'il y en a une (code 1).
+- Un résumé des projets créés et repris, puis le tableau `KIND REF TITLE` des éléments créés.
+- `--dry-run` fait tout puis annule, et dit ce qui serait créé, sans références.
+
+__Exemple__
+
+```
+nexus import plan.json --dry-run
+nexus import plan.json
+nexus import - --text < idees.txt
+```

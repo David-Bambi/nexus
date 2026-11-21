@@ -3,33 +3,32 @@ from typing import Callable, TextIO
 
 from sqlalchemy.orm import Session
 
-from src.cli import add, commands, import_cmd, views  # noqa: F401  (register commands)
+from src.cli import add, commands, export_cmd, import_cmd, state, views  # noqa: F401  (register commands)
 from src.cli.errors import UsageError
 from src.services.resolve import resolve
 from src.cli.session import open_session
 from src.services.errors import DomainError
 
 # Shown when nexus runs with no arguments or a wrong command line.
-USAGE = """usage: nexus <command> | <reference> [<version>]
+USAGE = """usage: nexus <command> | <reference>
 
   nexus version            app version
-  nexus tasks              all tasks
-  nexus versions           all versions
-  nexus projects           all projects
-  nexus <project>          project detail and its versions
-  nexus <project> <version>  version detail, tasks and definition of done
-  nexus <project> <version> check|uncheck <n>  check a definition-of-done criterion
-  nexus <project> <version> add-criterion <text>       add a criterion
-  nexus <project> <version> edit-criterion <n> <text>  reword a criterion
-  nexus <project> <version> remove-criterion <n>       delete a criterion
-  nexus <project> <version> start|release      change the version status
-  nexus <task>             task detail
-  nexus add task <project> [<version>] [--title T] [--body B] [--context C] [--size S]
+  nexus tasks              all features and tasks
+  nexus projects           all projects, subprojects indented, with versions
+  nexus <project> [--all]  project: version, criteria, subprojects, work tree
+  nexus <subproject> [--all]
+  nexus <feature|task>     feature or task detail (a feature: its children)
+  nexus add task|feature <project> [--parent f-ref] [--title T] [--body B]
+                           [--context C] [--size S]   add to the tree, in inbox
+  nexus state <feature|task> <STATE> [--reason R]
+                           move to INBOX, REFINED, DOING, WAITING, DONE or
+                           CANCELLED, through each step on the way
   nexus "<description>"     capture a task into the inbox
   nexus import <file|->
+  nexus export features [-o FILE]   feature export for metrique (JSON)
 
-A reference is a project key, a task ref (t-4k2) or a version ref (v-9xa);
-a version ref can stand for <project> <version>."""
+A reference is a project key, a subproject ref (s-4k2), a feature ref
+(f-4k2) or a task ref (t-4k2)."""
 
 # Exit codes.
 EXIT_OK = 0

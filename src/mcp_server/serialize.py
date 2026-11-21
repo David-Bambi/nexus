@@ -1,11 +1,11 @@
 from datetime import date, datetime
 
-from src.models.definition_of_done import DefinitionOfDoneCriterion
+from src.models.criterion import MajorCriterion
 from src.models.event import Event
 from src.models.project import Project
 from src.models.task import Task
-from src.models.version import Version
-from src.services.views import DashboardView
+from src.services import projects, versioning
+from src.services.views import DashboardView, TreeNode
 
 
 def _iso(value : date | datetime | None) -> str | None:
@@ -14,47 +14,45 @@ def _iso(value : date | datetime | None) -> str | None:
 
 
 def project(item : Project) -> dict:
-    """A project as a JSON-serialisable dict, identified by its key."""
+    """A project or subproject as a JSON-serialisable dict, identified by its key."""
     return {"key": item.key,
+            "ref": item.ref,
+            "parent": item.parent.key if item.parent else None,
             "name": item.name,
             "description": item.description,
-            "status": item.status.name}
+            "status": item.status.name,
+            "priority": item.effective_priority.name,
+            "version": versioning.label(item),
+            "directory": item.directory,
+            "effective_directory": projects.directory_of(item)}
 
 
-def criterion(index : int, item : DefinitionOfDoneCriterion) -> dict:
-    """A definition-of-done criterion; `index` is its 1-based place in the list."""
-    return {"index": index, "description": item.description, "done": item.done}
+def criteria(items : list[MajorCriterion]) -> list[dict]:
+    """A project's criteria for the next major version, in list order.
+
+    Each is identified by its "number", counted from 1, never by a raw id.
+    """
+    return [{"number": number, "text": item.text, "done": item.done}
+            for number, item in enumerate(items, start=1)]
 
 
-def version_brief(item : Version) -> dict:
-    """A version without its tasks or checklist, identified by its ref."""
-    return {"ref": item.ref,
-            "project": item.project.key,
-            "number": item.number,
-            "title": item.title,
-            "status": item.status.name}
-
-
-def version(item : Version, tasks : list[Task]) -> dict:
-    """A version with its tasks and its definition of done."""
-    return {**version_brief(item),
-            "goal": item.goal,
-            "target_date": _iso(item.target_date),
-            "released_at": _iso(item.released_at),
-            "tasks": [task_brief(t) for t in tasks],
-            "definition_of_done": [criterion(i, c) for i, c in enumerate(item.definition_of_done, start=1)]}
+def tree(nodes : list[TreeNode]) -> list[dict]:
+    """A work tree as nested dicts: each item's brief plus its "children"."""
+    return [{**task_brief(node.item), "children": tree(node.children)} for node in nodes]
 
 
 def task_brief(item : Task) -> dict:
-    """A task's identity and placement, identified by its ref."""
+    """A feature's or task's identity and placement, identified by its ref."""
     return {"ref": item.ref,
+            "kind": item.kind.name,
             "title": item.title,
             "state": item.state.name,
             "project": item.project.key if item.project else None,
-            "version": item.version.number if item.version else None,
-            "version_ref": item.version.ref if item.version else None,
+            "parent": item.parent.ref if item.parent else None,
             "size": item.size,
-            "context": item.context}
+            "context": item.context,
+            "released_in": item.released_in,
+            "archived": item.archived_at is not None}
 
 
 def task(item : Task) -> dict:
@@ -64,7 +62,8 @@ def task(item : Task) -> dict:
             "blocked_reason": item.blocked_reason,
             "created_at": _iso(item.created_at),
             "updated_at": _iso(item.updated_at),
-            "closed_at": _iso(item.closed_at)}
+            "closed_at": _iso(item.closed_at),
+            "archived_at": _iso(item.archived_at)}
 
 
 def event(item : Event) -> dict:
@@ -76,11 +75,10 @@ def event(item : Event) -> dict:
 
 
 def dashboard(view : DashboardView) -> dict:
-    """The dashboard: in-progress versions with progress, doing and waiting tasks, counters."""
-    return {"in_progress": [{**version_brief(p.version),
-                             "tasks_done": p.done, "tasks_total": p.total,
-                             "criteria_done": p.dod_done, "criteria_total": p.dod_total}
-                            for p in view.versions],
+    """The dashboard: active root projects by priority with their progress, doing and waiting items, counters."""
+    return {"projects": [{"key": row.project.key, "name": row.project.name, "priority": row.project.priority.name,
+                          "version": versioning.label(row.project), "features_done": row.features_done,
+                          "features_total": row.features_total} for row in view.projects],
             "doing": [task_brief(t) for t in view.doing],
             "waiting": [task_brief(t) for t in view.waiting],
             "inbox_count": view.inbox_count,

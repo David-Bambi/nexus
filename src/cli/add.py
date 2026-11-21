@@ -6,17 +6,24 @@ from sqlalchemy.orm import Session
 
 from src.cli import commands
 from src.cli.errors import UsageError, UsageParser
-from src.services.resolve import resolve_version
-from src.models.task import Task
+from src.models.task import Task, TaskKind
 from src.services import events, tasks
 from src.services.errors import ValidationError
 
 
-def _task_parser() -> argparse.ArgumentParser:
-    """Build the parser of `nexus add task`."""
-    parser = UsageParser(prog="nexus add task", add_help=False)
+# Kinds `nexus add` takes, mapped to the model's.
+_KINDS = {"task": TaskKind.TASK, "feature": TaskKind.FEATURE}
+
+
+def _task_parser(kind : str) -> argparse.ArgumentParser:
+    """Build the parser of `nexus add task` or `nexus add feature`.
+
+    Args:
+        kind: "task" or "feature", for the usage message.
+    """
+    parser = UsageParser(prog=f"nexus add {kind}", add_help=False)
     parser.add_argument("project")
-    parser.add_argument("version", nargs="?")
+    parser.add_argument("-p", "--parent")
     parser.add_argument("-t", "--title")
     parser.add_argument("-b", "--body")
     parser.add_argument("-c", "--context")
@@ -25,9 +32,11 @@ def _task_parser() -> argparse.ArgumentParser:
 
 
 def _report(task : Task, out : TextIO) -> None:
-    """Tell the user which task was created."""
-    where = "inbox" if task.version_id is None else "planned"
-    print(f"Created task {task.ref} ({where}): {task.title}", file=out)
+    """Tell the user which item was created, and where."""
+    status = task.state.name.lower()
+    if task.project:
+        status += f", {task.project.key}" + (f" > {task.parent.ref}" if task.parent else "")
+    print(f"Created {task.kind.name.lower()} {task.ref} ({status}): {task.title}", file=out)
 
 
 def _require_title(title : str | None) -> str:
@@ -53,10 +62,8 @@ def _require_title(title : str | None) -> str:
 
 
 def add(session : Session, args : list[str], out : TextIO) -> None:
-    """`nexus add task <project> [<version>]`: create a task.
-
-    Without a version the task lands in the project's inbox; with one it is
-    planned into that version straight away.
+    """`nexus add task|feature <project> [--parent f-ref]`: add an item to a
+    project's tree, in the inbox state (placed, still to refine).
 
     Args:
         session: Database session to use.
@@ -65,21 +72,17 @@ def add(session : Session, args : list[str], out : TextIO) -> None:
 
     Raises:
         UsageError: If the command line is malformed.
-        DomainError: If a service refuses the task.
+        DomainError: If a service refuses the item.
     """
-    if not args or args[0] != "task":
-        raise UsageError("usage: nexus add task <project> [<version>] [--title T]")
-    options = _task_parser().parse_args(args[1:])
+    if not args or args[0] not in _KINDS:
+        raise UsageError("usage: nexus add task|feature <project> [--parent f-ref] [--title T]")
+    options = _task_parser(args[0]).parse_args(args[1:])
     title = _require_title(options.title)
 
-    if options.version is None:
-        task = tasks.create(session, title, project_key=options.project, body=options.body,
-                            context=options.context, size=options.size, actor=events.ACTOR_CLI)
-    else:
-        version = resolve_version(session, options.project, options.version)
-        task = tasks.create_in_version(session, version.id, title, context=options.context,
-                                       size=options.size, body=options.body, actor=events.ACTOR_CLI)
-    _report(task, out)
+    item = tasks.add_to_tree(session, title, project_key=options.project, parent_ref=options.parent,
+                             kind=_KINDS[args[0]], body=options.body, context=options.context,
+                             size=options.size, actor=events.ACTOR_CLI)
+    _report(item, out)
 
 
 def capture(session : Session, text : str, out : TextIO) -> None:

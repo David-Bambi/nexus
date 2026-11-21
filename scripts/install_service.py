@@ -38,7 +38,8 @@ def _command(uv : str, repo : Path) -> list:
 
     Returns:
         The arguments, without any host option: the server address is fixed
-        in the app itself (ADR-0004).
+        in the app itself (see
+        docs/concept/nexus/operations/local-access.cpt).
     """
     return [uv, "run", "--frozen", "--directory", str(repo), "python", "-m", "src.main"]
 

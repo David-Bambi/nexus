@@ -1,0 +1,15 @@
+---
+title: Guides
+summary: "Conseils pour bien utiliser Nexus au quotidien"
+icon: lucide:book-open
+type: carte
+links: [sizes.cpt,
+        choosing-a-size.cpt]
+related:
+  - 
+---
+
+Des conseils pour bien utiliser Nexus au quotidien.
+
+- [Les quatre tailles](sizes.cpt) : XS, S, M, L, et quand choisir chacune.
+- [Choisir et découper](choosing-a-size.cpt) : les trois règles.

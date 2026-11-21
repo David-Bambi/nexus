@@ -28,7 +28,7 @@ def log(session : Session,
     Args:
         session: Database session to use.
         actor: Who made the change (e.g. ACTOR_WEB).
-        entity_type: Kind of entity changed ("task", "version", "project").
+        entity_type: Kind of entity changed ("task", "project").
         entity_id: Id of the entity changed.
         action: What happened (e.g. "created", "completed").
         payload: Optional JSON-serialisable detail of the change.
@@ -50,7 +50,7 @@ def history(session : Session, entity_type : str, entity_id : int) -> list:
 
     Args:
         session: Database session to use.
-        entity_type: Kind of entity ("task", "version", "project").
+        entity_type: Kind of entity ("task", "project").
         entity_id: Id of the entity.
 
     Returns:
@@ -59,31 +59,6 @@ def history(session : Session, entity_type : str, entity_id : int) -> list:
     return (
         session.query(Event)
         .filter(Event.entity_type == entity_type, Event.entity_id == entity_id)
-        .order_by(Event.at, Event.id)
-        .all()
-    )
-
-
-def changelog(session : Session, version_id : int) -> list:
-    """List what happened in a version.
-
-    Args:
-        session: Database session to use.
-        version_id: Id of the version.
-
-    Returns:
-        The version's own events plus the events of the tasks currently
-        planned in it, oldest first. Tasks deleted or unplanned since are
-        not included.
-    """
-    task_ids = session.query(Task.id).filter(Task.version_id == version_id)
-
-    return (
-        session.query(Event)
-        .filter(or_(
-            and_(Event.entity_type == "version", Event.entity_id == version_id),
-            and_(Event.entity_type == "task", Event.entity_id.in_(task_ids)),
-        ))
         .order_by(Event.at, Event.id)
         .all()
     )

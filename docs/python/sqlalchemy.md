@@ -17,17 +17,16 @@ flowchart TD
     TEARDOWN["teardown_appcontext<br/>_remove_session (src/app.py)"] -->|removes| SESSION
 
     BASE["Base = DeclarativeBase<br/>(src/db.py)"] --> M1["Project"]
-    BASE --> M2["Version"]
     BASE --> M3["Task"]
     BASE --> M4["Tag"]
     BASE --> M5["Event"]
-    M1 & M2 & M3 & M4 & M5 --> META["Base.metadata<br/>(full schema)"]
+    M1 & M3 & M4 & M5 --> META["Base.metadata<br/>(full schema)"]
 
     META --> AUTOGEN["Alembic autogenerate<br/>(src/migrations/env.py)"]
     AUTOGEN --> VERSIONS["migration scripts<br/>(src/migrations/versions/)"]
     VERSIONS -->|applied to| ENGINE
 
-    SESSION --> SVC["services/*<br/>(ADR-0001)"]
+    SESSION --> SVC["services/*<br/>(services layer)"]
     SVC -->|query / add / commit| SESSION
 ```
 

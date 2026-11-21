@@ -8,20 +8,22 @@
 
 {{ ui.error_message(error) }}
 
+{# Root projects by priority, each followed by its listed (non-archived) subprojects, indented. #}
+{% set listed = projects | map(attribute="id") | list %}
 <ul class="list">
-    {% for project in projects %}
+    {% for project in projects if not project.parent %}
     <li>
         <a class="row-title" href="{{ url_for('pages.project_detail', key=project.key) }}">{{ project.name }}</a>
-        {{ ui.ref_chip(project.key) }} {{ ui.badge(project.status.name) }}
+        {{ ui.ref_chip(project.key) }} <span class="version">v{{ project.version_major }}.{{ project.version_minor }}</span> {{ ui.badge(project.status.name) }} {{ ui.priority(project) }}
         {% if project.description %}<span class="hint">{{ project.description }}</span>{% endif %}
-        {% if progress_by_project[project.id] %}
-        <ul class="list list-nested">
-            {% for progress in progress_by_project[project.id] %}
-            {{ ui.version_row(progress) }}
-            {% endfor %}
-        </ul>
-        {% endif %}
     </li>
+    {% for sub in project.subprojects if sub.id in listed %}
+    <li class="subproject">
+        <a class="row-title" href="{{ url_for('pages.project_detail', key=sub.key) }}">{{ sub.name }}</a>
+        {{ ui.ref_chip(sub.key) }} {{ ui.ref_chip(sub.ref) }} <span class="version">v{{ sub.version_major }}.{{ sub.version_minor }}</span> {{ ui.badge(sub.status.name) }}
+        {% if sub.description %}<span class="hint">{{ sub.description }}</span>{% endif %}
+    </li>
+    {% endfor %}
     {% else %}
     {{ ui.empty("No projects yet.") }}
     {% endfor %}
@@ -32,6 +34,11 @@
     {{ ui.field("Key", "key", required=true) }}
     {{ ui.field("Name", "name", required=true) }}
     {{ ui.field("Description", "description", kind="textarea") }}
+    <label class="field">
+        <span class="field-label">Directory</span>
+        <input type="text" name="directory" value="" placeholder="~/projets/my-project">
+        <span class="hint">Optional: absolute path of the project's folder on this machine; ~ is expanded.</span>
+    </label>
     <div class="form-actions"><button class="button-primary" type="submit">Create</button></div>
 </form>
 {% endblock %}

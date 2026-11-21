@@ -1,0 +1,16 @@
+---
+title: Fermer, archiver, supprimer
+summary: "Une fonctionnalité ne se ferme qu'avec ses enfants fermés ; ce qui est fini s'archive sans changer d'état ; on ne supprime que ce qui est vide"
+icon: lucide:lock
+links: []
+related:
+  -
+---
+
+__Fermer__ : terminer ou annuler une fonctionnalité est refusé tant qu'un enfant reste ouvert. Pourquoi : c'est la garde « est-ce fini ? », sans liste de contrôle à part.
+
+__Archiver__ range un élément __done__ ou __cancelled__ hors des listes, dans l'onglet __Archived__ de son projet. Il garde son état : versions et export metrique ne changent pas. Une fonctionnalité entraîne son sous-arbre ; rouvrir ou restaurer lève l'archive. Pourquoi : ranger ce qui est fini ; une marque (`archived_at`) plutôt qu'un huitième [état](states.cpt), pour ne pas perdre « fait » ou « annulé ».
+
+Un __projet__ archivé quitte les listes de projets ; __restaurer__ le ramène.
+
+__Supprimer__ (web seulement) : une tâche toujours ; une fonctionnalité, un projet ou un sous-projet seulement s'il est __vide__. Rien ne part en cascade.

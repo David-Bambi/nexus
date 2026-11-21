@@ -1,19 +1,29 @@
 from flask import abort, redirect, render_template, request, url_for
 
-from src.models.task import TaskState
-from src.services import events, tasks, versions
-from src.services.errors import InvalidTransitionError, NotFoundError, ValidationError
+from src.models.task import TaskKind, TaskState
+from src.services import events, sizes, tasks, views
+from src.services.errors import ConflictError, InvalidTransitionError, NotFoundError, ValidationError
 from src.web.pages._shared import PAGE_LIMIT, _session, bp
+
+
+# Item kinds as the forms send them, mapped to the model's.
+_KINDS = {"task": TaskKind.TASK, "feature": TaskKind.FEATURE}
+
+
+@bp.route("/sizes")
+def sizes_guide():
+    """Show the task-size guide: when to choose each size, an example, and the rules."""
+    return render_template("sizes.html", size_rules=sizes.SIZE_RULES)
 
 
 @bp.route("/tasks", methods=["GET", "POST"])
 def tasks_list():
-    """List all tasks; a plain HTML form on the same page captures one."""
+    """List all tasks but archived ones; a plain HTML form on the same page captures one."""
     session = _session()
     if request.method == "POST":
         tasks.capture(session, request.form["title"])
         return redirect(url_for("pages.tasks_list"))
-    recent = tasks.list(session, limit=PAGE_LIMIT)
+    recent = tasks.list(session, limit=PAGE_LIMIT, include_archived=False)
     return render_template("tasks.html", tasks=recent, truncated=len(recent) == PAGE_LIMIT, limit=PAGE_LIMIT)
 
 
@@ -52,20 +62,23 @@ def capture():
     return redirect(_safe_next(request.form.get("next"), "pages.tasks_list"))
 
 
-def _render_task(task, error):
+def _render_task(task, error, open_form=None):
     """Render the task detail page with its event history.
 
     Args:
         task: The task to show.
         error: Message to display, or None.
+        open_form: Id of the hidden form to show open, e.g. the one whose
+            action was refused; None to keep every form closed.
     """
     return render_template(
         "task.html",
         task=task,
         history=events.history(_session(), "task", task.id),
+        children=views.item_tree(task, include_closed=True),
         error=error,
+        open_form=open_form,
         next=_local_path(request.values.get("next")),
-        versions=versions.list(_session(), task.project.key) if task.project else [],
     )
 
 
@@ -100,17 +113,39 @@ def _run_transition(session, task_id, fn):
     error = None
     try:
         task = fn(session)
-    except (NotFoundError, ValidationError, InvalidTransitionError) as e:
+    except (NotFoundError, ValidationError, InvalidTransitionError, ConflictError) as e:
         error = str(e)
     return task, error
 
 
 def _clarify_fields():
-    """Read the optional clarify fields from the current request's form."""
-    return {
-        name: request.form.get(name) or None
-        for name in ("body", "project_key", "context", "size")
+    """Read the optional clarify fields from the current request's form.
+
+    Returns:
+        body, project_key, context, size and parent_ref (None when blank),
+        and kind (a TaskKind, or None to keep the current one).
+    """
+    fields = {
+        name: (request.form.get(name) or "").strip() or None
+        for name in ("body", "project_key", "context", "size", "parent_ref")
     }
+    fields["kind"] = _KINDS.get(request.form.get("kind", ""))
+    return fields
+
+
+def _clarify(session, task_id, fields):
+    """Clarify a task from the form fields read by _clarify_fields().
+
+    Args:
+        session: Database session to use.
+        task_id: Id of the task.
+        fields: The clarify fields.
+    """
+    return tasks.clarify(
+        session, task_id, request.form["title"],
+        fields["body"], fields["project_key"], fields["context"], fields["size"],
+        parent_ref=fields["parent_ref"], kind=fields["kind"],
+    )
 
 
 def _apply_transition(task_id, fn):
@@ -121,12 +156,14 @@ def _apply_transition(task_id, fn):
 
 @bp.route("/tasks/<int:task_id>/update", methods=["POST"])
 def task_update(task_id):
-    """Update a task's descriptive fields."""
+    """Update a task's descriptive fields; with the "correction" box ticked,
+    the change is logged as a correction."""
     return _apply_transition(
         task_id,
         lambda s: tasks.update(
             s,
             task_id,
+            correction=request.form.get("correction") == "1",
             title=request.form["title"],
             body=request.form.get("body") or None,
             context=request.form.get("context") or None,
@@ -139,32 +176,12 @@ def task_update(task_id):
 def task_clarify(task_id):
     """Clarify a captured or someday task into a refined one."""
     fields = _clarify_fields()
-    return _apply_transition(
-        task_id,
-        lambda s: tasks.clarify(
-            s, task_id, request.form["title"],
-            fields["body"], fields["project_key"], fields["context"], fields["size"],
-        ),
-    )
-
-
-@bp.route("/tasks/<int:task_id>/plan", methods=["POST"])
-def task_plan(task_id):
-    """Plan a refined task into a version."""
-    return _apply_transition(
-        task_id, lambda s: tasks.plan(s, task_id, int(request.form["version_id"]))
-    )
-
-
-@bp.route("/tasks/<int:task_id>/unplan", methods=["POST"])
-def task_unplan(task_id):
-    """Unplan a planned task back to refined."""
-    return _apply_transition(task_id, lambda s: tasks.unplan(s, task_id))
+    return _apply_transition(task_id, lambda s: _clarify(s, task_id, fields))
 
 
 @bp.route("/tasks/<int:task_id>/start", methods=["POST"])
 def task_start(task_id):
-    """Start a planned task."""
+    """Start a refined task."""
     return _apply_transition(task_id, lambda s: tasks.start(s, task_id))
 
 
@@ -200,14 +217,6 @@ def task_defer(task_id):
     return _apply_transition(task_id, lambda s: tasks.defer(s, task_id))
 
 
-@bp.route("/tasks/<int:task_id>/move", methods=["POST"])
-def task_move(task_id):
-    """Move a task to another version of its project."""
-    return _apply_transition(
-        task_id, lambda s: tasks.move_to_version(s, task_id, int(request.form["version_id"]))
-    )
-
-
 @bp.route("/tasks/<int:task_id>/cancel", methods=["POST"])
 def task_cancel(task_id):
     """Cancel a task that won't be done."""
@@ -222,7 +231,13 @@ def task_restore(task_id):
 
 @bp.route("/tasks/<int:task_id>/state", methods=["POST"])
 def task_state(task_id):
-    """Move a task to the state picked in the form ("state", plus "reason" for waiting)."""
+    """Move a task to the state picked in the form ("state", plus "reason" for waiting).
+
+    On success, goes back to the safe "return_to" page when one is given
+    (e.g. the kanban board the form sits on); otherwise, and on a refusal,
+    shows the task page. "return_to" is separate from "next", which the task
+    page keeps as its back link.
+    """
     def move(session):
         try:
             target = TaskState[request.form.get("state", "")]
@@ -230,7 +245,91 @@ def task_state(task_id):
             raise ValidationError("unknown state.")
         return tasks.change_state(session, task_id, target, request.form.get("reason", ""))
 
-    return _apply_transition(task_id, move)
+    return _transition_then_return(task_id, move)
+
+
+def _transition_then_return(task_id, fn):
+    """Apply a change to a task, then go back to the safe "return_to" page
+    when one is given; otherwise, and on a refusal, show the task page.
+
+    Args:
+        task_id: Id of the task.
+        fn: Callable taking the session and applying the change.
+    """
+    task, error = _run_transition(_session(), task_id, fn)
+    target = _local_path(request.values.get("return_to"))
+    if target and not error:
+        return redirect(target)
+    return _render_task(task, error)
+
+
+@bp.route("/tasks/<int:task_id>/archive", methods=["POST"])
+def task_archive(task_id):
+    """Archive a done or cancelled item (and its descendants)."""
+    return _transition_then_return(task_id, lambda s: tasks.archive(s, task_id))
+
+
+@bp.route("/tasks/<int:task_id>/unarchive", methods=["POST"])
+def task_unarchive(task_id):
+    """Bring an archived item (and its descendants) back to the lists."""
+    return _transition_then_return(task_id, lambda s: tasks.unarchive(s, task_id))
+
+
+@bp.route("/tasks/<int:task_id>/children", methods=["POST"])
+def task_add_child(task_id):
+    """Add a feature or task under a feature, in the inbox state, then come back to the
+    feature's children; a refused add shows the page with its form open."""
+    def add(session):
+        feature = tasks.get(session, task_id)
+        if feature.project is None:
+            raise ValidationError(f"'{feature.ref}' has no project yet.")
+        tasks.add_to_tree(session, request.form.get("title", ""), project_key=feature.project.key,
+                          parent_ref=feature.ref,
+                          kind=_KINDS.get(request.form.get("kind", "task"), TaskKind.TASK))
+        return tasks.get(session, task_id)
+
+    task, error = _run_transition(_session(), task_id, add)
+    if error:
+        return _render_task(task, error, open_form="add-child")
+    return redirect(url_for("pages.task_detail", task_id=task_id,
+                            next=_local_path(request.values.get("next")), _anchor="children"))
+
+
+@bp.route("/tasks/<int:task_id>/move", methods=["POST"])
+def task_move(task_id):
+    """Move an item to another project (top level) or under a feature."""
+    return _apply_transition(task_id, lambda s: tasks.move(
+        s, task_id,
+        project_key=(request.form.get("project_key") or "").strip() or None,
+        parent_ref=(request.form.get("parent_ref") or "").strip() or None))
+
+
+@bp.route("/tasks/<int:task_id>/reorder", methods=["POST"])
+def task_reorder(task_id):
+    """Move an item up or down among its siblings ("direction" = up or down).
+
+    On success, goes back to the safe "next" page (the tree it was moved
+    in), else to the item's project; a refusal shows the item page.
+    """
+    session = _session()
+    task, error = _run_transition(
+        session, task_id, lambda s: tasks.reorder(s, task_id, request.form.get("direction", "")))
+    if error:
+        return _render_task(task, error)
+    target = _local_path(request.values.get("next"))
+    return redirect(target or url_for("pages.project_detail", key=task.project.key))
+
+
+@bp.route("/tasks/<int:task_id>/kind", methods=["POST"])
+def task_change_kind(task_id):
+    """Turn a task into a feature, or an empty feature into a task."""
+    def change(session):
+        kind = _KINDS.get(request.form.get("kind", ""))
+        if kind is None:
+            raise ValidationError("unknown kind.")
+        return tasks.change_kind(session, task_id, kind)
+
+    return _apply_transition(task_id, change)
 
 
 def _delete_task(task_id, redirect_endpoint):

@@ -1,0 +1,20 @@
+---
+title: Déploiement
+summary: "Comment deploy.sh branche les agents et skills d'ai-tools/ dans ~/.claude"
+icon: lucide:link
+links: []
+related:
+  - 
+---
+
+`ai-tools/deploy.sh` met les outils globaux en service dans `~/.claude` par des __liens symboliques__ : une modification dans le dépôt compte tout de suite.
+
+- `skills/<nom>` devient `~/.claude/skills/<nom>` ;
+- `agents/<nom>.md` devient `~/.claude/agents/<nom>.md`.
+
+Il ne remplace jamais ce qui n'est pas un lien vers le dépôt : il le signale. Il retire les liens morts qui pointaient vers le dépôt.
+
+- `--dry-run` montre ce qui serait fait, sans rien changer ;
+- `CLAUDE_DIR` remplace `~/.claude`, pour tester.
+
+On ne le relance que pour un nouvel agent ou skill. Un agent se charge au démarrage d'une session Claude Code.

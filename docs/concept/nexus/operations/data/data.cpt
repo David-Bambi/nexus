@@ -1,0 +1,17 @@
+---
+title: Données
+summary: "Où vivent la base, le journal applicatif et les sauvegardes, et comment les régler"
+icon: lucide:hard-drive
+type: carte
+links: [nexus-folder.cpt,
+        configuration.cpt,
+        app-log.cpt]
+related:
+  - 
+---
+
+Toutes les données de Nexus vivent dans un seul dossier, `~/.nexus` par défaut.
+
+- [Dossier ~/.nexus](nexus-folder.cpt) : la base, le journal, les copies.
+- [Configuration](configuration.cpt) : les variables d'environnement.
+- [Journal applicatif](app-log.cpt) : `app.log` et la sortie d'erreur.

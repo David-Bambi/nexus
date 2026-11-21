@@ -1,0 +1,15 @@
+---
+title: À affiner
+summary: "Les éléments clarifiés, prêts à démarrer, filtrés par contexte ou par projet"
+icon: lucide:filter
+image: refine.png
+links: []
+related:
+  - 
+---
+
+__Adresse__ : `/refine`.
+
+__Ce qu'on y voit__ : les éléments __refined__, prêts à démarrer, du plus ancien au plus récent, avec leur place et leur contexte. 100 au plus, avec une note quand la liste est coupée.
+
+__Ce qu'on y fait__ : filtrer par contexte (par exemple `@ordi`) et par projet, puis ouvrir un élément pour le démarrer.

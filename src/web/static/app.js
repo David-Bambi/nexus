@@ -22,41 +22,16 @@ document.addEventListener("input", function (event) {
     }
 });
 
-// A control marked data-autosubmit submits its form as soon as it changes (e.g. a checklist checkbox).
-document.addEventListener("change", function (event) {
-    if (event.target.dataset && event.target.dataset.autosubmit !== undefined) {
-        event.target.form.submit();
-    }
-});
-
-// Definition-of-done rows of the version creation form: add, remove (keeping one), Enter adds a row.
-document.addEventListener("DOMContentLoaded", function () {
-    var rows = document.getElementById("dod-rows");
-    if (!rows) {
-        return;
-    }
-    var template = rows.firstElementChild.cloneNode(true);
-
-    // Append an empty criterion row and focus it.
-    function addRow() {
-        var row = template.cloneNode(true);
-        row.querySelector("input").value = "";
-        rows.appendChild(row);
-        row.querySelector("input").focus();
-    }
-
-    document.getElementById("dod-add").addEventListener("click", addRow);
-
-    rows.addEventListener("click", function (event) {
-        if (event.target.classList.contains("dod-remove") && rows.children.length > 1) {
-            event.target.closest(".dod-row").remove();
+// A button with data-reveal="<id>" shows or hides the element with that id (e.g. the reason
+// field of the WAITING icon on a kanban card), focusing its first text field when shown.
+document.addEventListener("click", function (event) {
+    var button = event.target.closest("[data-reveal]");
+    if (button) {
+        var target = document.getElementById(button.dataset.reveal);
+        target.hidden = !target.hidden;
+        button.setAttribute("aria-expanded", String(!target.hidden));
+        if (!target.hidden) {
+            target.querySelector('input[type="text"]').focus();
         }
-    });
-
-    rows.addEventListener("keydown", function (event) {
-        if (event.key === "Enter" && event.target.name === "dod") {
-            event.preventDefault();
-            addRow();
-        }
-    });
+    }
 });

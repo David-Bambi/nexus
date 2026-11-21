@@ -1,0 +1,22 @@
+---
+title: change_kind
+summary: "Change une tâche en fonctionnalité, ou une fonctionnalité vide en tâche"
+icon: lucide:wrench
+tags: [element]
+links: []
+related:
+  - 
+---
+
+__Rôle__ : fait d'une tâche une fonctionnalité, ou d'une fonctionnalité vide une tâche.
+
+__Arguments__
+- Obligatoires : `ref`, `kind` (`task` ou `feature`).
+- Aucun facultatif.
+
+__Règles__
+- Refusé si l'élément a déjà ce type, ou si une fonctionnalité qui a des enfants devrait devenir tâche.
+- La lettre de la référence suit (`t-…` devient `f-…`) ; l'ancienne écriture trouve toujours l'élément.
+- Écriture, non destructif.
+
+__Résultat__ : l'élément, avec son nouveau `kind` et sa nouvelle `ref`.

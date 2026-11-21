@@ -11,16 +11,26 @@
     {{ ui.stat(dashboard.refine_count, "To refine", url_for('pages.refine')) }}
 </div>
 
-<h2>Versions in progress</h2>
-{% if dashboard.versions %}
-<div class="cards">
-    {% for progress in dashboard.versions %}
-    {{ ui.version_card(progress) }}
+<h2>Projects</h2>
+<ul class="list">
+    {% for row in dashboard.projects %}
+    {% set project = row.project %}
+    <li>
+        <a class="row-title" href="{{ url_for('pages.project_detail', key=project.key) }}">{{ project.name }}</a>
+        {{ ui.priority(project) }} <span class="version">v{{ project.version_major }}.{{ project.version_minor }}</span>
+        {% if row.features_total %}
+        <span class="progress" title="Features done">
+            <progress value="{{ row.features_done }}" max="{{ row.features_total }}" aria-label="Features done in {{ project.name }}"></progress>
+            <span class="progress-count">{{ row.features_done }}/{{ row.features_total }}</span>
+        </span>
+        {% else %}
+        <span class="hint">No features</span>
+        {% endif %}
+    </li>
+    {% else %}
+    {{ ui.empty("No active projects.") }}
     {% endfor %}
-</div>
-{% else %}
-<p class="empty">No version in progress.</p>
-{% endif %}
+</ul>
 
 <h2>Doing</h2>
 <ul class="list">

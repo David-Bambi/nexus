@@ -28,13 +28,12 @@ def _read(source : str) -> str:
 def _summary(result : importer.ImportResult) -> str:
     """Describe what an import created and reused."""
     verb = "Would create" if result.dry_run else "Created"
-    return (f"{verb} {result.projects_created} project(s), {result.versions_created} version(s), "
-            f"{result.tasks_created} task(s). "
-            f"Reused {result.projects_reused} project(s), {result.versions_reused} version(s).")
+    return (f"{verb} {result.projects_created} project(s), {result.tasks_created} feature(s) and task(s). "
+            f"Reused {result.projects_reused} project(s).")
 
 
 def import_data(session : Session, args : list[str], out : TextIO) -> None:
-    """`nexus import <file|-> [--dry-run] [--text]`: import projects, versions and tasks.
+    """`nexus import <file|-> [--dry-run] [--text]`: import projects, subprojects, features and tasks.
 
     Args:
         session: Database session to use.
