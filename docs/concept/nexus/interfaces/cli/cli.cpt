@@ -3,19 +3,19 @@ title: Ligne de commande
 summary: "La commande nexus : lire, ajouter, capturer, changer d'état, importer et exporter depuis le terminal"
 icon: lucide:terminal
 type: carte
-links: [meme-base.cpt,
+links: [same-database.cpt,
         installation.cpt,
-        codes-de-sortie.cpt,
-        commandes/commandes.cpt,
-        limites.cpt]
+        exit-codes.cpt,
+        commands/commands.cpt,
+        limits.cpt]
 related:
   - 
 ---
 
 La commande `nexus` lit et crée des données depuis le terminal, sur la même base que l'application web. Tout ce qu'elle écrit porte l'acteur `cli`.
 
-- [Même base que le service](meme-base.cpt) : comment elle atteint les données, et ce que ça implique.
+- [Même base que le service](same-database.cpt) : comment elle atteint les données, et ce que ça implique.
 - [Installer la commande](installation.cpt) : `nexus` partout, ou `uv run`.
-- [Codes de sortie](codes-de-sortie.cpt) : réussi, refusé, mal tapé.
-- [Commandes](commandes/commandes.cpt) : une fiche par commande.
-- [Ce que la CLI ne fait pas](limites.cpt) : où le faire à la place.
+- [Codes de sortie](exit-codes.cpt) : réussi, refusé, mal tapé.
+- [Commandes](commands/commands.cpt) : une fiche par commande.
+- [Ce que la CLI ne fait pas](limits.cpt) : où le faire à la place.

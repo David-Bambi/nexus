@@ -4,7 +4,7 @@ from src.services import sizes
 
 # Full-page (non-fragment) routes. Adapters only: no business logic here —
 # validate input, call a service, render a template (see
-# docs/concept/nexus/interfaces/couche-services.cpt). Every module
+# docs/concept/nexus/interfaces/service-layer.cpt). Every module
 # of this package registers its routes on this single blueprint.
 bp = Blueprint("pages", __name__)
 

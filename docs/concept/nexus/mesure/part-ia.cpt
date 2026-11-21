@@ -5,7 +5,7 @@ icon: lucide:bot
 links: []
 related:
   - ../interfaces/web/pages/projet.cpt
-  - ../interfaces/couche-services.cpt
+  - ../interfaces/service-layer.cpt
 ---
 
 La __part de l'IA__ dit quelle part des lignes ajoutées dans le dépôt git d'un projet l'a été avec Claude. Elle s'affiche sur la [page du projet](../interfaces/web/pages/projet.cpt).

@@ -20,4 +20,4 @@ python -m src.cli <commande>       # autre façon
 - Ajouter le dossier des outils de uv au `PATH` s'il manque ; le script le signale.
 - Le point d'entrée est déclaré dans `pyproject.toml` : `nexus = "src.cli:main"`.
 
-Installée ou non, la commande travaille sur la vraie base, et peut la migrer (voir [Même base que le service](meme-base.cpt)).
+Installée ou non, la commande travaille sur la vraie base, et peut la migrer (voir [Même base que le service](same-database.cpt)).

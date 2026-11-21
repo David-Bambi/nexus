@@ -24,4 +24,4 @@ Someday s'atteint en __reportant__, jamais par saut ; on en sort en __raffinant_
 
 Pourquoi des étapes plutôt qu'un seul événement : le journal et les métriques restent cohérents. Revenir en refined garde le premier démarrage (plan figé) ; en inbox, la place.
 
-Pas d'état « planifié » : on ne range pas le travail par version. Règles : [couche services](../interfaces/couche-services.cpt).
+Pas d'état « planifié » : on ne range pas le travail par version. Règles : [couche services](../interfaces/service-layer.cpt).

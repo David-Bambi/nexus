@@ -8,7 +8,7 @@ related:
   - 
 ---
 
-__Rôle__ : importe un document (projets, sous-projets, arbre, tâches libres) ou une liste de titres, [tout ou rien](../../import/tout-ou-rien.cpt).
+__Rôle__ : importe un document (projets, sous-projets, arbre, tâches libres) ou une liste de titres, [tout ou rien](../../import/all-or-nothing.cpt).
 
 __Arguments__
 - `document` (le [JSON d'import](../../import/format.cpt)) ou `text` (un titre par ligne) : exactement l'un des deux.

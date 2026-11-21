@@ -24,6 +24,6 @@ L'export `nexus.features/1` est le __contrat__ que lit metrique : une entrée pa
 - Les fonctionnalités viennent dans l'ordre de création.
 - Les dates sont en UTC avec un `+00:00` explicite (Nexus les stocke en UTC, sans fuseau).
 - Le numéro de schéma change seulement si un champ disparaît ou change de sens ; ajouter un champ le garde.
-- On l'obtient par [nexus export features](../interfaces/cli/commandes/export-features.cpt) ou à l'adresse `/export/features.json`. Pas d'outil MCP : metrique lit hors ligne, sans service lancé.
+- On l'obtient par [nexus export features](../interfaces/cli/commands/export-features.cpt) ou à l'adresse `/export/features.json`. Pas d'outil MCP : metrique lit hors ligne, sans service lancé.
 
 Pourquoi un export versionné : Nexus peut changer ses tables tant que le contrat tient. Lire les tables SQL casserait à chaque changement de schéma.
