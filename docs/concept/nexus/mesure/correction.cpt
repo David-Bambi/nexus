@@ -10,7 +10,7 @@ related:
 Une __correction__ est une modification qui répare une erreur (faute de frappe, mauvaise taille) sans changer le travail.
 
 - __Web__ : la case __Correction__ du formulaire de modification d'un élément.
-- __MCP__ : l'argument `correction: true` de [update_task](../interfaces/mcp/outils/update-task.cpt).
+- __MCP__ : l'argument `correction: true` de [update_task](../interfaces/mcp/tools/update-task.cpt).
 
 Le journal écrit alors `corrected` au lieu de `updated`, avec le même contenu (les champs changés).
 

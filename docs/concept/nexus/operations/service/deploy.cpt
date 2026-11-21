@@ -19,4 +19,4 @@ La copie de sauvegarde et les migrations se font au redémarrage, comme toujours
 
 __Piège__ : le nom du service et l'adresse sont écrits en dur. Avec un autre `NEXUS_PORT`, le contrôle échoue alors que le service tourne.
 
-Après un déploiement, Claude Code doit se [reconnecter](../../interfaces/mcp/brancher.cpt) au serveur MCP.
+Après un déploiement, Claude Code doit se [reconnecter](../../interfaces/mcp/connect.cpt) au serveur MCP.

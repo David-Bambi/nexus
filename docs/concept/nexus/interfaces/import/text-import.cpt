@@ -12,7 +12,7 @@ Le plus simple des imports : une liste de titres, __un par ligne__. Chaque ligne
 `parse_text` transforme le texte en document d'import (des tâches libres), qui suit ensuite les mêmes règles : tout ou rien, essai à blanc.
 
 - __CLI__ : l'option `--text` de [nexus import](../cli/commands/import.cpt).
-- __MCP__ : l'argument `text` de [import_data](../mcp/outils/import-data.cpt), à la place de `document` (l'un ou l'autre).
+- __MCP__ : l'argument `text` de [import_data](../mcp/tools/import-data.cpt), à la place de `document` (l'un ou l'autre).
 
 ```
 nexus import - --text <<'FIN'

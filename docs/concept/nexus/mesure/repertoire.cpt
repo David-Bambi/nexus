@@ -12,6 +12,6 @@ Un projet peut noter le __dossier__ de la machine où vit son travail (`director
 - Facultatif. Un chemin __absolu__ ; `~` est développé, le `/` final retiré.
 - Un chemin relatif est refusé. Le dossier peut ne pas exister.
 - Un __sous-projet__ sans répertoire prend celui de son parent ; la page et la CLI l'affichent avec « (from … ) ».
-- Où le régler : les formulaires web (nouveau projet, nouveau sous-projet, modification) et les outils MCP [create_project](../interfaces/mcp/outils/create-project.cpt) et [update_project](../interfaces/mcp/outils/update-project.cpt). Une valeur vide l'efface. L'import ne le prend pas.
+- Où le régler : les formulaires web (nouveau projet, nouveau sous-projet, modification) et les outils MCP [create_project](../interfaces/mcp/tools/create-project.cpt) et [update_project](../interfaces/mcp/tools/update-project.cpt). Une valeur vide l'efface. L'import ne le prend pas.
 
 Il est noté dans les événements `created` et `updated` du projet, et l'export donne le répertoire effectif de chaque fonctionnalité.

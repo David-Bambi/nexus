@@ -3,19 +3,19 @@ title: Serveur MCP
 summary: "Comment un assistant IA lit et modifie Nexus par le protocole MCP"
 icon: lucide:bot
 type: carte
-links: [point-d-acces.cpt,
-        garde.cpt,
-        brancher.cpt,
-        resultats.cpt,
-        outils/outils.cpt]
+links: [endpoint.cpt,
+        security-guard.cpt,
+        connect.cpt,
+        results.cpt,
+        tools/tools.cpt]
 related:
   - 
 ---
 
 Le serveur __MCP__ (Model Context Protocol, le protocole qui laisse un assistant IA appeler des outils) permet à Claude Code de lire et de modifier Nexus. C'est une adresse du service déjà lancé ; tout ce qu'il écrit porte l'acteur `mcp`.
 
-- [Un point d'accès du service](point-d-acces.cpt) : le transport, et pourquoi dans Flask.
-- [Garde de sécurité](garde.cpt) : les contrôles avant de lire une requête.
-- [Brancher Claude Code](brancher.cpt) : l'enregistrer, et qui protège l'écriture.
-- [Résultats et erreurs](resultats.cpt) : ce que renvoie un outil.
-- [Outils MCP](outils/outils.cpt) : une fiche par outil.
+- [Un point d'accès du service](endpoint.cpt) : le transport, et pourquoi dans Flask.
+- [Garde de sécurité](security-guard.cpt) : les contrôles avant de lire une requête.
+- [Brancher Claude Code](connect.cpt) : l'enregistrer, et qui protège l'écriture.
+- [Résultats et erreurs](results.cpt) : ce que renvoie un outil.
+- [Outils MCP](tools/tools.cpt) : une fiche par outil.

@@ -11,7 +11,7 @@ Le journal se lit à plusieurs endroits.
 
 - `events.history` : les événements d'un élément, du plus ancien au plus récent. Un index sur (`entity_type`, `entity_id`) garde cette lecture rapide.
 - __Page d'un élément__ : la section __History__, dessinée en frise ; les valeurs vides sont cachées.
-- __Outil MCP__ [get_task](../interfaces/mcp/outils/get-task.cpt) : les champs de l'élément et son historique.
+- __Outil MCP__ [get_task](../interfaces/mcp/tools/get-task.cpt) : les champs de l'élément et son historique.
 - __Export complet__ (`/export.json`) : toute la table des événements.
 - __Export des fonctionnalités__ : pour chaque fonctionnalité, les événements qui la concernent (voir [Mesure](../mesure/mesure.cpt)).
 

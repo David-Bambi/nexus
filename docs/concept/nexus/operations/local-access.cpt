@@ -14,4 +14,4 @@ Nexus n'écoute que sur `127.0.0.1`, l'adresse de la machine elle-même : aucun 
 
 Pourquoi : Nexus n'a pas d'authentification. Écouter sur toutes les adresses (`0.0.0.0`) exposerait les données à tout le réseau local. Un déploiement sur un serveur viendra __avec__ l'authentification, jamais avant.
 
-Contre les pages web ouvertes sur la machine même, le serveur MCP ajoute sa [garde de sécurité](../interfaces/mcp/garde.cpt).
+Contre les pages web ouvertes sur la machine même, le serveur MCP ajoute sa [garde de sécurité](../interfaces/mcp/security-guard.cpt).
