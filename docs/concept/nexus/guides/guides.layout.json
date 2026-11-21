@@ -1,9 +1,9 @@
 {
-  "tailles.cpt": {
+  "sizes.cpt": {
     "x": -103,
     "y": -23
   },
-  "choisir-une-taille.cpt": {
+  "choosing-a-size.cpt": {
     "x": 77,
     "y": -20
   }
