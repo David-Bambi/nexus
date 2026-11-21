@@ -15,7 +15,7 @@ nexus projects
 ```
 
 __Résultat__
-- Un tableau des projets actifs : `KEY`, `REF`, `VERSION`, `STATUS`, `PRIORITY`, `NAME`, par [priorité](../../../modele/arbre.cpt) (`HIGH` d'abord).
+- Un tableau des projets actifs : `KEY`, `REF`, `VERSION`, `STATUS`, `PRIORITY`, `NAME`, par [priorité](../../../model/tree.cpt) (`HIGH` d'abord).
 - Chaque sous-projet actif suit son projet racine, la clé en retrait ; un projet racine n'a pas de référence (tiret). Un sous-projet montre la priorité de sa racine.
 - Les projets archivés sont cachés.
 

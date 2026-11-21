@@ -8,7 +8,7 @@ related:
   - 
 ---
 
-__Rôle__ : dix outils font chacun un passage d'[état](../../../modele/etats.cpt).
+__Rôle__ : dix outils font chacun un passage d'[état](../../../model/states.cpt).
 - `start_task` : refined → doing ; `unstart_task` : doing ou waiting → refined.
 - `unrefine_task` : refined → inbox, à sa place.
 - `complete_task` : doing → done ; `reopen_task` : done → doing.
@@ -25,6 +25,6 @@ __Règles__
 - Terminer ou annuler une fonctionnalité est refusé tant qu'un enfant est ouvert.
 - Depuis someday, la première étape raffine (`clarified`).
 - Une tâche qui quitte waiting perd sa raison.
-- Terminer une fonctionnalité la première fois fait monter la [version mineure](../../../modele/version/mineure.cpt).
+- Terminer une fonctionnalité la première fois fait monter la [version mineure](../../../model/version/minor.cpt).
 
 __Résultat__ : l'élément, dans son nouvel état.

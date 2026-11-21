@@ -15,7 +15,7 @@ nexus add task|feature <projet> [-p f-…] [-t TITRE] [-b CORPS] [-c CONTEXTE] [
 ```
 
 __Résultat__
-- Crée l'élément à la fin du haut de l'arbre du projet, ou sous la fonctionnalité `--parent`, en __inbox__ : placé, à raffiner (voir [Capturer, clarifier, ajouter](../../../modele/capturer-et-clarifier.cpt)).
+- Crée l'élément à la fin du haut de l'arbre du projet, ou sous la fonctionnalité `--parent`, en __inbox__ : placé, à raffiner (voir [Capturer, clarifier, ajouter](../../../model/capture-and-clarify.cpt)).
 - Le parent doit appartenir au projet : sinon code 1, et rien n'est créé.
 - Sans `--title`, la commande le demande dans un terminal ; hors terminal, elle échoue (code 2).
 - Une ligne confirme la création, avec la référence et la place.

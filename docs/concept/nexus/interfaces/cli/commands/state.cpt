@@ -17,7 +17,7 @@ nexus state <f-…|t-…> <ÉTAT> [--reason R]
 __Résultat__
 - `ÉTAT` : inbox, refined, doing, waiting, done ou cancelled, sans souci de casse.
 - L'élément peut partir de someday : il est d'abord raffiné (`clarified`).
-- Enchaîne les étapes du [cycle de vie](../../../modele/etats.cpt), chacune au journal avec l'acteur `cli`, comme l'outil MCP `set_state`.
+- Enchaîne les étapes du [cycle de vie](../../../model/states.cpt), chacune au journal avec l'acteur `cli`, comme l'outil MCP `set_state`.
 - Code 2 : argument manquant, clé de projet au lieu d'une référence, état hors liste.
 - Code 1 : refus du service avant toute étape, par exemple waiting sans `--reason`.
 - Une ligne confirme le nouvel état.

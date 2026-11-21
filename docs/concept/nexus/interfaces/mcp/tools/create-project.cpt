@@ -15,7 +15,7 @@ __Arguments__
 - Facultatifs : `description`, `parent` (clé d'un projet racine), `directory` (chemin absolu, `~` développé ; voir [Répertoire du projet](../../../measurement/project-directory.cpt)).
 
 __Règles__
-- Refusé si la clé est prise ou [réservée](../../../modele/references.cpt), si le parent est lui-même un sous-projet, ou si le chemin est relatif.
+- Refusé si la clé est prise ou [réservée](../../../model/references.cpt), si le parent est lui-même un sous-projet, ou si le chemin est relatif.
 - Écriture, non destructif.
 
 __Résultat__ : le projet créé, en version `0.0` ; un sous-projet reçoit sa référence `s-…`.

@@ -8,7 +8,7 @@ related:
   -
 ---
 
-__Rôle__ : `archive_task` [archive](../../../modele/fermer-et-supprimer.cpt) un élément terminé ou annulé ; `unarchive_task` le ramène dans les listes.
+__Rôle__ : `archive_task` [archive](../../../model/close-and-delete.cpt) un élément terminé ou annulé ; `unarchive_task` le ramène dans les listes.
 
 __Arguments__
 - Obligatoire : `ref`.

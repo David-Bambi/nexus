@@ -7,7 +7,7 @@ related:
   - 
 ---
 
-Chaque [état](../../modele/etats.cpt) a sa couleur, tirée des jetons de `app.css`, pour qu'on le reconnaisse d'un coup d'œil.
+Chaque [état](../../model/states.cpt) a sa couleur, tirée des jetons de `app.css`, pour qu'on le reconnaisse d'un coup d'œil.
 
 - __inbox__ : gris (`--color-text-muted`).
 - __refined__ : violet (`--color-info`).

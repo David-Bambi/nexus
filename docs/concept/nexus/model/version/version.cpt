@@ -3,15 +3,15 @@ title: Version calculée
 summary: "Le numéro MAJEUR.MINEUR d'un projet, déduit du travail terminé"
 icon: lucide:milestone
 type: carte
-links: [mineure.cpt,
-        majeure.cpt]
+links: [minor.cpt,
+        major.cpt]
 related:
   - 
 ---
 
 Chaque projet et sous-projet a une version __MAJEUR.MINEUR__, déduite du travail terminé plutôt que planifiée. Un nouveau projet part de `0.0`. Les services la tiennent à jour ; la version d'un sous-projet est indépendante de celle de son parent.
 
-- [Version mineure](mineure.cpt) : monte toute seule quand une fonctionnalité est terminée.
-- [Version majeure](majeure.cpt) : monte à la main, une fois tous ses critères cochés.
+- [Version mineure](minor.cpt) : monte toute seule quand une fonctionnalité est terminée.
+- [Version majeure](major.cpt) : monte à la main, une fois tous ses critères cochés.
 
 Pourquoi : la version dit où en est un projet sans planifier de sorties.

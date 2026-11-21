@@ -12,7 +12,7 @@ __Adresse__ : `/`, la page d'accueil.
 
 __Ce qu'on y voit__
 - Deux tuiles : le nombre de captures sans projet dans l'__Inbox__, et le nombre d'éléments __To refine__ (clarifiés, prêts à démarrer). Chacune mène à sa file.
-- __Projects__ : les projets racines actifs par [priorité](../../../modele/arbre.cpt), avec nom, badge de priorité, version et avancement : une barre fine et le ratio (« 3/7 »), ou « No features ». L'avancement compte les fonctionnalités terminées sur celles non annulées, à toute profondeur, sous-projets compris ; pas les tâches. Pourquoi : terminer une fonctionnalité fait monter la [version](../../../modele/version/mineure.cpt), c'est donc elle qui mesure l'avancement.
+- __Projects__ : les projets racines actifs par [priorité](../../../model/tree.cpt), avec nom, badge de priorité, version et avancement : une barre fine et le ratio (« 3/7 »), ou « No features ». L'avancement compte les fonctionnalités terminées sur celles non annulées, à toute profondeur, sous-projets compris ; pas les tâches. Pourquoi : terminer une fonctionnalité fait monter la [version](../../../model/version/minor.cpt), c'est donc elle qui mesure l'avancement.
 - __Doing__ : les éléments en cours, avec leur place (clé du projet, fonctionnalité parente).
 - __Waiting__ : les éléments bloqués, avec leur raison.
 

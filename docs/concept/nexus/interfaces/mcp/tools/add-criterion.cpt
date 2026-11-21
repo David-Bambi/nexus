@@ -8,7 +8,7 @@ related:
   - 
 ---
 
-__Rôle__ : ajoute un critère à la liste de la prochaine [version majeure](../../../modele/version/majeure.cpt), à la fin, non coché.
+__Rôle__ : ajoute un critère à la liste de la prochaine [version majeure](../../../model/version/major.cpt), à la fin, non coché.
 
 __Arguments__
 - Obligatoires : `project`, `text`.

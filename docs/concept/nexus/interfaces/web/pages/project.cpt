@@ -11,7 +11,7 @@ related:
 __Adresse__ : `/projects/<clé>`. Six onglets : __Backlog__, [Kanban](kanban.cpt), quatre d'[état](state-tabs.cpt).
 
 __Ce qu'on y voit__
-- En tête : clé, statut, badge de [priorité](../../../modele/arbre.cpt), version, répertoire (ou celui du parent), __Subprojects__ (projet racine).
+- En tête : clé, statut, badge de [priorité](../../../model/tree.cpt), version, répertoire (ou celui du parent), __Subprojects__ (projet racine).
 - __AI share__ : la [part de l'IA](../../../measurement/ai-share.cpt) du dépôt du projet.
 - __Work__ : l'arbre des éléments ouverts. Chaque fonctionnalité résume son sous-arbre (faites/total, tailles ouvertes).
 - __Next major version__ : les critères, et __Release N+1.0__, actif une fois tous cochés.

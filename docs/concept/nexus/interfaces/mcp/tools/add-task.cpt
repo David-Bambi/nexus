@@ -17,6 +17,6 @@ __Arguments__
 __Règles__
 - Il faut `project`, `parent`, ou les deux.
 - Refusé si le parent est une tâche ou appartient à un autre projet.
-- Écriture, non destructif. Voir [Capturer, clarifier, ajouter](../../../modele/capturer-et-clarifier.cpt).
+- Écriture, non destructif. Voir [Capturer, clarifier, ajouter](../../../model/capture-and-clarify.cpt).
 
 __Résultat__ : l'élément créé, avec tous ses champs (`ref`, `kind`, `state`, `project`, `parent`, `released_in`, `archived`, dates…).

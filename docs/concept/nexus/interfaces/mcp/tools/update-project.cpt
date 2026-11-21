@@ -16,7 +16,7 @@ __Arguments__
 
 __Règles__
 - Une description ou un répertoire vide l'efface ; un champ absent garde sa valeur ; un nom vide est refusé.
-- Seul un projet racine a une [priorité](../../../modele/arbre.cpt) : la changer sur un sous-projet est refusé.
+- Seul un projet racine a une [priorité](../../../model/tree.cpt) : la changer sur un sous-projet est refusé.
 - Seuls les champs qui changent sont notés au journal.
 - Écriture, idempotent, non destructif.
 

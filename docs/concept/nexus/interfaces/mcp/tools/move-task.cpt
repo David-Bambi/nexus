@@ -17,6 +17,6 @@ __Arguments__
 __Règles__
 - Refusé sous soi-même ou un descendant, sous une tâche, ou si l'élément y est déjà.
 - L'élément arrive en dernier parmi ses nouveaux voisins.
-- Écriture, non destructif. Voir [Déplacer et réordonner](../../../modele/deplacer.cpt).
+- Écriture, non destructif. Voir [Déplacer et réordonner](../../../model/move.cpt).
 
 __Résultat__ : l'élément déplacé, avec son nouveau `project` et son nouveau `parent`.

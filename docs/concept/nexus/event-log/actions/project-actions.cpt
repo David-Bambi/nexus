@@ -9,7 +9,7 @@ related:
 
 __Actions__ (sur `project`, pour un projet comme pour un sous-projet)
 - Vie du projet : `created`, `updated`, `archived`, `restored`, `deleted`.
-- [Version](../../modele/version/version.cpt) : `minor_bumped`, `major_released`, `version_set`.
+- [Version](../../model/version/version.cpt) : `minor_bumped`, `major_released`, `version_set`.
 
 __Contenu__
 

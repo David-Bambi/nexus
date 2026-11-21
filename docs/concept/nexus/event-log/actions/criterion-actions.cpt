@@ -7,7 +7,7 @@ related:
   - 
 ---
 
-__Actions__ (sur `criterion`, un critère de [version majeure](../../modele/version/majeure.cpt))
+__Actions__ (sur `criterion`, un critère de [version majeure](../../model/version/major.cpt))
 - `criterion_added`, `criterion_updated`, `criterion_checked` (cocher comme décocher), `criterion_deleted`.
 
 __Contenu__

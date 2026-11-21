@@ -36,5 +36,5 @@ __Particularités__
 - Clarifier en changeant de type écrit aussi `kind_changed`.
 - `unstarted` ramène un élément commencé en REFINED ; une tâche en attente perd sa raison. Le premier `started` reste : au redémarrage, pas de nouveau `plan`.
 - `unrefined` ramène un élément raffiné en INBOX ; il garde sa place et son détail, ou retourne dans l'inbox global s'il n'a pas de projet.
-- [Archiver](../../modele/fermer-et-supprimer.cpt) une fonctionnalité écrit aussi `archived` pour chaque descendant.
+- [Archiver](../../model/close-and-delete.cpt) une fonctionnalité écrit aussi `archived` pour chaque descendant.
 - Terminer une fonctionnalité peut écrire `minor_bumped` sur son projet.
